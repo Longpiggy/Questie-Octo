@@ -340,7 +340,7 @@ function A:EvaluateQuest(questID,trackStats)
 
   -- lvl is presentation/triviality; it is NOT the high-level acceptance gate.
   -- When low-level quests are enabled, players may optionally bound how far
-  -- below their current level Questie-Octo exposes them. The value 30 is the
+  -- below their current level Questie-Octo exposes them. The value 35 is the
   -- options UI's "All" sentinel and preserves the historical unrestricted
   -- Show Low-Level Quests behavior.
   if q.level and q.level>0 then
@@ -348,8 +348,8 @@ function A:EvaluateQuest(questID,trackStats)
       Track(self,"level",trackStats)
       return false,"lowLevel"
     elseif showLowLevel then
-      local below=tonumber(settings:Get("lowLevelQuestRange")) or 30
-      if below<30 and q.level<level-below then
+      local below=tonumber(settings:Get("lowLevelQuestRange")) or 35
+      if below<35 and q.level<level-below then
         Track(self,"level",trackStats)
         return false,"lowLevel"
       end

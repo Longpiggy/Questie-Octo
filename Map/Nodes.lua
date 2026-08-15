@@ -21,6 +21,13 @@ N.stats={
   auctioneer=0,
   banker=0,
   mailbox=0,
+  battlemaster=0,
+  innkeeper=0,
+  meetingStone=0,
+  repair=0,
+  spiritHealer=0,
+  stableMaster=0,
+  vendor=0,
   rareMob=0,
 }
 
@@ -38,6 +45,13 @@ local function NewStats()
     auctioneer=0,
     banker=0,
     mailbox=0,
+    battlemaster=0,
+    innkeeper=0,
+    meetingStone=0,
+    repair=0,
+    spiritHealer=0,
+    stableMaster=0,
+    vendor=0,
     rareMob=0,
   }
 end
@@ -223,8 +237,8 @@ local function BuildServiceCreatureNodes(metaKey,role,statKey)
   end
 end
 
-local function BuildMailboxNodes()
-  local list=TrackingMeta("mailbox")
+local function BuildServiceObjectNodes(metaKey,role,statKey)
+  local list=TrackingMeta(metaKey)
   if not list then return end
   local factionCode=PlayerFactionCode()
   if not factionCode then return end
@@ -236,17 +250,144 @@ local function BuildMailboxNodes()
       if coords and next(coords) then
         AddNode({
           questID=0,
-          role="mailbox",
+          role=role,
           sourceKind="gameObject",
           sourceID=objectID,
           sourceName=QuestieOcto.DatabaseAPI:GetObjectName(objectID),
           coords=coords,
           serviceFaction=allowed
         })
-        CurrentStats().mailbox=CurrentStats().mailbox+1
+        CurrentStats()[statKey]=(CurrentStats()[statKey] or 0)+1
       end
     end
   end
+end
+
+local function BuildMailboxNodes()
+  BuildServiceObjectNodes("mailbox","mailbox","mailbox")
+end
+
+local optionalServiceSettings={
+  battlemaster={"showMapBattlemaster","showMinimapBattlemaster"},
+  innkeeper={"showMapInnkeeper","showMinimapInnkeeper"},
+  meetingStone={"showMapMeetingStone","showMinimapMeetingStone"},
+  repair={"showMapRepair","showMinimapRepair"},
+  spiritHealer={"showMapSpiritHealer","showMinimapSpiritHealer"},
+  stableMaster={"showMapStableMaster","showMinimapStableMaster"},
+  vendor={"showMapVendor","showMinimapVendor"},
+}
+
+local function OptionalServiceEnabled(role)
+  local keys=optionalServiceSettings[role]
+  if not keys or not QuestieOcto.MinimapSettings then return true end
+  return QuestieOcto.MinimapSettings:Get(keys[1]) or QuestieOcto.MinimapSettings:Get(keys[2])
+end
+
+local function BuildOptionalServiceCreatureNodes(metaKey,role,statKey)
+  if OptionalServiceEnabled(role) then BuildServiceCreatureNodes(metaKey,role,statKey) end
+end
+
+local function BuildOptionalServiceObjectNodes(metaKey,role,statKey)
+  if OptionalServiceEnabled(role) then BuildServiceObjectNodes(metaKey,role,statKey) end
+end
+
+local function ProcessServiceCreatureSlice(metaKey,role,statKey,cursor,limit)
+  local list=TrackingMeta(metaKey)
+  if not list then return nil,true end
+  local factionCode=PlayerFactionCode()
+  if not factionCode then return nil,true end
+
+  local count=0
+  while count<(limit or 128) do
+    local rawID,allowed=next(list,cursor)
+    if rawID==nil then return nil,true end
+    cursor=rawID
+    local creatureID=tonumber(rawID)
+    if creatureID and creatureID>0 and FactionAllows(allowed,factionCode) then
+      local coords=QuestieOcto.DatabaseAPI:GetCreatureCoords(creatureID)
+      if coords and next(coords) then
+        AddNode({
+          questID=0,
+          role=role,
+          sourceKind="creature",
+          sourceID=creatureID,
+          sourceName=QuestieOcto.DatabaseAPI:GetCreatureName(creatureID),
+          coords=coords,
+          serviceFaction=allowed
+        })
+        CurrentStats()[statKey]=(CurrentStats()[statKey] or 0)+1
+      end
+    end
+    count=count+1
+  end
+
+  return cursor,false
+end
+
+local function ProcessServiceObjectSlice(metaKey,role,statKey,cursor,limit)
+  local list=TrackingMeta(metaKey)
+  if not list then return nil,true end
+  local factionCode=PlayerFactionCode()
+  if not factionCode then return nil,true end
+
+  local count=0
+  while count<(limit or 128) do
+    local rawID,allowed=next(list,cursor)
+    if rawID==nil then return nil,true end
+    cursor=rawID
+    local objectID=math.abs(tonumber(rawID) or 0)
+    if objectID>0 and FactionAllows(allowed,factionCode) then
+      local coords=QuestieOcto.DatabaseAPI:GetObjectCoords(objectID)
+      if coords and next(coords) then
+        AddNode({
+          questID=0,
+          role=role,
+          sourceKind="gameObject",
+          sourceID=objectID,
+          sourceName=QuestieOcto.DatabaseAPI:GetObjectName(objectID),
+          coords=coords,
+          serviceFaction=allowed
+        })
+        CurrentStats()[statKey]=(CurrentStats()[statKey] or 0)+1
+      end
+    end
+    count=count+1
+  end
+
+  return cursor,false
+end
+
+local function ProcessRareMobSlice(cursor,limit)
+  local list=TrackingMeta("rares")
+  if not list then return nil,true end
+
+  local count=0
+  while count<(limit or 128) do
+    local rawID,rareLevel=next(list,cursor)
+    if rawID==nil then return nil,true end
+    cursor=rawID
+    local creatureID=tonumber(rawID)
+    if creatureID and creatureID>0 then
+      local coords=QuestieOcto.DatabaseAPI:GetCreatureCoords(creatureID)
+      if coords and next(coords) then
+        AddNode({
+          questID=0,
+          role="rareMob",
+          sourceKind="creature",
+          sourceID=creatureID,
+          sourceName=QuestieOcto.DatabaseAPI:GetCreatureName(creatureID),
+          sourceRank=QuestieOcto.DatabaseAPI:GetCreatureRank(creatureID),
+          respawnSeconds=QuestieOcto.DatabaseAPI:GetCreatureRespawnSeconds(creatureID),
+          rareLevel=tonumber(rareLevel),
+          coords=coords
+        })
+        CurrentStats().rareMob=CurrentStats().rareMob+1
+      end
+    end
+    count=count+1
+  end
+
+  return cursor,false
 end
 
 local function BuildRareMobNodes()
@@ -283,6 +424,13 @@ local function BuildPermanentMapNodes()
   BuildServiceCreatureNodes("auctioneer","auctioneer","auctioneer")
   BuildServiceCreatureNodes("banker","banker","banker")
   BuildMailboxNodes()
+  BuildOptionalServiceCreatureNodes("battlemaster","battlemaster","battlemaster")
+  BuildOptionalServiceCreatureNodes("innkeeper","innkeeper","innkeeper")
+  BuildOptionalServiceObjectNodes("meetingstone","meetingStone","meetingStone")
+  BuildOptionalServiceCreatureNodes("repair","repair","repair")
+  BuildOptionalServiceCreatureNodes("spirithealer","spiritHealer","spiritHealer")
+  BuildOptionalServiceCreatureNodes("stablemaster","stableMaster","stableMaster")
+  BuildOptionalServiceCreatureNodes("vendor","vendor","vendor")
   BuildRareMobNodes()
 end
 
@@ -352,6 +500,13 @@ local function StatKeyForNode(node)
   if node.role=="auctioneer" then return "auctioneer" end
   if node.role=="banker" then return "banker" end
   if node.role=="mailbox" then return "mailbox" end
+  if node.role=="battlemaster" then return "battlemaster" end
+  if node.role=="innkeeper" then return "innkeeper" end
+  if node.role=="meetingStone" then return "meetingStone" end
+  if node.role=="repair" then return "repair" end
+  if node.role=="spiritHealer" then return "spiritHealer" end
+  if node.role=="stableMaster" then return "stableMaster" end
+  if node.role=="vendor" then return "vendor" end
   if node.role=="rareMob" then return "rareMob" end
   return nil
 end
@@ -554,20 +709,48 @@ function N:Rebuild()
     QuestieOcto.Scheduler:Enqueue(SortStep,"nodes-sort")
   end
 
+  -- Keep service tracking incremental too. Vendor/repair metadata is large in
+  -- pfQuest, and enabling an opt-in category must not turn into one long frame.
   local permanentBuilders={
-    function() BuildServiceCreatureNodes("flight","flightMaster","flightMaster") end,
-    function() BuildServiceCreatureNodes("auctioneer","auctioneer","auctioneer") end,
-    function() BuildServiceCreatureNodes("banker","banker","banker") end,
-    BuildMailboxNodes,
-    BuildRareMobNodes,
+    {kind="creature",metaKey="flight",role="flightMaster",statKey="flightMaster"},
+    {kind="creature",metaKey="auctioneer",role="auctioneer",statKey="auctioneer"},
+    {kind="creature",metaKey="banker",role="banker",statKey="banker"},
+    {kind="object",metaKey="mailbox",role="mailbox",statKey="mailbox"},
+    {kind="creature",metaKey="battlemaster",role="battlemaster",statKey="battlemaster",optional=true},
+    {kind="creature",metaKey="innkeeper",role="innkeeper",statKey="innkeeper",optional=true},
+    {kind="object",metaKey="meetingstone",role="meetingStone",statKey="meetingStone",optional=true},
+    {kind="creature",metaKey="repair",role="repair",statKey="repair",optional=true},
+    {kind="creature",metaKey="spirithealer",role="spiritHealer",statKey="spiritHealer",optional=true},
+    {kind="creature",metaKey="stablemaster",role="stableMaster",statKey="stableMaster",optional=true},
+    {kind="creature",metaKey="vendor",role="vendor",statKey="vendor",optional=true},
+    {kind="rare"},
   }
 
-  local function PermanentStep(index)
+  local function PermanentStep(index,cursor)
     if generation~=N.generation then return end
-    local fn=permanentBuilders[index]
-    if not fn then SortMaps(); return end
-    fn()
-    QuestieOcto.Scheduler:Enqueue(function() PermanentStep(index+1) end,"nodes-permanent")
+    local job=permanentBuilders[index]
+    if not job then SortMaps(); return end
+
+    if job.optional and not OptionalServiceEnabled(job.role) then
+      QuestieOcto.Scheduler:Enqueue(function() PermanentStep(index+1,nil) end,"nodes-permanent")
+      return
+    end
+
+    local nextCursor=nil
+    local done=true
+    if job.kind=="creature" then
+      nextCursor,done=ProcessServiceCreatureSlice(job.metaKey,job.role,job.statKey,cursor,128)
+    elseif job.kind=="object" then
+      nextCursor,done=ProcessServiceObjectSlice(job.metaKey,job.role,job.statKey,cursor,128)
+    elseif job.kind=="rare" then
+      nextCursor,done=ProcessRareMobSlice(cursor,128)
+    end
+
+    if done then
+      QuestieOcto.Scheduler:Enqueue(function() PermanentStep(index+1,nil) end,"nodes-permanent")
+    else
+      QuestieOcto.Scheduler:Enqueue(function() PermanentStep(index,nextCursor) end,"nodes-permanent")
+    end
   end
 
   local function ItemStartStep()

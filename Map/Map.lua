@@ -7,7 +7,9 @@ end
 
 local function IsPermanentRole(role)
   return role=="flightMaster" or role=="auctioneer" or role=="banker"
-      or role=="mailbox" or role=="rareMob"
+      or role=="mailbox" or role=="battlemaster" or role=="innkeeper"
+      or role=="meetingStone" or role=="repair" or role=="spiritHealer"
+      or role=="stableMaster" or role=="vendor" or role=="rareMob"
 end
 
 local function IsSpecialQuestNode(node)
@@ -35,6 +37,13 @@ local function IsRoleEnabled(role)
   if role=="banker" then return settings:Get("showMapBanker") and true or false end
   if role=="flightMaster" then return settings:Get("showMapFlightMaster") and true or false end
   if role=="mailbox" then return settings:Get("showMapMailbox") and true or false end
+  if role=="battlemaster" then return settings:Get("showMapBattlemaster") and true or false end
+  if role=="innkeeper" then return settings:Get("showMapInnkeeper") and true or false end
+  if role=="meetingStone" then return settings:Get("showMapMeetingStone") and true or false end
+  if role=="repair" then return settings:Get("showMapRepair") and true or false end
+  if role=="spiritHealer" then return settings:Get("showMapSpiritHealer") and true or false end
+  if role=="stableMaster" then return settings:Get("showMapStableMaster") and true or false end
+  if role=="vendor" then return settings:Get("showMapVendor") and true or false end
   if role=="rareMob" then return settings:Get("showMapRareMonsters") and true or false end
   if not settings:Get("enableMapIcons") then return false end
 
@@ -84,6 +93,13 @@ local TEX_FLIGHT=ICON_ROOT.."flight"
 local TEX_AUCTIONEER=ICON_ROOT.."auctioneer"
 local TEX_BANKER=ICON_ROOT.."banker"
 local TEX_MAILBOX=ICON_ROOT.."mailbox"
+local TEX_BATTLEMASTER=ICON_ROOT.."battlemaster"
+local TEX_INNKEEPER=ICON_ROOT.."innkeeper"
+local TEX_MEETINGSTONE=ICON_ROOT.."meetingstone"
+local TEX_REPAIR=ICON_ROOT.."repair"
+local TEX_SPIRITHEALER=ICON_ROOT.."spirithealer"
+local TEX_STABLEMASTER=ICON_ROOT.."stablemaster"
+local TEX_VENDOR=ICON_ROOT.."vendor"
 local TEX_RARE=ICON_ROOT.."rares"
 
 local function TextureForNode(node)
@@ -91,6 +107,13 @@ local function TextureForNode(node)
   if node.role=="auctioneer" then return TEX_AUCTIONEER end
   if node.role=="banker" then return TEX_BANKER end
   if node.role=="mailbox" then return TEX_MAILBOX end
+  if node.role=="battlemaster" then return TEX_BATTLEMASTER end
+  if node.role=="innkeeper" then return TEX_INNKEEPER end
+  if node.role=="meetingStone" then return TEX_MEETINGSTONE end
+  if node.role=="repair" then return TEX_REPAIR end
+  if node.role=="spiritHealer" then return TEX_SPIRITHEALER end
+  if node.role=="stableMaster" then return TEX_STABLEMASTER end
+  if node.role=="vendor" then return TEX_VENDOR end
   if node.role=="rareMob" then return TEX_RARE end
   if node.role=="itemStart" then
     -- Presentation priority: PvP > Repeatable > Event > Normal.
@@ -213,10 +236,13 @@ function M:GetIconTypeScale(node)
 end
 
 function M:GetPinScale(pin)
-  -- Auctioneer, Banker and Mailbox service artwork share the same compact
-  -- intrinsic footprint. The player-facing global map/minimap scale remains
-  -- unchanged.
-  if pin and (pin.role=="auctioneer" or pin.role=="banker" or pin.role=="mailbox") then
+  -- Keep every townsfolk/service marker on the same compact footprint.
+  -- Rare Monsters intentionally stay on their dedicated 12px footprint below.
+  -- The player-facing global map/minimap scale remains unchanged.
+  if pin and (pin.role=="auctioneer" or pin.role=="banker" or pin.role=="flightMaster" or
+              pin.role=="mailbox" or pin.role=="battlemaster" or pin.role=="innkeeper" or
+              pin.role=="meetingStone" or pin.role=="repair" or pin.role=="spiritHealer" or
+              pin.role=="stableMaster" or pin.role=="vendor") then
     return 0.9
   end
   return 1
@@ -1122,6 +1148,8 @@ function M:OnSettingChanged(key,value)
      key=="enableAvailable" or key=="showItemStartQuests" or key=="showItemStartMap" or
      key=="showMapAuctioneer" or key=="showMapBanker" or
      key=="showMapFlightMaster" or key=="showMapMailbox" or
+     key=="showMapBattlemaster" or key=="showMapInnkeeper" or key=="showMapMeetingStone" or
+     key=="showMapRepair" or key=="showMapSpiritHealer" or key=="showMapStableMaster" or key=="showMapVendor" or
      key=="showMapRareMonsters" then
     self:RequestSync(true)
   end

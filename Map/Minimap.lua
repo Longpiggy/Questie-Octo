@@ -30,7 +30,9 @@ local ResizePin
 
 local function IsPermanentRole(role)
   return role=="flightMaster" or role=="auctioneer" or role=="banker"
-      or role=="mailbox" or role=="rareMob"
+      or role=="mailbox" or role=="battlemaster" or role=="innkeeper"
+      or role=="meetingStone" or role=="repair" or role=="spiritHealer"
+      or role=="stableMaster" or role=="vendor" or role=="rareMob"
 end
 
 local function IsRoleEnabled(role)
@@ -39,6 +41,13 @@ local function IsRoleEnabled(role)
   if role=="banker" then return settings:Get("showMinimapBanker") and true or false end
   if role=="flightMaster" then return settings:Get("showMinimapFlightMaster") and true or false end
   if role=="mailbox" then return settings:Get("showMinimapMailbox") and true or false end
+  if role=="battlemaster" then return settings:Get("showMinimapBattlemaster") and true or false end
+  if role=="innkeeper" then return settings:Get("showMinimapInnkeeper") and true or false end
+  if role=="meetingStone" then return settings:Get("showMinimapMeetingStone") and true or false end
+  if role=="repair" then return settings:Get("showMinimapRepair") and true or false end
+  if role=="spiritHealer" then return settings:Get("showMinimapSpiritHealer") and true or false end
+  if role=="stableMaster" then return settings:Get("showMinimapStableMaster") and true or false end
+  if role=="vendor" then return settings:Get("showMinimapVendor") and true or false end
   if role=="rareMob" then return settings:Get("showMinimapRareMonsters") and true or false end
   if not settings:Get("enableMiniMapIcons") then return false end
 
@@ -111,6 +120,8 @@ function MM:OnSettingChanged(key,value)
      key=="showItemStartQuests" or key=="showItemStartMinimap" or
      key=="showMinimapAuctioneer" or key=="showMinimapBanker" or
      key=="showMinimapFlightMaster" or key=="showMinimapMailbox" or
+     key=="showMinimapBattlemaster" or key=="showMinimapInnkeeper" or key=="showMinimapMeetingStone" or
+     key=="showMinimapRepair" or key=="showMinimapSpiritHealer" or key=="showMinimapStableMaster" or key=="showMinimapVendor" or
      key=="showMinimapRareMonsters" then
     self:UpdatePositions(true)
     return

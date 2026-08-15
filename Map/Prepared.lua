@@ -14,7 +14,10 @@ P.stats={preparedMaps=0,descriptors=0,currentMap=nil,currentReady=false,stateRev
 
 local function ExactRole(role)
   return role=="available" or role=="turnin" or role=="flightMaster"
-      or role=="auctioneer" or role=="banker" or role=="mailbox" or role=="rareMob"
+      or role=="auctioneer" or role=="banker" or role=="mailbox"
+      or role=="battlemaster" or role=="innkeeper" or role=="meetingStone"
+      or role=="repair" or role=="spiritHealer" or role=="stableMaster" or role=="vendor"
+      or role=="rareMob"
 end
 
 local function DescriptorKey(node,x,y)

@@ -251,10 +251,10 @@ local function CreateGeneralTab()
         questLogShowLevels={type="toggle",order=1,name="Show Quest Levels",desc="Show the quest level before each quest title in the native Quest Log.",width="full",get=GetValue,set=SetValue},
         showLowLevelQuests={type="toggle",order=2,name="Show Low-Level Quests",desc="Show otherwise-valid quests below the normal green quest range. Use Levels Below to limit how far below your current level they are shown. Questie-Octo default: enabled.",get=GetValue,set=SetValue},
         lowLevelQuestRange={type="range",order=2.1,name=function()
-          local value=tonumber(Settings():Get("lowLevelQuestRange")) or 30
-          if value>=30 then return "Levels Below: All" end
+          local value=tonumber(Settings():Get("lowLevelQuestRange")) or 35
+          if value>=35 then return "Levels Below: All" end
           return "Levels Below: "..tostring(value)
-        end,desc="How many displayed quest levels below your current level may be shown. Example: at level 60, 15 shows level 45+ quests. All preserves the unrestricted low-level quest view. ( Default: All )",width="normal",min=0,max=30,step=5,arg={questieHideEditBox=true,questieMaxLabel="All",questieCommitOnMouseUp=true,questieLiveLabelPrefix="Levels Below: "},disabled=function() return not Settings():Get("showLowLevelQuests") end,get=GetValue,set=SetValue},
+        end,desc="How many displayed quest levels below your current level may be shown. Example: at level 60, 15 shows level 45+ quests. All preserves the unrestricted low-level quest view. ( Default: All )",width="normal",min=5,max=35,step=5,arg={questieHideEditBox=true,questieMaxLabel="All",questieCommitOnMouseUp=true,questieLiveLabelPrefix="Levels Below: "},disabled=function() return not Settings():Get("showLowLevelQuests") end,get=GetValue,set=SetValue},
         showRepeatableQuests={type="toggle",order=3,name="Show Repeatable Quests",desc="Show available repeatable quests. Active objectives and turn-ins remain visible. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
         showEventQuests={type="toggle",order=4,name="Show Event Quests",desc="Show or hide available event quests on the map and minimap. Event quests use Questie's event quest artwork. Accepted objectives and turn-ins remain visible. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
         showPvPRelatedQuests={type="toggle",order=5,name="Show PVP Related Quests",desc="Show or hide PvP-related quest markers on the map and minimap. When disabled, all PvP quest markers are hidden, including available quests, active objectives, and turn-ins. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
@@ -285,7 +285,15 @@ local function CreateMapTab()
       showMapRareMonsters={type="toggle",order=20.1,name="Rare Monsters",desc="Show Rare Monster icons on the World Map.",width="full",get=GetValue,set=SetValue},
       showMapAuctioneer={type="toggle",order=20.2,name="Auctioneer",desc="Show Auctioneer icons on the World Map.",width="full",get=GetValue,set=SetValue},
       showMapBanker={type="toggle",order=20.3,name="Banker",desc="Show Banker icons on the World Map.",width="full",get=GetValue,set=SetValue},
+      showMapFlightMaster={type="toggle",order=20.4,name="Flight Master",desc="Show Flight Master icons on the World Map.",width="full",get=GetValue,set=SetValue},
       showMapMailbox={type="toggle",order=20.5,name="Mailbox",desc="Show Mailbox icons on the World Map.",width="full",get=GetValue,set=SetValue},
+      showMapBattlemaster={type="toggle",order=20.6,name="Battlemaster",desc="Show Battlemaster icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMapInnkeeper={type="toggle",order=20.7,name="Innkeeper",desc="Show Innkeeper icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMapMeetingStone={type="toggle",order=20.8,name="Meeting Stones",desc="Show Meeting Stone icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMapRepair={type="toggle",order=20.9,name="Repair",desc="Show Repair icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMapSpiritHealer={type="toggle",order=21.0,name="Spirit Healer",desc="Show Spirit Healer icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMapStableMaster={type="toggle",order=21.1,name="Stable Master",desc="Show Stable Master icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMapVendor={type="toggle",order=21.2,name="Vendor",desc="Show Vendor icons on the World Map. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
     },
   }
 end
@@ -304,8 +312,15 @@ local function CreateMinimapTab()
       showMinimapRareMonsters={type="toggle",order=20.1,name="Rare Monsters",desc="Show Rare Monster icons on the Minimap.",width="full",get=GetValue,set=SetValue},
       showMinimapAuctioneer={type="toggle",order=20.2,name="Auctioneer",desc="Show Auctioneer icons on the Minimap.",width="full",get=GetValue,set=SetValue},
       showMinimapBanker={type="toggle",order=20.3,name="Banker",desc="Show Banker icons on the Minimap.",width="full",get=GetValue,set=SetValue},
-      showMinimapFlightMaster={type="toggle",order=20.4,name="Flight master",desc="Show Flight Master icons on the Minimap.",width="full",get=GetValue,set=SetValue},
+      showMinimapFlightMaster={type="toggle",order=20.4,name="Flight Master",desc="Show Flight Master icons on the Minimap.",width="full",get=GetValue,set=SetValue},
       showMinimapMailbox={type="toggle",order=20.5,name="Mailbox",desc="Show Mailbox icons on the Minimap.",width="full",get=GetValue,set=SetValue},
+      showMinimapBattlemaster={type="toggle",order=20.6,name="Battlemaster",desc="Show Battlemaster icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMinimapInnkeeper={type="toggle",order=20.7,name="Innkeeper",desc="Show Innkeeper icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMinimapMeetingStone={type="toggle",order=20.8,name="Meeting Stones",desc="Show Meeting Stone icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMinimapRepair={type="toggle",order=20.9,name="Repair",desc="Show Repair icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMinimapSpiritHealer={type="toggle",order=21.0,name="Spirit Healer",desc="Show Spirit Healer icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMinimapStableMaster={type="toggle",order=21.1,name="Stable Master",desc="Show Stable Master icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      showMinimapVendor={type="toggle",order=21.2,name="Vendor",desc="Show Vendor icons on the Minimap. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
     },
   }
 end

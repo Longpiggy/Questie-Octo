@@ -46,17 +46,33 @@ S.defaults={
   showMapBanker=true,
   showMapFlightMaster=true,
   showMapMailbox=true,
+  -- Additional pfQuest service/utility tracking categories are opt-in. Keeping
+  -- them disabled by default preserves Questie-Octo's lightweight baseline.
+  showMapBattlemaster=false,
+  showMapInnkeeper=false,
+  showMapMeetingStone=false,
+  showMapRepair=false,
+  showMapSpiritHealer=false,
+  showMapStableMaster=false,
+  showMapVendor=false,
   showMinimapRareMonsters=true,
   showMinimapAuctioneer=true,
   showMinimapBanker=true,
   showMinimapFlightMaster=true,
   showMinimapMailbox=true,
+  showMinimapBattlemaster=false,
+  showMinimapInnkeeper=false,
+  showMinimapMeetingStone=false,
+  showMinimapRepair=false,
+  showMinimapSpiritHealer=false,
+  showMinimapStableMaster=false,
+  showMinimapVendor=false,
 
   showLowLevelQuests=true,
   -- Maximum number of displayed quest levels below the player to expose when
-  -- Show Low-Level Quests is enabled. 30 is the UI's "All" sentinel; it is
-  -- intentionally not interpreted as a literal 30-level cutoff.
-  lowLevelQuestRange=30,
+  -- Show Low-Level Quests is enabled. 35 is the UI's "All" sentinel; the
+  -- visible slider stops are 5/10/15/20/25/30/All.
+  lowLevelQuestRange=35,
   showEventQuests=false,
   showRepeatableQuests=true,
   showPvPRelatedQuests=true,
@@ -149,6 +165,15 @@ function S:Initialize()
     end
   end
 
+  -- 1.0.38: 30 used to be the hidden "All" sentinel. The slider now exposes
+  -- a literal 30-level choice and uses 35 internally for "All". Migrate the
+  -- old saved sentinel once so updating players keep the same unrestricted
+  -- behavior instead of unexpectedly receiving a 30-level cutoff.
+  if not charDB.lowLevelQuestRangeAll35Migrated then
+    if tonumber(charDB.lowLevelQuestRange)==30 then charDB.lowLevelQuestRange=35 end
+    charDB.lowLevelQuestRangeAll35Migrated=true
+  end
+
   -- Requested 0.1.45 defaults. Migrate only exact previous defaults.
   if not db.mapScaleDefault1Migrated then
     if tonumber(db.globalScale)==0.7 then db.globalScale=1 end
@@ -197,8 +222,12 @@ function S:Set(key,value)
       key=="showItemStartQuests" or key=="showItemStartMap" or key=="showItemStartMinimap" or
       key=="showMapRareMonsters" or key=="showMapAuctioneer" or key=="showMapBanker" or
       key=="showMapFlightMaster" or key=="showMapMailbox" or
+      key=="showMapBattlemaster" or key=="showMapInnkeeper" or key=="showMapMeetingStone" or
+      key=="showMapRepair" or key=="showMapSpiritHealer" or key=="showMapStableMaster" or key=="showMapVendor" or
       key=="showMinimapRareMonsters" or key=="showMinimapAuctioneer" or key=="showMinimapBanker" or
       key=="showMinimapFlightMaster" or key=="showMinimapMailbox" or
+      key=="showMinimapBattlemaster" or key=="showMinimapInnkeeper" or key=="showMinimapMeetingStone" or
+      key=="showMinimapRepair" or key=="showMinimapSpiritHealer" or key=="showMinimapStableMaster" or key=="showMinimapVendor" or
       key=="enableTooltips" or
       key=="enableTooltipsQuestLevel" or key=="enableTooltipsQuestID" or
       key=="enableTooltipsNPCID" or key=="enableTooltipsItemID" or
@@ -210,7 +239,7 @@ function S:Set(key,value)
     value=value and true or false
   elseif key=="lowLevelQuestRange" then
     value=tonumber(value)
-    if value~=0 and value~=5 and value~=10 and value~=15 and value~=20 and value~=25 and value~=30 then return false end
+    if value~=5 and value~=10 and value~=15 and value~=20 and value~=25 and value~=30 and value~=35 then return false end
   elseif key=="globalScale" then
     value=Clamp(value,0.01,4)
   elseif key=="objectiveNodeDensity" or key=="itemStartDensity" then
@@ -324,7 +353,17 @@ function S:Set(key,value)
   end
 
   if key=="showMapRareMonsters" or key=="showMapAuctioneer" or key=="showMapBanker" or
-     key=="showMapFlightMaster" or key=="showMapMailbox" then
+     key=="showMapFlightMaster" or key=="showMapMailbox" or
+     key=="showMapBattlemaster" or key=="showMapInnkeeper" or key=="showMapMeetingStone" or
+     key=="showMapRepair" or key=="showMapSpiritHealer" or key=="showMapStableMaster" or key=="showMapVendor" then
+    -- The additional pfQuest service categories are not materialized while
+    -- disabled on both map surfaces. Rebuild transactionally when one changes
+    -- so opt-in categories have no default startup/node cost.
+    if string.find(key,"Battlemaster") or string.find(key,"Innkeeper") or string.find(key,"MeetingStone") or
+       string.find(key,"Repair") or string.find(key,"SpiritHealer") or string.find(key,"StableMaster") or
+       string.find(key,"Vendor") then
+      if QuestieOcto.Nodes and QuestieOcto.Nodes.Rebuild then QuestieOcto.Nodes:Rebuild() end
+    end
     if QuestieOcto.Map and QuestieOcto.Map.OnSettingChanged then
       QuestieOcto.Map:OnSettingChanged(key,value)
     end
@@ -332,7 +371,14 @@ function S:Set(key,value)
   end
 
   if key=="showMinimapRareMonsters" or key=="showMinimapAuctioneer" or key=="showMinimapBanker" or
-     key=="showMinimapFlightMaster" or key=="showMinimapMailbox" then
+     key=="showMinimapFlightMaster" or key=="showMinimapMailbox" or
+     key=="showMinimapBattlemaster" or key=="showMinimapInnkeeper" or key=="showMinimapMeetingStone" or
+     key=="showMinimapRepair" or key=="showMinimapSpiritHealer" or key=="showMinimapStableMaster" or key=="showMinimapVendor" then
+    if string.find(key,"Battlemaster") or string.find(key,"Innkeeper") or string.find(key,"MeetingStone") or
+       string.find(key,"Repair") or string.find(key,"SpiritHealer") or string.find(key,"StableMaster") or
+       string.find(key,"Vendor") then
+      if QuestieOcto.Nodes and QuestieOcto.Nodes.Rebuild then QuestieOcto.Nodes:Rebuild() end
+    end
     if QuestieOcto.Minimap and QuestieOcto.Minimap.OnSettingChanged then
       QuestieOcto.Minimap:OnSettingChanged(key,value)
     end

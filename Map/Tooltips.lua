@@ -1029,6 +1029,13 @@ function T:Show(pin)
     auctioneer="Auctioneer",
     banker="Banker",
     mailbox="Mailbox",
+    battlemaster="Battlemaster",
+    innkeeper="Innkeeper",
+    meetingStone="Meeting Stone",
+    repair="Repair",
+    spiritHealer="Spirit Healer",
+    stableMaster="Stable Master",
+    vendor="Vendor",
     rareMob="[Rare]"
   }
   local permanentLabel=permanentLabels[pin.role]
