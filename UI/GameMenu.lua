@@ -36,9 +36,9 @@ local function InstallDragonflightMenu()
   -- DragonflightUI-Reforged kills Blizzard's GameMenuFrame and exposes its
   -- replacement as DFRL.menuframe. Insert Questie directly into that live
   -- menu instead of attaching a button to the now-hidden Blizzard frame.
-  local exitButton=FindDragonflightButton(menu,"Exit Game")
-  local resumeButton=FindDragonflightButton(menu,"Resume Game")
-  if not exitButton or not resumeButton then return false end
+  local optionsButton=FindDragonflightButton(menu,"Options")
+  local keyButton=FindDragonflightButton(menu,"Key Bindings")
+  if not optionsButton or not keyButton then return false end
 
   local button=nil
   if DFRL.tools and DFRL.tools.CreateButton then
@@ -52,9 +52,12 @@ local function InstallDragonflightMenu()
   if not button then return false end
 
   button:ClearAllPoints()
-  button:SetPoint("TOP",exitButton,"BOTTOM",0,0)
-  resumeButton:ClearAllPoints()
-  resumeButton:SetPoint("TOP",button,"BOTTOM",0,0)
+  -- Keep Questie with the options-related controls. DragonflightUI normally
+  -- leaves a 15 px section gap between Options and Key Bindings; preserve
+  -- that same gap below Questie while inserting the new button in between.
+  button:SetPoint("TOP",optionsButton,"BOTTOM",0,0)
+  keyButton:ClearAllPoints()
+  keyButton:SetPoint("TOP",button,"BOTTOM",0,-15)
   menu:SetHeight(menu:GetHeight()+30)
 
   button:SetScript("OnClick",function()
