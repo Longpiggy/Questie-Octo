@@ -4,6 +4,8 @@ local P = QuestieOcto.PreparedMap
 P.cache={}
 P.readyMaps={}
 P.cacheRevision={}
+P.worldItemStartCache={}
+P.worldItemStartRevision={}
 P.stateRevision=1
 P.running=false
 P.generation=0
@@ -138,7 +140,61 @@ function P:BuildPlanFromNodes(mapID,nodes)
   return plan
 end
 
-function P:SetPreparedMap(mapID,plan)
+
+
+local function IsWorldMapUltraRareItemStart(node)
+  return node and node.role=="itemStart" and QuestieOcto.ItemStartAreas
+     and QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance) and true or false
+end
+
+function P:BuildWorldItemStartPlanFromNodes(mapID,nodes)
+  mapID=tonumber(mapID)
+  if not mapID then return nil end
+
+  local plan={}
+  local slots={}
+  local density=QuestieOcto.MinimapSettings:Get("itemStartDensity")
+
+  if density=="full" then
+    for _,node in pairs(nodes or {}) do
+      if node.role=="itemStart" and not IsWorldMapUltraRareItemStart(node) then
+        local points=QuestieOcto.Clustering:PointsForNodeOnMap(node,mapID)
+        for _,point in pairs(points) do
+          AddNormal(
+            plan,slots,node,point.x,point.y,1,"itemStartFull",
+            FullPointKey("itemstart-full",node,point.x,point.y)
+          )
+        end
+      end
+    end
+  else
+    local normalAreas=QuestieOcto.ItemStartAreas:BuildForMap(
+      nodes or {},mapID,
+      function(node) return not IsWorldMapUltraRareItemStart(node) end
+    )
+    for _,area in pairs(normalAreas) do
+      table.insert(plan,{
+        type="itemStartArea",
+        area=area,
+        key="itemarea:"..tostring(area.key)
+      })
+    end
+  end
+
+  local rareAreas=QuestieOcto.ItemStartAreas:BuildZoneWideRareForMap(nodes or {},mapID)
+  for _,area in pairs(rareAreas) do
+    table.insert(plan,{
+      type="itemStartArea",
+      area=area,
+      key="itemrarearea:"..tostring(area.key)
+    })
+  end
+
+  table.sort(plan,function(a,b) return tostring(a.key)<tostring(b.key) end)
+  return plan
+end
+
+function P:SetPreparedMap(mapID,plan,worldItemStartPlan)
   mapID=tonumber(mapID)
   if not mapID or not plan then return nil end
 
@@ -149,6 +205,8 @@ function P:SetPreparedMap(mapID,plan)
   self.cache[mapID]=plan
   self.readyMaps[mapID]=true
   self.cacheRevision[mapID]=self.stateRevision
+  self.worldItemStartCache[mapID]=worldItemStartPlan or {}
+  self.worldItemStartRevision[mapID]=self.stateRevision
 
   if not wasReady then
     self.stats.preparedMaps=self.stats.preparedMaps+1
@@ -168,8 +226,10 @@ function P:BuildMap(mapID)
   mapID=tonumber(mapID)
   if not mapID or not QuestieOcto.Nodes.ready then return nil end
 
-  local plan=self:BuildPlanFromNodes(mapID,QuestieOcto.Nodes:GetMapNodes(mapID))
-  return self:SetPreparedMap(mapID,plan)
+  local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
+  local plan=self:BuildPlanFromNodes(mapID,nodes)
+  local worldItemStartPlan=self:BuildWorldItemStartPlanFromNodes(mapID,nodes)
+  return self:SetPreparedMap(mapID,plan,worldItemStartPlan)
 end
 
 function P:Get(mapID)
@@ -177,6 +237,13 @@ function P:Get(mapID)
   if not mapID then return nil end
   if self.cacheRevision[mapID]~=self.stateRevision then return nil end
   return self.cache[mapID]
+end
+
+function P:GetWorldItemStarts(mapID)
+  mapID=tonumber(mapID)
+  if not mapID then return nil end
+  if self.worldItemStartRevision[mapID]~=self.stateRevision then return nil end
+  return self.worldItemStartCache[mapID]
 end
 
 function P:IsReady(mapID)
@@ -241,6 +308,17 @@ function P:RemoveQuest(questID)
     end
   end
 
+  for mapID,plan in pairs(self.worldItemStartCache or {}) do
+    local filtered={}
+    for _,desc in pairs(plan or {}) do
+      local drop,count=RemoveQuestFromDescriptor(desc,questID)
+      removed=removed+(count or 0)
+      if not drop then table.insert(filtered,desc) end
+    end
+    self.worldItemStartCache[mapID]=filtered
+    if self.readyMaps[mapID] then self.worldItemStartRevision[mapID]=self.stateRevision end
+  end
+
   -- `descriptors` counts coordinate slots, not quest references, in the new
   -- pfQuest-style prepared representation. Recalculate cheaply after an
   -- immediate quest removal rather than subtracting removed metadata entries.
@@ -268,6 +346,8 @@ function P:Invalidate()
   self.cache={}
   self.readyMaps={}
   self.cacheRevision={}
+  self.worldItemStartCache={}
+  self.worldItemStartRevision={}
   self.running=false
   self.stats.preparedMaps=0
   self.stats.descriptors=0
@@ -311,8 +391,10 @@ function P:PrepareAll()
 
   local function publishMap(mapID)
     if generation~=P.generation then return false end
-    local plan=P:BuildPlanFromNodes(mapID,QuestieOcto.Nodes:GetMapNodes(mapID)) or {}
-    P:SetPreparedMap(mapID,plan)
+    local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
+    local plan=P:BuildPlanFromNodes(mapID,nodes) or {}
+    local worldItemStartPlan=P:BuildWorldItemStartPlanFromNodes(mapID,nodes) or {}
+    P:SetPreparedMap(mapID,plan,worldItemStartPlan)
     return true
   end
 
@@ -454,7 +536,9 @@ function P:PatchMaps(mapSet,changedQuests)
         for _,desc in pairs(delta) do MergePreparedDescriptor(byKey,plan,desc) end
 
         table.sort(plan,function(a,b) return DescriptorKeyValue(a)<DescriptorKeyValue(b) end)
-        P:SetPreparedMap(mapID,plan)
+        local allNodes=QuestieOcto.Nodes:GetMapNodes(mapID)
+        local worldItemStartPlan=P:BuildWorldItemStartPlanFromNodes(mapID,allNodes) or {}
+        P:SetPreparedMap(mapID,plan,worldItemStartPlan)
       end
     end
 
@@ -486,8 +570,10 @@ function P:RebuildMaps(mapSet)
     local mapID=ids[pos]
     pos=pos+1
     if mapID then
-      local plan=P:BuildPlanFromNodes(mapID,QuestieOcto.Nodes:GetMapNodes(mapID)) or {}
-      P:SetPreparedMap(mapID,plan)
+      local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
+      local plan=P:BuildPlanFromNodes(mapID,nodes) or {}
+      local worldItemStartPlan=P:BuildWorldItemStartPlanFromNodes(mapID,nodes) or {}
+      P:SetPreparedMap(mapID,plan,worldItemStartPlan)
     end
 
     if pos<=table.getn(ids) then

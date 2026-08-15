@@ -298,7 +298,7 @@ function MM:GetOrCreate(index)
     pin.texture=tex
 
     pin:SetScript("OnEnter",function() QuestieOcto.Tooltips:Show(this) end)
-    pin:SetScript("OnLeave",function() GameTooltip:Hide() end)
+    pin:SetScript("OnLeave",function() QuestieOcto.Tooltips:Hide(this) end)
 
     self.frames[index]=pin
     self.stats.created=self.stats.created+1

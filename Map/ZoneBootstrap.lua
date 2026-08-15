@@ -257,8 +257,9 @@ function Z:Start(mapID)
 
     Z.stats.nodes=table.getn(nodes)
     local plan=QuestieOcto.PreparedMap:BuildPlanFromNodes(mapID,nodes)
+    local worldItemStartPlan=QuestieOcto.PreparedMap:BuildWorldItemStartPlanFromNodes(mapID,nodes)
     QuestieOcto.PreparedMap.stats.currentMap=mapID
-    QuestieOcto.PreparedMap:SetPreparedMap(mapID,plan)
+    QuestieOcto.PreparedMap:SetPreparedMap(mapID,plan,worldItemStartPlan)
 
     Z.running=false
     Z.ready=true

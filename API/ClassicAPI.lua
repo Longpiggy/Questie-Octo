@@ -33,6 +33,8 @@ function A:Validate()
     coroutines = coroutine and type(coroutine.create)=="function",
     hooksecurefunc = type(hooksecurefunc)=="function",
     tooltipUnit = GameTooltip and type(GameTooltip.GetUnitGUID)=="function",
+    tooltipObject = GameTooltip and type(GameTooltip.GetGameObject)=="function",
+    tooltipItem = GameTooltip and type(GameTooltip.GetItem)=="function",
     gossipActive = Has(C_GossipInfo,"GetActiveQuests"),
     questDetails = Has(C_QuestLog,"GetQuestDetails"),
     questObjectives = Has(C_QuestLog,"GetQuestObjectives"),

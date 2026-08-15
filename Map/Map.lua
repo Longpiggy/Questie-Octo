@@ -315,6 +315,36 @@ local function DisplayedContextKey()
   return nil
 end
 
+local function OpenContinentZoneForPin(pin)
+  if not pin or not pin.continentZoneMapID or not SetMapZoom or not GetMapZones then return false end
+  local continent=GetCurrentMapContinent and GetCurrentMapContinent() or 0
+  if not continent or continent<=0 then return false end
+
+  local target=tonumber(pin.continentZoneMapID)
+  if not target then return false end
+  local zones={GetMapZones(continent)}
+  local index,name
+  for index,name in ipairs(zones) do
+    if QuestieOcto.DatabaseAPI:GetMapIDByName(name)==target then
+      if QuestieOcto.Tooltips then QuestieOcto.Tooltips:Hide(pin) end
+      SetMapZoom(continent,index)
+      return true
+    end
+  end
+  return false
+end
+
+local function AttachWorldMapPinInput(pin)
+  if not pin then return end
+  pin:EnableMouse(true)
+  pin:RegisterForClicks("LeftButtonUp")
+  pin:SetScript("OnEnter",function() QuestieOcto.Tooltips:Show(this) end)
+  pin:SetScript("OnLeave",function() QuestieOcto.Tooltips:Hide(this) end)
+  -- Continent-map markers should behave as zone-entry targets instead of
+  -- swallowing the click that would otherwise select the zone underneath.
+  pin:SetScript("OnClick",function() OpenContinentZoneForPin(this) end)
+end
+
 function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
   if not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) then return nil end
 
@@ -330,8 +360,7 @@ function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
     tex:SetAllPoints(pin)
     pin.texture=tex
 
-    pin:SetScript("OnEnter",function() QuestieOcto.Tooltips:Show(this) end)
-    pin:SetScript("OnLeave",function() GameTooltip:Hide() end)
+    AttachWorldMapPinInput(pin)
 
     self.frames[key]=pin
     self.stats.created=self.stats.created+1
@@ -359,6 +388,7 @@ function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
     pin.fullNodeNode=nil
     pin.iconScaleKey=nil
     pin.sourceKind=node.sourceKind
+    pin.continentZoneMapID=nil
     if QuestieOcto.Visuals then QuestieOcto.Visuals:ClearPin(pin,1) end
   end
 
@@ -528,7 +558,7 @@ function M:SetMap(mapID)
   self:HideAll()
 end
 
-function M:RenderItemStartArea(area,generation)
+function M:RenderItemStartArea(area,generation,continentZoneMapID)
   if not IsRoleEnabled("itemStart") then return end
   local itemQuest=QuestieOcto.QuestModel:Get(area.questID)
   if itemQuest and itemQuest.pvp and not DisplaySettings():Get("showPvPRelatedQuests") then return end
@@ -549,8 +579,7 @@ function M:RenderItemStartArea(area,generation)
     tex:SetAllPoints(pin)
     pin.texture=tex
 
-    pin:SetScript("OnEnter",function() QuestieOcto.Tooltips:Show(this) end)
-    pin:SetScript("OnLeave",function() GameTooltip:Hide() end)
+    AttachWorldMapPinInput(pin)
 
     self.frames[key]=pin
     self.stats.created=self.stats.created+1
@@ -564,6 +593,7 @@ function M:RenderItemStartArea(area,generation)
   end
   pin.itemStartArea=area
   pin.entries={}
+  pin.continentZoneMapID=tonumber(continentZoneMapID)
   pin.visualPriority=40
   pin.role="itemStart"
   pin.questID=area.questID
@@ -585,6 +615,7 @@ function M:RenderItemStartArea(area,generation)
 
   if not pin:IsShown() then pin:Show() end
   self.stats.itemStartAreaPins=self.stats.itemStartAreaPins+1
+  return pin
 end
 
 function M:RenderNode(node,generation)
@@ -708,15 +739,15 @@ function M:Finish(generation,doPrune)
   end
 end
 
-function M:RenderPreparedDescriptor(desc,generation)
+function M:RenderPreparedDescriptor(desc,generation,renderItemStarts)
   if desc.type=="itemStartArea" then
-    M:RenderItemStartArea(desc.area,generation)
+    if renderItemStarts then M:RenderItemStartArea(desc.area,generation) end
     return
   end
 
   if desc.type=="nodeSlot" then
     for _,entry in pairs(desc.entries or {}) do
-      if entry.node then
+      if entry.node and (renderItemStarts or entry.node.role~="itemStart") then
         M:GetOrCreate(
           desc.key,
           entry.node,
@@ -733,7 +764,8 @@ function M:RenderPreparedDescriptor(desc,generation)
 
   -- Backward compatibility for a prepared map published by an older cache
   -- during an in-session update/reload boundary.
-  if desc.type=="node" then
+  if desc.type=="node" and desc.node
+     and (renderItemStarts or desc.node.role~="itemStart") then
     M:GetOrCreate(desc.key,desc.node,desc.x,desc.y,desc.clusterCount or 1,generation,desc.kind or "objective")
   end
 end
@@ -753,6 +785,7 @@ end
 
 function M:RenderContinentNode(node,mapID,generation)
   if not node or not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) then return 0 end
+  if node.role=="itemStart" and QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance) then return 0 end
   -- World Map Visibility toggles apply only to continent/world overviews.
   -- Selected zone and city maps keep normal/special quest markers visible and
   -- are controlled by Enable Available/Completed Quest Icons instead.
@@ -778,7 +811,8 @@ function M:RenderContinentNode(node,mapID,generation)
     end
     if n>0 then
       local x,y=sx/n,sy/n
-      self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
+      local pin=self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
+      if pin then pin.continentZoneMapID=mapID end
       return 1
     end
     return 0
@@ -787,11 +821,73 @@ function M:RenderContinentNode(node,mapID,generation)
   for _,point in pairs(points) do
     local x,y=projection:Project(mapID,point.x,point.y)
     if x and y then
-      self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
+      local pin=self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
+      if pin then pin.continentZoneMapID=mapID end
       rendered=rendered+1
     end
   end
   return rendered
+end
+
+local function AddContinentRareItemStart(groups,node,mapID)
+  if not node or node.role~="itemStart" or not QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance) then return false end
+  -- Consume ultra-rare nodes even when their world-map category is disabled so
+  -- they do not fall back to the ordinary per-source continent renderer.
+  if not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) or not IsQuestMarkerNodeEnabled(node) then return true end
+  local projection=QuestieOcto.ContinentProjection
+  if not projection then return false end
+  local key=tostring(node.questID)..":"..tostring(node.itemID or 0)
+  local group=groups[key]
+  if not group then
+    group={
+      questID=node.questID,itemID=node.itemID,itemName=node.itemName,
+      sx=0,sy=0,n=0,sources={}
+    }
+    groups[key]=group
+  end
+
+  local points=QuestieOcto.Clustering:PointsForNodeOnMap(node,mapID)
+  for _,point in pairs(points or {}) do
+    local x,y=projection:Project(mapID,point.x,point.y)
+    if x and y then
+      group.sx=group.sx+x
+      group.sy=group.sy+y
+      group.n=group.n+1
+      local source=group.sources[node.sourceID]
+      if not source then
+        source={
+          id=node.sourceID,name=node.sourceName,count=0,chance=node.chance,
+          rank=node.sourceRank,respawnSeconds=node.respawnSeconds
+        }
+        group.sources[node.sourceID]=source
+      end
+      source.count=source.count+1
+    end
+  end
+  return true
+end
+
+local function RenderContinentRareItemStarts(groups,mapID,generation)
+  for _,group in pairs(groups or {}) do
+    if group.n and group.n>0 then
+      local sourceList={}
+      for _,source in pairs(group.sources or {}) do table.insert(sourceList,source) end
+      table.sort(sourceList,function(a,b)
+        if a.count==b.count then return tostring(a.name)<tostring(b.name) end
+        return a.count>b.count
+      end)
+      local first=sourceList[1]
+      local area={
+        x=group.sx/group.n,y=group.sy/group.n,n=group.n,
+        questID=group.questID,itemID=group.itemID,itemName=group.itemName,
+        sourceList=sourceList,zoneWideRare=true,
+        rareThreshold=QuestieOcto.ItemStartAreas.zoneWideRareThreshold,
+        displayName=first and first.name or "Rare item-start source",
+        key="continent:"..tostring(mapID)..":"..tostring(group.questID)..":"..tostring(group.itemID or 0)..":zone-rare"
+      }
+      M:RenderItemStartArea(area,generation,mapID)
+    end
+  end
 end
 
 function M:StartContinentSync(continentMapID,doPrune)
@@ -816,6 +912,7 @@ function M:StartContinentSync(continentMapID,doPrune)
   local mapPos=1
   local nodePos=1
   local nodes=nil
+  local rareGroups={}
 
   local function step()
     if generation~=M.generation then return end
@@ -825,15 +922,21 @@ function M:StartContinentSync(continentMapID,doPrune)
       if not nodes then
         nodes=QuestieOcto.Nodes:GetMapNodes(mapIDs[mapPos]) or {}
         nodePos=1
+        rareGroups={}
         M.stats.inputNodes=M.stats.inputNodes+table.getn(nodes)
       end
 
       if nodePos<=table.getn(nodes) then
-        M:RenderContinentNode(nodes[nodePos],mapIDs[mapPos],generation)
+        local node=nodes[nodePos]
+        if not AddContinentRareItemStart(rareGroups,node,mapIDs[mapPos]) then
+          M:RenderContinentNode(node,mapIDs[mapPos],generation)
+        end
         nodePos=nodePos+1
         budget=budget-1
       else
+        RenderContinentRareItemStarts(rareGroups,mapIDs[mapPos],generation)
         nodes=nil
+        rareGroups={}
         mapPos=mapPos+1
       end
     end
@@ -907,18 +1010,25 @@ function M:StartSync(doPrune)
 
     -- Prepared descriptors contain no DB discovery or clustering work.
     -- Typical zone maps can therefore appear in one rendering tick.
+    local worldItemStarts=QuestieOcto.PreparedMap:GetWorldItemStarts(mapID) or {}
     local pos=1
+    local itemPos=1
     local function preparedStep()
       if generation~=M.generation then return end
 
       local count=0
       while pos<=table.getn(prepared) and count<128 do
-        M:RenderPreparedDescriptor(prepared[pos],generation)
+        M:RenderPreparedDescriptor(prepared[pos],generation,false)
         pos=pos+1
         count=count+1
       end
+      while pos>table.getn(prepared) and itemPos<=table.getn(worldItemStarts) and count<128 do
+        M:RenderPreparedDescriptor(worldItemStarts[itemPos],generation,true)
+        itemPos=itemPos+1
+        count=count+1
+      end
 
-      if pos<=table.getn(prepared) then
+      if pos<=table.getn(prepared) or itemPos<=table.getn(worldItemStarts) then
         QuestieOcto.Scheduler:Enqueue(preparedStep,"map-prepared-render")
       else
         M:Finish(generation,doPrune)
@@ -944,18 +1054,25 @@ function M:StartSync(doPrune)
       return
     end
 
+    local worldItemStarts=QuestieOcto.PreparedMap:GetWorldItemStarts(mapID) or {}
     local pos=1
+    local itemPos=1
     local function fallbackPreparedStep()
       if generation~=M.generation then return end
 
       local count=0
       while pos<=table.getn(ready) and count<128 do
-        M:RenderPreparedDescriptor(ready[pos],generation)
+        M:RenderPreparedDescriptor(ready[pos],generation,false)
         pos=pos+1
         count=count+1
       end
+      while pos>table.getn(ready) and itemPos<=table.getn(worldItemStarts) and count<128 do
+        M:RenderPreparedDescriptor(worldItemStarts[itemPos],generation,true)
+        itemPos=itemPos+1
+        count=count+1
+      end
 
-      if pos<=table.getn(ready) then
+      if pos<=table.getn(ready) or itemPos<=table.getn(worldItemStarts) then
         QuestieOcto.Scheduler:Enqueue(fallbackPreparedStep,"map-first-prepare-render")
       else
         M:Finish(generation,doPrune)

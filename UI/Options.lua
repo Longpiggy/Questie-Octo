@@ -336,7 +336,7 @@ local function CreateTooltipTab()
     name="Tooltips", type="group", order=13,
     args={
       header={type="header",order=1,name="Tooltip Options"},
-      enableTooltips={type="toggle",order=2,name="Enable Questie Tooltips",desc="Enable Questie information on map and minimap marker tooltips.",width="full",get=GetValue,set=SetValue},
+      enableTooltips={type="toggle",order=2,name="Enable Questie Tooltips",desc="Enable Questie information on map/minimap markers and when hovering relevant creatures, items, and game objects.",width="full",get=GetValue,set=SetValue},
       enableTooltipsQuestLevel={type="toggle",order=3,name="Show Quest Levels",desc="Show the quest level before the quest title.",width="full",disabled=function() return not Settings():Get("enableTooltips") end,get=GetValue,set=SetValue},
       enableTooltipDroprates={type="toggle",order=4,name="Show Drop Rates",desc="Show database drop-rate percentages for item objectives and item-start quests.",width="full",disabled=function() return not Settings():Get("enableTooltips") end,get=GetValue,set=SetValue},
       id_header={type="header",order=10,name="Tooltip IDs"},

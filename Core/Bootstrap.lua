@@ -25,6 +25,9 @@ f:SetScript("OnEvent",function()
   end
 
   QuestieOcto.enabled=true
+  if QuestieOcto.Tooltips and QuestieOcto.Tooltips.Initialize then
+    QuestieOcto.Tooltips:Initialize()
+  end
   QuestieOcto:RegisterMessage("DATABASE_READY",QuestieOcto,"OnFoundationServiceReady")
   QuestieOcto:RegisterMessage("DATABASE_API_READY",QuestieOcto,"OnFoundationServiceReady")
   QuestieOcto:RegisterMessage("COMPLETION_READY",QuestieOcto,"OnFoundationServiceReady")
