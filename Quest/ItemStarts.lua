@@ -7,7 +7,18 @@ I.running=false
 I.generation=0
 I.stats={ quests=0, starterItems=0, creatureSources=0, objectSources=0 }
 
-local MIN_DROP_CHANCE=1
+-- Quest-starting items can intentionally be rare. A positive recorded
+-- drop chance is enough to make the source useful guidance; filtering at 1%
+-- caused legitimate starters such as Captain Sander's Treasure Map (0.75%)
+-- to vanish after the full item-start resolver replaced the zone bootstrap.
+local function PositiveDropChance(chance)
+  chance=tonumber(chance) or 0
+  return chance>0
+end
+
+function I:IsPositiveDropChance(chance)
+  return PositiveDropChance(chance)
+end
 
 local function ResetStats()
   I.stats={ quests=0, starterItems=0, creatureSources=0, objectSources=0 }
@@ -41,21 +52,21 @@ local function ResolveSources(entry,itemID)
   if sources and sources.Creature then
     for creatureID,chance in pairs(sources.Creature) do
       chance=tonumber(chance) or 0
-      if chance>=MIN_DROP_CHANCE then AddCreature(entry,seenCreature,creatureID,chance,false) end
+      if PositiveDropChance(chance) then AddCreature(entry,seenCreature,creatureID,chance,false) end
     end
   end
 
   if sources and sources.GameObject then
     for objectID,chance in pairs(sources.GameObject) do
       chance=tonumber(chance) or 0
-      if chance>=MIN_DROP_CHANCE and chance>0 then AddObject(entry,seenObject,objectID,chance) end
+      if PositiveDropChance(chance) then AddObject(entry,seenObject,objectID,chance) end
     end
   end
 
   if sources and sources.Reference then
     for refID,chance in pairs(sources.Reference) do
       chance=tonumber(chance) or 0
-      if chance>=MIN_DROP_CHANCE then
+      if PositiveDropChance(chance) then
         local ref=QuestieOcto.DatabaseAPI:GetReferenceLootRaw(refID)
         if ref and ref["U"] then
           for creatureID in pairs(ref["U"]) do AddCreature(entry,seenCreature,creatureID,chance,false) end

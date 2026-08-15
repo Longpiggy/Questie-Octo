@@ -126,11 +126,17 @@ local function StarterTouchesMap(q,mapID)
   for _,itemID in pairs(q.starts.item or {}) do
     local sources=QuestieOcto.DatabaseAPI:GetItemSources(itemID)
     if sources then
-      for id in pairs(sources.Creature or {}) do
-        if CoordsContainMap(QuestieOcto.DatabaseAPI:GetCreatureCoords(id),mapID) then return true end
+      for id,chance in pairs(sources.Creature or {}) do
+        if QuestieOcto.ItemStarts:IsPositiveDropChance(chance)
+           and CoordsContainMap(QuestieOcto.DatabaseAPI:GetCreatureCoords(id),mapID) then
+          return true
+        end
       end
-      for id in pairs(sources.GameObject or {}) do
-        if CoordsContainMap(QuestieOcto.DatabaseAPI:GetObjectCoords(id),mapID) then return true end
+      for id,chance in pairs(sources.GameObject or {}) do
+        if QuestieOcto.ItemStarts:IsPositiveDropChance(chance)
+           and CoordsContainMap(QuestieOcto.DatabaseAPI:GetObjectCoords(id),mapID) then
+          return true
+        end
       end
     end
   end
@@ -153,17 +159,21 @@ local function AddAvailableQuestNodes(nodes,q,mapID)
     local sources=QuestieOcto.DatabaseAPI:GetItemSources(itemID)
     if sources then
       for id,chance in pairs(sources.Creature or {}) do
-        local node=CreatureNode(q.id,"itemStart",id,itemID,chance)
-        if CoordsContainMap(node.coords,mapID) then
-          AddNode(nodes,node)
-          Z.stats.itemSources=Z.stats.itemSources+1
+        if QuestieOcto.ItemStarts:IsPositiveDropChance(chance) then
+          local node=CreatureNode(q.id,"itemStart",id,itemID,chance)
+          if CoordsContainMap(node.coords,mapID) then
+            AddNode(nodes,node)
+            Z.stats.itemSources=Z.stats.itemSources+1
+          end
         end
       end
       for id,chance in pairs(sources.GameObject or {}) do
-        local node=ObjectNode(q.id,"itemStart",id,itemID,chance)
-        if CoordsContainMap(node.coords,mapID) then
-          AddNode(nodes,node)
-          Z.stats.itemSources=Z.stats.itemSources+1
+        if QuestieOcto.ItemStarts:IsPositiveDropChance(chance) then
+          local node=ObjectNode(q.id,"itemStart",id,itemID,chance)
+          if CoordsContainMap(node.coords,mapID) then
+            AddNode(nodes,node)
+            Z.stats.itemSources=Z.stats.itemSources+1
+          end
         end
       end
     end
