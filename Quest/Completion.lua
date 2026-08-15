@@ -341,4 +341,4 @@ f:SetScript("OnUpdate",function()
   end
 end)
 
-QuestieOcto:RegisterMessage("QUEST_LOG_CHANGED",C,"RefreshAfterQuestStateChange")
+QuestieOcto:RegisterMessage("QUEST_ELIGIBILITY_STATE_CHANGED",C,"RefreshAfterQuestStateChange")

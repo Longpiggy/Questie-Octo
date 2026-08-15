@@ -7,6 +7,7 @@ P.cacheRevision={}
 P.stateRevision=1
 P.running=false
 P.generation=0
+P.dirtyGeneration=0
 P.stats={preparedMaps=0,descriptors=0,currentMap=nil,currentReady=false,stateRevision=1,revisionBumps=0}
 
 local function ExactRole(role)
@@ -36,20 +37,33 @@ local function AreaKey(node,area)
 end
 
 local function FullPointKey(prefix,node,x,y)
-  return tostring(prefix)..":"..tostring(node.questID)..":"..tostring(node.role)..":"..
-    tostring(node.sourceKind)..":"..tostring(node.sourceID)..":"..
-    tostring(node.itemID or 0)..":"..string.format("%.2f",x)..":"..string.format("%.2f",y)
+  -- Full Nodes means every UNIQUE spawn coordinate. Multiple active quests or
+  -- item objectives can reference the exact same spawn; pfQuest stores those
+  -- references in one coordinate slot and combines their tooltip metadata.
+  -- Keep item-start and objective namespaces compatible by sharing the same
+  -- quest-coordinate key so one physical spawn never allocates duplicate pins.
+  return "full:quest:"..string.format("%.2f",x)..":"..string.format("%.2f",y)
 end
 
-local function AddNormal(plan,node,x,y,clusterCount,kind,key)
-  table.insert(plan,{
-    type="node",
+local function AddNormal(plan,slots,node,x,y,clusterCount,kind,key)
+  local slot=slots[key]
+  if not slot then
+    slot={
+      type="nodeSlot",
+      x=x,
+      y=y,
+      key=key,
+      coordKey=string.format("%.2f:%.2f",x,y),
+      entries={}
+    }
+    slots[key]=slot
+    table.insert(plan,slot)
+  end
+
+  table.insert(slot.entries,{
     node=node,
-    x=x,
-    y=y,
     clusterCount=clusterCount or 1,
-    kind=kind,
-    key=key
+    kind=kind
   })
 end
 
@@ -58,6 +72,7 @@ function P:BuildPlanFromNodes(mapID,nodes)
   if not mapID then return nil end
 
   local plan={}
+  local slots={}
 
   for _,node in pairs(nodes or {}) do
     if node.role~="itemStart" then
@@ -66,7 +81,7 @@ function P:BuildPlanFromNodes(mapID,nodes)
 
         for _,point in pairs(points) do
           AddNormal(
-            plan,node,point.x,point.y,1,"exact",
+            plan,slots,node,point.x,point.y,1,"exact",
             DescriptorKey(node,point.x,point.y)
           )
         end
@@ -76,7 +91,7 @@ function P:BuildPlanFromNodes(mapID,nodes)
         if QuestieOcto.MinimapSettings:Get("objectiveNodeDensity")=="full" then
           for _,point in pairs(points) do
             AddNormal(
-              plan,node,point.x,point.y,1,"objectiveFull",
+              plan,slots,node,point.x,point.y,1,"objectiveFull",
               FullPointKey("objective-full",node,point.x,point.y)
             )
           end
@@ -86,7 +101,7 @@ function P:BuildPlanFromNodes(mapID,nodes)
           )
 
           for _,area in pairs(areas) do
-            AddNormal(plan,node,area.x,area.y,area.n,"objective",AreaKey(node,area))
+            AddNormal(plan,slots,node,area.x,area.y,area.n,"objective",AreaKey(node,area))
           end
         end
       end
@@ -99,7 +114,7 @@ function P:BuildPlanFromNodes(mapID,nodes)
         local points=QuestieOcto.Clustering:PointsForNodeOnMap(node,mapID)
         for _,point in pairs(points) do
           AddNormal(
-            plan,node,point.x,point.y,1,"itemStartFull",
+            plan,slots,node,point.x,point.y,1,"itemStartFull",
             FullPointKey("itemstart-full",node,point.x,point.y)
           )
         end
@@ -172,21 +187,39 @@ function P:IsReady(mapID)
      and true or false
 end
 
-local function DescriptorQuestID(desc)
-  if not desc then return nil end
-  if desc.type=="node" and desc.node then return tonumber(desc.node.questID) end
-  if desc.type=="itemStartArea" and desc.area then return tonumber(desc.area.questID) end
-  return nil
+local function RemoveQuestFromDescriptor(desc,questID)
+  if not desc then return false,0 end
+
+  if desc.type=="itemStartArea" and desc.area then
+    if tonumber(desc.area.questID)==questID then return true,1 end
+    return false,0
+  end
+
+  if desc.type=="nodeSlot" then
+    local kept={}
+    local removed=0
+    for _,entry in pairs(desc.entries or {}) do
+      if entry.node and tonumber(entry.node.questID)==questID then
+        removed=removed+1
+      else
+        table.insert(kept,entry)
+      end
+    end
+    desc.entries=kept
+    return table.getn(kept)==0,removed
+  end
+
+  if desc.type=="node" and desc.node and tonumber(desc.node.questID)==questID then
+    return true,1
+  end
+
+  return false,0
 end
 
 function P:RemoveQuest(questID)
   questID=tonumber(questID)
   if not questID then return 0 end
 
-  -- Questie has no separate prepared-descriptor cache: UnloadQuestFrames()
-  -- removes the quest from both map presentations immediately. Keep our
-  -- approved cache optimization semantically equivalent by purging the quest
-  -- from every cached map before either presentation can consume it again.
   self.stateRevision=self.stateRevision+1
   self.stats.stateRevision=self.stateRevision
   self.stats.revisionBumps=(self.stats.revisionBumps or 0)+1
@@ -197,11 +230,9 @@ function P:RemoveQuest(questID)
   for mapID,plan in pairs(self.cache) do
     local filtered={}
     for _,desc in pairs(plan or {}) do
-      if DescriptorQuestID(desc)==questID then
-        removed=removed+1
-      else
-        table.insert(filtered,desc)
-      end
+      local drop,count=RemoveQuestFromDescriptor(desc,questID)
+      removed=removed+(count or 0)
+      if not drop then table.insert(filtered,desc) end
     end
 
     self.cache[mapID]=filtered
@@ -210,7 +241,12 @@ function P:RemoveQuest(questID)
     end
   end
 
-  self.stats.descriptors=math.max(0,(self.stats.descriptors or 0)-removed)
+  -- `descriptors` counts coordinate slots, not quest references, in the new
+  -- pfQuest-style prepared representation. Recalculate cheaply after an
+  -- immediate quest removal rather than subtracting removed metadata entries.
+  local descriptorCount=0
+  for _,plan in pairs(self.cache) do descriptorCount=descriptorCount+table.getn(plan or {}) end
+  self.stats.descriptors=descriptorCount
   if self.stats.currentMap and self.readyMaps[self.stats.currentMap] then
     self.stats.currentReady=true
   end
@@ -228,6 +264,7 @@ end
 
 function P:Invalidate()
   self.generation=self.generation+1
+  self.dirtyGeneration=(self.dirtyGeneration or 0)+1
   self.cache={}
   self.readyMaps={}
   self.cacheRevision={}
@@ -300,7 +337,7 @@ function P:PrepareAll()
     end
 
     local count=0
-    while pos<=table.getn(ids) and count<3 do
+    while pos<=table.getn(ids) and count<1 do
       local mapID=ids[pos]
       pos=pos+1
       if tonumber(mapID)~=tonumber(current) and tonumber(mapID)~=tonumber(displayed) then
@@ -325,3 +362,144 @@ function P:OnNodesReady()
 end
 
 QuestieOcto:RegisterMessage("NODES_READY",P,"OnNodesReady")
+
+local function DescriptorKeyValue(desc)
+  return desc and tostring(desc.key or "") or ""
+end
+
+local function MergePreparedDescriptor(byKey,plan,desc)
+  if not desc then return end
+  local key=DescriptorKeyValue(desc)
+  local existing=byKey[key]
+
+  if existing and existing.type=="nodeSlot" and desc.type=="nodeSlot" then
+    for _,entry in pairs(desc.entries or {}) do table.insert(existing.entries,entry) end
+    return
+  end
+
+  -- Item-start areas are quest-specific and exact/full node-slot keys are
+  -- canonical. A same-key non-slot descriptor is safely replaced.
+  if existing then
+    for i,current in ipairs(plan) do
+      if current==existing then plan[i]=desc; break end
+    end
+    byKey[key]=desc
+    return
+  end
+
+  byKey[key]=desc
+  table.insert(plan,desc)
+end
+
+function P:PatchMaps(mapSet,changedQuests)
+  if not QuestieOcto.Nodes.ready then return end
+
+  local changed={}
+  for questID in pairs(changedQuests or {}) do
+    questID=tonumber(questID)
+    if questID and questID>0 then changed[questID]=true end
+  end
+  if not next(changed) then
+    -- Compatibility/fallback for an older producer that did not provide the
+    -- reverse quest set: rebuilding just the affected maps is still bounded.
+    return self:RebuildMaps(mapSet)
+  end
+
+  local ids={}
+  for mapID in pairs(mapSet or {}) do
+    mapID=tonumber(mapID)
+    if mapID then table.insert(ids,mapID) end
+  end
+  table.sort(ids)
+  if table.getn(ids)==0 then return end
+
+  self.dirtyGeneration=(self.dirtyGeneration or 0)+1
+  local generation=self.dirtyGeneration
+  local pos=1
+
+  local function step()
+    if generation~=P.dirtyGeneration then return end
+    local mapID=ids[pos]
+    pos=pos+1
+
+    if mapID then
+      local existing=P:Get(mapID)
+      if not existing then
+        -- First visit / stale cache: build the authoritative map once.
+        P:BuildMap(mapID)
+      else
+        -- pfQuest-style reverse update: remove only the changed quests' metadata
+        -- from existing coordinate slots, then merge descriptors produced by
+        -- those quests' new semantic state. Unrelated coordinates/clusters are
+        -- never rediscovered or reclustered.
+        local plan={}
+        local byKey={}
+        for _,desc in pairs(existing) do
+          local drop=false
+          for questID in pairs(changed) do
+            local remove=RemoveQuestFromDescriptor(desc,questID)
+            if remove then drop=true end
+          end
+          if not drop then
+            table.insert(plan,desc)
+            byKey[DescriptorKeyValue(desc)]=desc
+          end
+        end
+
+        local changedNodes={}
+        for _,node in pairs(QuestieOcto.Nodes:GetMapNodes(mapID) or {}) do
+          if changed[tonumber(node.questID)] then table.insert(changedNodes,node) end
+        end
+        local delta=P:BuildPlanFromNodes(mapID,changedNodes) or {}
+        for _,desc in pairs(delta) do MergePreparedDescriptor(byKey,plan,desc) end
+
+        table.sort(plan,function(a,b) return DescriptorKeyValue(a)<DescriptorKeyValue(b) end)
+        P:SetPreparedMap(mapID,plan)
+      end
+    end
+
+    if pos<=table.getn(ids) then
+      QuestieOcto.Scheduler:Enqueue(step,"prepare-dirty-maps")
+    end
+  end
+
+  QuestieOcto.Scheduler:Enqueue(step,"prepare-dirty-maps")
+end
+
+function P:RebuildMaps(mapSet)
+  if not QuestieOcto.Nodes.ready then return end
+
+  local ids={}
+  for mapID in pairs(mapSet or {}) do
+    mapID=tonumber(mapID)
+    if mapID then table.insert(ids,mapID) end
+  end
+  table.sort(ids)
+  if table.getn(ids)==0 then return end
+
+  self.dirtyGeneration=(self.dirtyGeneration or 0)+1
+  local generation=self.dirtyGeneration
+  local pos=1
+
+  local function step()
+    if generation~=P.dirtyGeneration then return end
+    local mapID=ids[pos]
+    pos=pos+1
+    if mapID then
+      local plan=P:BuildPlanFromNodes(mapID,QuestieOcto.Nodes:GetMapNodes(mapID)) or {}
+      P:SetPreparedMap(mapID,plan)
+    end
+
+    if pos<=table.getn(ids) then
+      QuestieOcto.Scheduler:Enqueue(step,"prepare-dirty-maps")
+    end
+  end
+
+  QuestieOcto.Scheduler:Enqueue(step,"prepare-dirty-maps")
+end
+
+function P:OnNodesChanged(mapSet,changedQuests)
+  self:PatchMaps(mapSet,changedQuests)
+end
+
+QuestieOcto:RegisterMessage("NODES_CHANGED",P,"OnNodesChanged")

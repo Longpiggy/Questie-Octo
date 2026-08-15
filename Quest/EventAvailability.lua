@@ -450,4 +450,4 @@ function E:OnDatabaseReady()
 end
 
 QuestieOcto:RegisterMessage("DATABASE_API_READY",E,"OnDatabaseReady")
-QuestieOcto:RegisterMessage("QUEST_LOG_CHANGED",E,"OnQuestLogChanged")
+QuestieOcto:RegisterMessage("QUEST_ACTIVE_SET_CHANGED",E,"OnQuestLogChanged")

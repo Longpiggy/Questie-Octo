@@ -646,7 +646,7 @@ end
 
 QuestieOcto:RegisterMessage("DATABASE_API_READY",A,"OnFoundationInputChanged")
 QuestieOcto:RegisterMessage("COMPLETION_READY",A,"OnFoundationInputChanged")
-QuestieOcto:RegisterMessage("QUEST_LOG_CHANGED",A,"OnFoundationInputChanged")
+QuestieOcto:RegisterMessage("QUEST_ELIGIBILITY_STATE_CHANGED",A,"OnFoundationInputChanged")
 
 local stateFrame=CreateFrame("Frame","QuestieOctoQuestEligibilityEvents",UIParent)
 stateFrame:RegisterEvent("PLAYER_LEVEL_UP")

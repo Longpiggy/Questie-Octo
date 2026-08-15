@@ -124,6 +124,57 @@ local function PlayerHasItem(itemID)
   return false
 end
 
+-- pfQuest only reacts to bag changes that affect registered quest-item
+-- dependencies. Normal objective counts refresh the Tracker directly; map
+-- objectives only rebuild when their todo/done semantics actually change.
+local function CollectIRItemIDs()
+  local tracked={}
+  for questID in pairs(QuestieOcto.QuestLog.active or {}) do
+    local q=QuestieOcto.QuestModel:Get(questID)
+    if q and q.objectives and q.objectives.irItems then
+      for _,itemID in pairs(q.objectives.irItems) do
+        itemID=tonumber(itemID)
+        if itemID and itemID>0 then tracked[itemID]=true end
+      end
+    end
+  end
+  return tracked
+end
+
+local function SnapshotIRPresence()
+  local state={}
+  local tracked=CollectIRItemIDs()
+  for itemID in pairs(tracked) do
+    state[itemID]=PlayerHasItem(itemID) and true or false
+  end
+  return state
+end
+
+local function RefreshIRPresence()
+  O.irPresence=SnapshotIRPresence()
+end
+
+local function IRPresenceChanged()
+  local previous=O.irPresence or {}
+  local current=SnapshotIRPresence()
+
+  for itemID,present in pairs(current) do
+    if previous[itemID]~=present then
+      O.irPresence=current
+      return true
+    end
+  end
+  for itemID in pairs(previous) do
+    if current[itemID]==nil then
+      O.irPresence=current
+      return true
+    end
+  end
+
+  O.irPresence=current
+  return false
+end
+
 local function BuildIRTargets(q)
   local targets={}
   local skipCreature={}
@@ -385,6 +436,7 @@ function O:Rebuild()
     end
     O.running=false
     O.ready=true
+    RefreshIRPresence()
     QuestieOcto:SendMessage("OBJECTIVES_READY")
     if O.pending then O.pending=false; O:Schedule(0.01) end
   end
@@ -398,11 +450,59 @@ function O:Schedule(delay)
   end,"objectives-rebuild")
 end
 
-function O:OnDependencyChanged()
-  self:Schedule(0.01)
+function O:RefreshQuests(changedQuests)
+  if not self.ready or self.running or not DependenciesReady() then
+    self:Schedule(0.01)
+    return
+  end
+
+  local ids={}
+  for questID in pairs(changedQuests or {}) do table.insert(ids,tonumber(questID)) end
+  table.sort(ids)
+  if table.getn(ids)==0 then return end
+
+  self.running=true
+  self.generation=self.generation+1
+  local generation=self.generation
+  local pos=1
+
+  local function step()
+    if generation~=O.generation then return end
+    local count=0
+    while pos<=table.getn(ids) and count<8 do
+      local questID=ids[pos]
+      pos=pos+1
+      if QuestieOcto.QuestLog.active[questID] then
+        O.byQuest[questID]=O:ResolveQuest(questID)
+      else
+        O.byQuest[questID]=nil
+      end
+      count=count+1
+    end
+
+    if pos<=table.getn(ids) then
+      QuestieOcto.Scheduler:Enqueue(step,"objective-refresh-quests")
+      return
+    end
+
+    O.running=false
+    RefreshIRPresence()
+    QuestieOcto:SendMessage("OBJECTIVES_CHANGED",changedQuests)
+    if O.pending then O.pending=false; O:Schedule(0.01) end
+  end
+
+  QuestieOcto.Scheduler:Enqueue(step,"objective-refresh-quests")
 end
 
-QuestieOcto:RegisterMessage("QUEST_LOG_CHANGED",O,"OnDependencyChanged")
+function O:OnDependencyChanged(changedQuests)
+  if type(changedQuests)=="table" and self.ready then
+    self:RefreshQuests(changedQuests)
+  else
+    self:Schedule(0.01)
+  end
+end
+
+QuestieOcto:RegisterMessage("QUEST_MAP_STATE_CHANGED",O,"OnDependencyChanged")
 QuestieOcto:RegisterMessage("DATABASE_API_READY",O,"OnDependencyChanged")
 
 local bagFrame=CreateFrame("Frame","QuestieOctoObjectiveItemEvents",UIParent)
@@ -410,5 +510,19 @@ bagFrame:RegisterEvent("BAG_UPDATE")
 bagFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
 bagFrame:SetScript("OnEvent",function()
   if event=="UNIT_INVENTORY_CHANGED" and arg1 and arg1~="player" then return end
-  O:Schedule(0.05)
+
+  -- Coalesce the entire loot/equipment burst, then touch the objective pipeline
+  -- only if an IR quest-item dependency actually appeared/disappeared.
+  QuestieOcto.Scheduler:After(0.25,function()
+    if IRPresenceChanged() then
+      local affected={}
+      for questID in pairs(QuestieOcto.QuestLog.active or {}) do
+        local q=QuestieOcto.QuestModel:Get(questID)
+        if q and q.objectives and q.objectives.irItems and table.getn(q.objectives.irItems)>0 then
+          affected[questID]=true
+        end
+      end
+      if next(affected) then O:RefreshQuests(affected) end
+    end
+  end,"objective-ir-bag-check")
 end)

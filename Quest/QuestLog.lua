@@ -11,7 +11,9 @@ QL.acceptPollGeneration=0
 QL.acceptPollUntil=0
 QL.active={}
 QL.snapshot=nil
-QL.stats={ entries=0, quests=0, resolved=0, refreshes=0, acceptedFastRefreshes=0, acceptedEvents=0, acceptedResolved=0, acceptedFromIndex=0, acceptedHintsUsed=0, acceptedPrimes=0, acceptedPolls=0, lastAcceptedQuestID=0, removedEvents=0, removedResolved=0, removedFromIndex=0, lastRemovedQuestID=0, completeRaw=0, completeObjectives=0, completeNoObjectives=0, failed=0 }
+QL.mapSnapshot=nil
+QL.mapState=nil
+QL.stats={ entries=0, quests=0, resolved=0, refreshes=0, acceptedFastRefreshes=0, acceptedEvents=0, acceptedResolved=0, acceptedFromIndex=0, acceptedHintsUsed=0, acceptedPrimes=0, acceptedPolls=0, lastAcceptedQuestID=0, removedEvents=0, removedResolved=0, removedFromIndex=0, lastRemovedQuestID=0, completeRaw=0, completeObjectives=0, completeNoObjectives=0, failed=0, mapChanges=0, progressOnlyChanges=0 }
 
 local function ParseObjectiveProgress(text)
   if not text then return nil,nil end
@@ -30,6 +32,7 @@ end
 local function ReadObjectives(index,questID)
   local objectives={}
   local snapshot={}
+  local mapSnapshot={}
   local allDone=false
 
   -- Questie v7+ source of truth.
@@ -69,9 +72,19 @@ local function ReadObjectives(index,questID)
       table.insert(snapshot,finished and "1" or "0")
       table.insert(snapshot,tostring(current or -1))
       table.insert(snapshot,tostring(required or -1))
+
+      -- Map nodes only care whether an objective is still active. pfQuest's
+      -- quest-state signature likewise records todo/done, not 3/10 -> 4/10.
+      -- Keep the full snapshot above for Tracker/UI updates, but exclude the
+      -- numerical counter (and counter-bearing text) from map invalidation.
+      if typ~="log" then
+        table.insert(mapSnapshot,tostring(i))
+        table.insert(mapSnapshot,tostring(typ or ""))
+        table.insert(mapSnapshot,finished and "1" or "0")
+      end
     end
 
-    return objectives,table.concat(snapshot,"\\030"),allDone,"QuestieAPI"
+    return objectives,table.concat(snapshot,"\\030"),allDone,"QuestieAPI",table.concat(mapSnapshot,"\\030")
   end
 
   -- 1.12 compatibility fallback. The legacy leaderboard API only supplies
@@ -106,9 +119,15 @@ local function ReadObjectives(index,questID)
     table.insert(snapshot,finished and "1" or "0")
     table.insert(snapshot,tostring(current or -1))
     table.insert(snapshot,tostring(required or -1))
+
+    if typ~="log" then
+      table.insert(mapSnapshot,tostring(i))
+      table.insert(mapSnapshot,tostring(typ or ""))
+      table.insert(mapSnapshot,finished and "1" or "0")
+    end
   end
 
-  return objectives,table.concat(snapshot,"\\030"),allDone,"LeaderboardFallback"
+  return objectives,table.concat(snapshot,"\\030"),allDone,"LeaderboardFallback",table.concat(mapSnapshot,"\\030")
 end
 
 
@@ -291,6 +310,7 @@ function QL:Refresh(fastRefresh)
 
   local nextActive={}
   local snapshotParts={}
+  local nextMapState={}
   local pos=1
   local currentHeader="Other"
   local nativeResolved={}
@@ -322,7 +342,7 @@ function QL:Refresh(fastRefresh)
         if questID and QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI.GetQuestTitle then
           title=QuestieOcto.DatabaseAPI:GetQuestTitle(questID) or nativeTitle
         end
-        local objectives,objectiveSnapshot,allObjectivesDone,objectiveSource=ReadObjectives(index,questID)
+        local objectives,objectiveSnapshot,allObjectivesDone,objectiveSource,objectiveMapSnapshot=ReadObjectives(index,questID)
         objectives=LocalizeObjectiveRows(questID,objectives)
 
         -- Preserve the client/server tri-state exactly:
@@ -406,6 +426,10 @@ function QL:Refresh(fastRefresh)
             objectives=objectives,
             objectiveSource=objectiveSource
           }
+          -- Separate map semantics from live progress text. A simple 3/10 ->
+          -- 4/10 update must refresh the Tracker, but it must not reconstruct
+          -- thousands of Full Nodes whose visibility did not change.
+          nextMapState[questID]=tostring(status).."\031"..tostring(objectiveMapSnapshot or "")
           QL.stats.resolved=QL.stats.resolved+1
         end
 
@@ -421,7 +445,57 @@ function QL:Refresh(fastRefresh)
     local nextSnapshot=table.concat(snapshotParts,"\031")
     local changed=(nextSnapshot~=QL.snapshot)
 
+    local previousActive=QL.active or {}
+    local activeSetChangedQuests={}
+    local activeSetChanged=false
+    for questID in pairs(nextActive) do
+      if previousActive[questID]==nil then
+        activeSetChangedQuests[questID]=true
+        activeSetChanged=true
+      end
+    end
+    for questID in pairs(previousActive) do
+      if nextActive[questID]==nil then
+        activeSetChangedQuests[questID]=true
+        activeSetChanged=true
+      end
+    end
+
+    -- Eligibility consumers need active membership and whole-quest status, but
+    -- not every individual objective completion. Keep that signal separate so
+    -- availability/completion services preserve their old correctness without
+    -- forcing a Full Nodes rebuild for 3/10 -> 4/10 or one sub-objective done.
+    local eligibilityChangedQuests={}
+    local eligibilityChanged=activeSetChanged and true or false
+    for questID in pairs(activeSetChangedQuests) do eligibilityChangedQuests[questID]=true end
+    for questID,state in pairs(nextActive) do
+      local previous=previousActive[questID]
+      if previous and tonumber(previous.status or 0)~=tonumber(state.status or 0) then
+        eligibilityChangedQuests[questID]=true
+        eligibilityChanged=true
+      end
+    end
+
+    local firstMapPublication=(QL.mapState==nil)
+    local previousMapState=QL.mapState or {}
+    local mapChangedQuests={}
+    local mapChanged=firstMapPublication and true or false
+    for questID,state in pairs(nextMapState) do
+      if previousMapState[questID]~=state then
+        mapChangedQuests[questID]=true
+        mapChanged=true
+      end
+    end
+    for questID in pairs(previousMapState) do
+      if nextMapState[questID]==nil then
+        mapChangedQuests[questID]=true
+        mapChanged=true
+      end
+    end
+
     QL.snapshot=nextSnapshot
+    QL.mapState=nextMapState
+    QL.mapSnapshot=true
     QL.active=nextActive
     PurgeAcceptedHints(nativeResolved)
     QL.running=false
@@ -430,7 +504,21 @@ function QL:Refresh(fastRefresh)
       QL.stats.acceptedFastRefreshes=(QL.stats.acceptedFastRefreshes or 0)+1
     end
 
-    if changed then QuestieOcto:SendMessage("QUEST_LOG_CHANGED") end
+    if changed then
+      QuestieOcto:SendMessage("QUEST_LOG_CHANGED")
+      if activeSetChanged then
+        QuestieOcto:SendMessage("QUEST_ACTIVE_SET_CHANGED",activeSetChangedQuests)
+      end
+      if eligibilityChanged then
+        QuestieOcto:SendMessage("QUEST_ELIGIBILITY_STATE_CHANGED",eligibilityChangedQuests)
+      end
+      if mapChanged then
+        QL.stats.mapChanges=(QL.stats.mapChanges or 0)+1
+        QuestieOcto:SendMessage("QUEST_MAP_STATE_CHANGED",mapChangedQuests)
+      else
+        QL.stats.progressOnlyChanges=(QL.stats.progressOnlyChanges or 0)+1
+      end
+    end
 
     if QL.acceptedQuestID then
       local accepted=QL.active[QL.acceptedQuestID]

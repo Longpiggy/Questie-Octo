@@ -6,6 +6,8 @@ N.running=false
 N.generation=0
 N.nodes={}
 N.byMap={}
+N.questMaps={}
+N.nodeSequence=0
 N.stats={
   total=0,
   availableCreature=0,
@@ -56,6 +58,10 @@ local function CurrentByMap()
   return N.buildByMap or N.byMap
 end
 
+local function CurrentQuestMaps()
+  return N.buildQuestMaps or N.questMaps
+end
+
 local function ApplyIconScaleKey(node)
   return node
 end
@@ -71,7 +77,8 @@ end
 local function AddNode(node)
   node=ApplyIconScaleKey(node)
   CurrentStats().total=CurrentStats().total+1
-  node.nodeID=CurrentStats().total
+  N.nodeSequence=(N.nodeSequence or 0)+1
+  node.nodeID=N.nodeSequence
   table.insert(CurrentNodes(),node)
 
   local coords=node.coords
@@ -89,6 +96,11 @@ local function AddNode(node)
           local byMap=CurrentByMap()
           byMap[mapID]=byMap[mapID] or {}
           table.insert(byMap[mapID],node)
+          if tonumber(node.questID) and tonumber(node.questID)>0 then
+            local questMaps=CurrentQuestMaps()
+            questMaps[node.questID]=questMaps[node.questID] or {}
+            questMaps[node.questID][mapID]=true
+          end
         end
       end
     end
@@ -274,50 +286,145 @@ local function BuildPermanentMapNodes()
   BuildRareMobNodes()
 end
 
-local function BuildActiveNodes()
-  for questID,state in pairs(QuestieOcto.QuestLog.active) do
-    local q=QuestieOcto.QuestModel:Get(questID)
-    if q then
-      if state.complete then
-        for _,id in pairs(q.finishes.creature or {}) do
-          AddCreatureNode(questID,"turnin",id,nil,nil)
-          CurrentStats().turnin=CurrentStats().turnin+1
+local function BuildActiveQuestNodes(questID)
+  local state=QuestieOcto.QuestLog.active[questID]
+  local q=QuestieOcto.QuestModel:Get(questID)
+  if not state or not q then return end
+
+  if state.complete then
+    for _,id in pairs(q.finishes.creature or {}) do
+      AddCreatureNode(questID,"turnin",id,nil,nil)
+      CurrentStats().turnin=CurrentStats().turnin+1
+    end
+    for _,id in pairs(q.finishes.gameObject or {}) do
+      AddObjectNode(questID,"turnin",id,nil,nil)
+      CurrentStats().turnin=CurrentStats().turnin+1
+    end
+    return
+  end
+
+  local resolved=QuestieOcto.Objectives.byQuest[questID]
+  if not resolved then return end
+
+  for _,src in pairs(resolved.creature or {}) do
+    if not src.complete then
+      AddCreatureNode(questID,"objectiveCreature",src.id,src.itemID,nil,src)
+      CurrentStats().objectiveCreature=CurrentStats().objectiveCreature+1
+    end
+  end
+  for _,src in pairs(resolved.gameObject or {}) do
+    if not src.complete then
+      AddObjectNode(questID,"objectiveObject",src.id,src.itemID,nil,src)
+      CurrentStats().objectiveObject=CurrentStats().objectiveObject+1
+    end
+  end
+  for _,item in pairs(resolved.item or {}) do
+    if not item.complete then
+      for _,src in pairs(item.sources or {}) do
+        if src.kind=="creature" then
+          AddCreatureNode(questID,"objectiveItemSource",src.id,item.itemID,src.chance,item,src.vendor)
+        else
+          AddObjectNode(questID,"objectiveItemSource",src.id,item.itemID,src.chance,item)
         end
-        for _,id in pairs(q.finishes.gameObject or {}) do
-          AddObjectNode(questID,"turnin",id,nil,nil)
-          CurrentStats().turnin=CurrentStats().turnin+1
-        end
-      else
-        local resolved=QuestieOcto.Objectives.byQuest[questID]
-        if resolved then
-          for _,src in pairs(resolved.creature) do
-            if not src.complete then
-              AddCreatureNode(questID,"objectiveCreature",src.id,src.itemID,nil,src)
-              CurrentStats().objectiveCreature=CurrentStats().objectiveCreature+1
-            end
-          end
-          for _,src in pairs(resolved.gameObject) do
-            if not src.complete then
-              AddObjectNode(questID,"objectiveObject",src.id,src.itemID,nil,src)
-              CurrentStats().objectiveObject=CurrentStats().objectiveObject+1
-            end
-          end
-          for _,item in pairs(resolved.item) do
-            if not item.complete then
-              for _,src in pairs(item.sources) do
-                if src.kind=="creature" then
-                  AddCreatureNode(questID,"objectiveItemSource",src.id,item.itemID,src.chance,item,src.vendor)
-                else
-                  AddObjectNode(questID,"objectiveItemSource",src.id,item.itemID,src.chance,item)
-                end
-                CurrentStats().objectiveItemSource=CurrentStats().objectiveItemSource+1
-              end
-            end
-          end
-        end
+        CurrentStats().objectiveItemSource=CurrentStats().objectiveItemSource+1
       end
     end
   end
+end
+
+local function BuildActiveNodes()
+  for questID in pairs(QuestieOcto.QuestLog.active or {}) do
+    BuildActiveQuestNodes(questID)
+  end
+end
+
+local function StatKeyForNode(node)
+  if not node then return nil end
+  if node.role=="available" then
+    return node.sourceKind=="gameObject" and "availableObject" or "availableCreature"
+  end
+  if node.role=="itemStart" then return "itemStart" end
+  if node.role=="objectiveCreature" then return "objectiveCreature" end
+  if node.role=="objectiveObject" then return "objectiveObject" end
+  if node.role=="objectiveItemSource" then return "objectiveItemSource" end
+  if node.role=="turnin" then return "turnin" end
+  if node.role=="flightMaster" then return "flightMaster" end
+  if node.role=="auctioneer" then return "auctioneer" end
+  if node.role=="banker" then return "banker" end
+  if node.role=="mailbox" then return "mailbox" end
+  if node.role=="rareMob" then return "rareMob" end
+  return nil
+end
+
+local function DecrementNodeStats(node)
+  N.stats.total=math.max(0,(N.stats.total or 0)-1)
+  local key=StatKeyForNode(node)
+  if key then N.stats[key]=math.max(0,(N.stats[key] or 0)-1) end
+end
+
+function N:RefreshQuests(changedQuests)
+  if not self.ready or self.running or not QuestieOcto.Objectives.ready then
+    self:Rebuild()
+    return
+  end
+
+  local changed={}
+  for questID in pairs(changedQuests or {}) do
+    questID=tonumber(questID)
+    if questID and questID>0 then changed[questID]=true end
+  end
+  if not next(changed) then return end
+
+  local affectedMaps={}
+
+  -- Update global node/stat accounting once per canonical node. A canonical
+  -- source can belong to more than one map, so decrementing while filtering
+  -- per-map arrays would count the same node more than once.
+  local keptGlobal={}
+  for _,node in pairs(self.nodes or {}) do
+    if changed[tonumber(node.questID)] then
+      DecrementNodeStats(node)
+    else
+      table.insert(keptGlobal,node)
+    end
+  end
+  self.nodes=keptGlobal
+
+  -- Remove only the changed quests from map indexes. The reverse quest->map
+  -- index is the same idea as pfQuest's titleIndex and avoids scanning
+  -- unrelated zone tables.
+  for questID in pairs(changed) do
+    for mapID in pairs(self.questMaps[questID] or {}) do
+      affectedMaps[mapID]=true
+      local kept={}
+      for _,node in pairs(self.byMap[mapID] or {}) do
+        if tonumber(node.questID)~=questID then table.insert(kept,node) end
+      end
+      self.byMap[mapID]=kept
+    end
+    self.questMaps[questID]=nil
+  end
+
+  -- Add the current semantic state for only those quests (objective nodes or
+  -- turn-in nodes). AddNode repopulates questMaps and may touch new maps.
+  for questID in pairs(changed) do
+    BuildActiveQuestNodes(questID)
+    for mapID in pairs(self.questMaps[questID] or {}) do affectedMaps[mapID]=true end
+  end
+
+  for mapID in pairs(affectedMaps) do
+    local mapNodes=self.byMap[mapID]
+    if mapNodes then
+      table.sort(mapNodes,function(a,b)
+        if a.questID~=b.questID then return a.questID<b.questID end
+        if a.role~=b.role then return tostring(a.role)<tostring(b.role) end
+        if a.sourceKind~=b.sourceKind then return tostring(a.sourceKind)<tostring(b.sourceKind) end
+        return tonumber(a.sourceID or 0)<tonumber(b.sourceID or 0)
+      end)
+    end
+  end
+
+  QuestieOcto:SendMessage("NODES_CHANGED",affectedMaps,changed)
 end
 
 function N:Rebuild()
@@ -341,6 +448,7 @@ function N:Rebuild()
   self.running=true
   self.buildNodes={}
   self.buildByMap={}
+  self.buildQuestMaps={}
   self.buildStats=NewStats()
 
   -- Capture the input snapshots. A newer publication triggers another rebuild
@@ -355,9 +463,11 @@ function N:Rebuild()
     if generation~=N.generation then return end
     N.nodes=N.buildNodes or {}
     N.byMap=N.buildByMap or {}
+    N.questMaps=N.buildQuestMaps or {}
     N.stats=N.buildStats or N.stats
     N.buildNodes=nil
     N.buildByMap=nil
+    N.buildQuestMaps=nil
     N.buildStats=nil
     N.running=false
     N.ready=true
@@ -460,6 +570,11 @@ function N:OnInputReady()
   self:Rebuild()
 end
 
+function N:OnObjectivesChanged(changedQuests)
+  self:RefreshQuests(changedQuests)
+end
+
 QuestieOcto:RegisterMessage("OBJECTIVES_READY",N,"OnInputReady")
+QuestieOcto:RegisterMessage("OBJECTIVES_CHANGED",N,"OnObjectivesChanged")
 QuestieOcto:RegisterMessage("ITEM_STARTS_READY",N,"OnInputReady")
 QuestieOcto:RegisterMessage("AVAILABLE_QUESTS_READY",N,"OnInputReady")

@@ -60,6 +60,8 @@ M.syncing=false
 M.resync=false
 M.prune=false
 M.frames={}
+M.activeFrames={}
+M.buildActiveFrames=nil
 M.stats={active=0,created=0,reused=0,hidden=0,exact=0,objectiveAreas=0,itemStartAreas=0,syncs=0,visibleAvailable=0,visibleItemStart=0,visibleObjective=0,visibleTurnin=0,inputNodes=0,multiEntryPins=0,itemStartRawNodes=0,itemStartAreaPins=0,preparedHits=0,preparedMisses=0,preparedDescriptors=0,mapPriorityRequests=0}
 
 local ICON_ROOT="Interface\\AddOns\\Questie-Octo\\UI\\Icons\\"
@@ -125,7 +127,10 @@ local function RolePriority(role)
   -- exact same source/area also participates in active objective/loot data.
   if role=="turnin" then return 50 end
   if role=="available" or role=="itemStart" then return 40 end
-  if role=="objectiveObject" then return 20 end
+  -- At a shared Full Nodes coordinate, a direct objective should own the
+  -- displayed quest color over an indirect item-drop source. The merged pin
+  -- still retains every quest/objective entry for its tooltip.
+  if role=="objectiveObject" or role=="objectiveCreature" then return 20 end
   if role=="objectiveItemSource" then return 15 end
   return 10
 end
@@ -165,6 +170,7 @@ local function ApplyVisualRole(pin,node)
     pin.repeatable=node.repeatable and true or false
     pin.sourceKind=node.sourceKind
     pin.sourceID=node.sourceID
+    pin.displayName=node.sourceName or pin.displayName or "Quest source"
     pin.iconScaleKey=node.iconScaleKey or ScaleKeyForRole(node.role)
     pin.texture:SetTexture(TextureForNode(node))
     pin.texture:SetDrawLayer("OVERLAY",DrawSublevelForRole(node.role))
@@ -334,13 +340,16 @@ function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
   end
 
   pin.itemStartArea=nil
-  pin.displayName=node.sourceName or "Quest source"
-  pin.clusterCount=math.max(pin.clusterCount or 1,clusterCount or 1)
-  pin.seenGeneration=generation
+  if pin.seenGeneration~=generation then
+    pin.seenGeneration=generation
+    if self.buildActiveFrames then table.insert(self.buildActiveFrames,pin) end
+  end
 
   if pin.entryGeneration~=generation then
     pin.entryGeneration=generation
     pin.entries={}
+    pin.displayName=nil
+    pin.clusterCount=1
     pin.visualPriority=nil
     pin.role=nil
     pin.event=nil
@@ -353,14 +362,19 @@ function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
     if QuestieOcto.Visuals then QuestieOcto.Visuals:ClearPin(pin,1) end
   end
 
+  pin.clusterCount=math.max(pin.clusterCount or 1,clusterCount or 1)
+
   -- Place at canonical coordinates first. Final layout resolves overlap
   -- after the complete visible pin set is known.
   UpdatePosition(pin,x,y,0,0)
   AddEntry(pin,node)
   if kind=="objectiveFull" or kind=="itemStartFull" then
-    if QuestieOcto.Visuals and QuestieOcto.Visuals.ApplyFullNode then
-      QuestieOcto.Visuals:ApplyFullNode(pin,node,false,1)
+    local current=pin.fullNodeNode
+    if not current or self:GetVisualPriority(node)>self:GetVisualPriority(current) then
       pin.fullNodeNode=node
+    end
+    if QuestieOcto.Visuals and QuestieOcto.Visuals.ApplyFullNode then
+      QuestieOcto.Visuals:ApplyFullNode(pin,pin.fullNodeNode,false,1)
     end
   end
   self:ResizePin(pin)
@@ -379,7 +393,7 @@ function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
 end
 
 local function RefreshPinVisual(pin)
-  local fullNode=pin.fullNodeNode
+  local wasFull=pin.fullNode and true or false
   pin.visualPriority=nil
   pin.role=nil
   pin.questID=nil
@@ -387,9 +401,16 @@ local function RefreshPinVisual(pin)
   pin.iconScaleKey=nil
   pin.fullNode=nil
 
+  local fullNode=nil
   for _,entry in pairs(pin.entries or {}) do
-    if entry.node then ApplyVisualRole(pin,entry.node) end
+    if entry.node then
+      ApplyVisualRole(pin,entry.node)
+      if wasFull and (not fullNode or M:GetVisualPriority(entry.node)>M:GetVisualPriority(fullNode)) then
+        fullNode=entry.node
+      end
+    end
   end
+  pin.fullNodeNode=fullNode
   if fullNode and QuestieOcto.Visuals and QuestieOcto.Visuals.ApplyFullNode then
     QuestieOcto.Visuals:ApplyFullNode(pin,fullNode,false,1)
   end
@@ -402,7 +423,7 @@ function M:RemoveQuest(questID)
 
   local removed=0
 
-  for _,pin in pairs(self.frames) do
+  for _,pin in pairs(self.activeFrames or {}) do
     local changed=false
 
     if pin.itemStartArea and tonumber(pin.itemStartArea.questID)==questID then
@@ -441,12 +462,14 @@ function M:RemoveQuest(questID)
 end
 
 function M:HideAll()
-  for _,pin in pairs(self.frames) do
+  for _,pin in pairs(self.activeFrames or {}) do
     if pin:IsShown() then
       pin:Hide()
       self.stats.hidden=self.stats.hidden+1
     end
   end
+  self.activeFrames={}
+  self.buildActiveFrames=nil
   self.stats.active=0
 end
 
@@ -470,7 +493,7 @@ function M:GetNearbyQuestTooltipPins(pin,maxPixels)
   local py=(tonumber(pin.y) or 0)*height/100+(tonumber(pin.offsetY) or 0)
 
   local _,other
-  for _,other in pairs(self.frames or {}) do
+  for _,other in pairs(self.activeFrames or {}) do
     if other and other:IsShown() and not IsPermanentRole(other.role) and (other.itemStartArea or next(other.entries or {})) then
       local ox=(tonumber(other.x) or 0)*width/100+(tonumber(other.offsetX) or 0)
       local oy=(tonumber(other.y) or 0)*height/100+(tonumber(other.offsetY) or 0)
@@ -535,7 +558,10 @@ function M:RenderItemStartArea(area,generation)
     self.stats.reused=self.stats.reused+1
   end
 
-  pin.seenGeneration=generation
+  if pin.seenGeneration~=generation then
+    pin.seenGeneration=generation
+    if self.buildActiveFrames then table.insert(self.buildActiveFrames,pin) end
+  end
   pin.itemStartArea=area
   pin.entries={}
   pin.visualPriority=40
@@ -595,10 +621,10 @@ function M:RenderNode(node,generation)
   end
 end
 
-local function ResetVisibleOffsets(generation)
+local function ResetVisibleOffsets(generation,frames)
   local groups={}
 
-  for _,pin in pairs(M.frames) do
+  for _,pin in pairs(frames or {}) do
     if pin:IsShown() and pin.seenGeneration==generation and pin.x and pin.y then
       local key=string.format("%.2f:%.2f",tonumber(pin.x) or 0,tonumber(pin.y) or 0)
       groups[key]=groups[key] or {}
@@ -606,15 +632,12 @@ local function ResetVisibleOffsets(generation)
     end
   end
 
-  -- Keep the pfQuest database coordinate as the anchor. Only separate icons in
-  -- screen space when several markers occupy that exact coordinate, so a
-  -- service/rare marker never hides a quest marker (or another service icon).
   local offsets={{0,0},{10,0},{-10,0},{0,10},{0,-10},{8,8},{-8,8},{8,-8},{-8,-8}}
   for _,group in pairs(groups) do
     table.sort(group,function(a,b)
       local ap=IsPermanentRole(a.role) and 1 or 0
       local bp=IsPermanentRole(b.role) and 1 or 0
-      if ap~=bp then return ap<bp end -- quest marker keeps the canonical point
+      if ap~=bp then return ap<bp end
       if tostring(a.role)~=tostring(b.role) then return tostring(a.role)<tostring(b.role) end
       return tonumber(a.sourceID or 0)<tonumber(b.sourceID or 0)
     end)
@@ -629,44 +652,39 @@ end
 function M:Finish(generation,doPrune)
   if generation~=self.generation then return end
 
-  if doPrune then
-    for _,pin in pairs(self.frames) do
-      if pin:IsShown() and pin.seenGeneration~=generation then
-        pin:Hide()
-        self.stats.hidden=self.stats.hidden+1
-      end
+  local nextActive=self.buildActiveFrames or {}
+  local seen={}
+  for _,pin in pairs(nextActive) do seen[pin]=true end
+
+  -- A completed sync is authoritative for the displayed map. Hide only frames
+  -- from the previous active set that are no longer used; never scan the entire
+  -- historical frame cache accumulated across zones.
+  for _,pin in pairs(self.activeFrames or {}) do
+    if not seen[pin] and pin:IsShown() then
+      pin:Hide()
+      self.stats.hidden=self.stats.hidden+1
     end
   end
 
-  -- Keep every marker at its canonical database/resolved coordinate.
-  -- Vanilla-style overlap is intentionally accepted.
-  ResetVisibleOffsets(generation)
+  self.activeFrames=nextActive
+  self.buildActiveFrames=nil
+  ResetVisibleOffsets(generation,self.activeFrames)
 
   local active=0
   local visibleAvailable=0
   local visibleItemStart=0
   local visibleObjective=0
   local visibleTurnin=0
-
-  for _,pin in pairs(self.frames) do
-    if pin:IsShown() then
-      active=active+1
-      if pin.role=="available" then
-        visibleAvailable=visibleAvailable+1
-      elseif pin.role=="itemStart" then
-        visibleItemStart=visibleItemStart+1
-      elseif pin.role=="turnin" then
-        visibleTurnin=visibleTurnin+1
-      else
-        visibleObjective=visibleObjective+1
-      end
-    end
-  end
-
   local multiEntryPins=0
 
-  for _,pin in pairs(self.frames) do
+  for _,pin in pairs(self.activeFrames) do
     if pin:IsShown() then
+      active=active+1
+      if pin.role=="available" then visibleAvailable=visibleAvailable+1
+      elseif pin.role=="itemStart" then visibleItemStart=visibleItemStart+1
+      elseif pin.role=="turnin" then visibleTurnin=visibleTurnin+1
+      else visibleObjective=visibleObjective+1 end
+
       local entries=0
       for _ in pairs(pin.entries or {}) do entries=entries+1 end
       if entries>1 then multiEntryPins=multiEntryPins+1 end
@@ -696,16 +714,27 @@ function M:RenderPreparedDescriptor(desc,generation)
     return
   end
 
+  if desc.type=="nodeSlot" then
+    for _,entry in pairs(desc.entries or {}) do
+      if entry.node then
+        M:GetOrCreate(
+          desc.key,
+          entry.node,
+          desc.x,
+          desc.y,
+          entry.clusterCount or 1,
+          generation,
+          entry.kind or "objective"
+        )
+      end
+    end
+    return
+  end
+
+  -- Backward compatibility for a prepared map published by an older cache
+  -- during an in-session update/reload boundary.
   if desc.type=="node" then
-    M:GetOrCreate(
-      desc.key,
-      desc.node,
-      desc.x,
-      desc.y,
-      desc.clusterCount or 1,
-      generation,
-      desc.kind or "objective"
-    )
+    M:GetOrCreate(desc.key,desc.node,desc.x,desc.y,desc.clusterCount or 1,generation,desc.kind or "objective")
   end
 end
 
@@ -771,14 +800,12 @@ function M:StartContinentSync(continentMapID,doPrune)
 
   local contextKey=-1000-continentMapID
   if tonumber(self.mapID)~=contextKey then self:SetMap(contextKey) end
-  if not QuestieOcto.Nodes.ready then
-    self.syncing=false
-    return
-  end
+  if not QuestieOcto.Nodes.ready then self.syncing=false; return end
 
   self.generation=self.generation+1
   local generation=self.generation
   self.syncing=true
+  self.buildActiveFrames={}
   self.stats.reused=0
   self.stats.exact=0
   self.stats.objectiveAreas=0
@@ -786,25 +813,32 @@ function M:StartContinentSync(continentMapID,doPrune)
   self.stats.inputNodes=0
 
   local mapIDs=QuestieOcto.ContinentProjection:GetZoneMapIDs(continentMapID)
-  local pos=1
-  local rendered=0
+  local mapPos=1
+  local nodePos=1
+  local nodes=nil
 
   local function step()
     if generation~=M.generation then return end
-    local mapsThisFrame=0
-    while pos<=table.getn(mapIDs) and mapsThisFrame<4 and rendered<1000 do
-      local mapID=mapIDs[pos]
-      pos=pos+1
-      mapsThisFrame=mapsThisFrame+1
-      local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
-      M.stats.inputNodes=M.stats.inputNodes+table.getn(nodes)
-      for _,node in pairs(nodes) do
-        if rendered>=1000 then break end
-        rendered=rendered+M:RenderContinentNode(node,mapID,generation)
+
+    local budget=96
+    while budget>0 and mapPos<=table.getn(mapIDs) do
+      if not nodes then
+        nodes=QuestieOcto.Nodes:GetMapNodes(mapIDs[mapPos]) or {}
+        nodePos=1
+        M.stats.inputNodes=M.stats.inputNodes+table.getn(nodes)
+      end
+
+      if nodePos<=table.getn(nodes) then
+        M:RenderContinentNode(nodes[nodePos],mapIDs[mapPos],generation)
+        nodePos=nodePos+1
+        budget=budget-1
+      else
+        nodes=nil
+        mapPos=mapPos+1
       end
     end
 
-    if pos<=table.getn(mapIDs) and rendered<1000 then
+    if mapPos<=table.getn(mapIDs) then
       QuestieOcto.Scheduler:Enqueue(step,"map-continent-render")
     else
       M:Finish(generation,doPrune)
@@ -848,6 +882,7 @@ function M:StartSync(doPrune)
   self.generation=self.generation+1
   local generation=self.generation
   self.syncing=true
+  self.buildActiveFrames={}
   self.stats.reused=0
   self.stats.exact=0
   self.stats.objectiveAreas=0
@@ -877,14 +912,13 @@ function M:StartSync(doPrune)
       if generation~=M.generation then return end
 
       local count=0
-      local renderLimit=math.min(table.getn(prepared),1000)
-      while pos<=renderLimit and count<128 do
+      while pos<=table.getn(prepared) and count<128 do
         M:RenderPreparedDescriptor(prepared[pos],generation)
         pos=pos+1
         count=count+1
       end
 
-      if pos<=math.min(table.getn(prepared),1000) then
+      if pos<=table.getn(prepared) then
         QuestieOcto.Scheduler:Enqueue(preparedStep,"map-prepared-render")
       else
         M:Finish(generation,doPrune)
@@ -933,7 +967,7 @@ function M:StartSync(doPrune)
 end
 
 function M:RefreshVisualSettings()
-  for _,pin in pairs(self.frames) do
+  for _,pin in pairs(self.activeFrames or {}) do
     if pin.itemStartArea then
       if QuestieOcto.Visuals then QuestieOcto.Visuals:ClearPin(pin,1) end
     elseif pin.entries and next(pin.entries) then
@@ -956,7 +990,7 @@ function M:RescaleIcons(changedKey,changedValue)
   -- Scaling is presentation-only. Do not rebuild a pin's semantic visual here:
   -- doing so used to replace Full Nodes with the normal Questie objective
   -- texture until the next map sync. The global slider now changes size only.
-  for _,pin in pairs(self.frames) do
+  for _,pin in pairs(self.activeFrames or {}) do
     self:ResizePin(pin)
   end
 end
@@ -989,7 +1023,11 @@ function M:RequestSync(doPrune)
 end
 
 function M:OnNodesReady()
-  self:RequestSync(true)
+  -- A hidden World Map does not need to walk/rebind a dense Full Nodes plan
+  -- after every semantic quest change. It synchronizes when opened instead.
+  if WorldMapFrame and WorldMapFrame:IsVisible() then
+    self:RequestSync(true)
+  end
 end
 
 QuestieOcto:RegisterMessage("NODES_READY",M,"OnNodesReady")
@@ -1005,7 +1043,6 @@ QuestieOcto:RegisterMessage("PREPARED_MAP_READY",M,"OnPreparedMapReady")
 
 local f=CreateFrame("Frame","QuestieOctoWorldMapEvents",UIParent)
 f:RegisterEvent("WORLD_MAP_UPDATE")
-f:RegisterEvent("QUEST_LOG_UPDATE")
 f:SetScript("OnEvent",function()
   if event=="WORLD_MAP_UPDATE" then
     if WorldMapFrame and WorldMapFrame:IsVisible() then
@@ -1015,7 +1052,5 @@ f:SetScript("OnEvent",function()
         M:RequestSync(false)
       end
     end
-  elseif event=="QUEST_LOG_UPDATE" then
-    M:RequestSync(false)
   end
 end)
