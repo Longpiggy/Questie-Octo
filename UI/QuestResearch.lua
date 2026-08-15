@@ -570,7 +570,7 @@ function R:GetOptionsTab()
     args={
       heading={type="header",order=1,name="Quests"},
       description={type="description",order=2,fontSize="medium",width="full",name="Browse/search the pfQuest quest database in a dedicated lightweight window."},
-      open={type="execute",order=3,name="Open Quests",desc="Open the Questie-Octo quest browser.",width="double",func=function() R:OpenWindow() end},
+      open={type="execute",order=3,name="Open Quests",desc="Open the quest browser.",width="double",func=function() R:OpenWindow() end},
     },
   }
 end

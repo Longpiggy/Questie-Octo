@@ -153,14 +153,33 @@ local function RestoreCurrentZoneMapContext(reason)
 end
 
 local function CurrentMapID()
-  local id=QuestieOcto.API:GetBestMapForPlayer()
-  if id then return tonumber(id) end
-
+  -- The minimap must follow the player's PHYSICAL zone, never the zone being
+  -- browsed in WorldMapFrame. On Vanilla/Turtle the global map context can
+  -- leak into C_Map/GetPlayerMapPosition while the World Map is open, so use
+  -- GetRealZoneText first just like pfQuest's minimap projection does.
   if GetRealZoneText and QuestieOcto.DatabaseAPI.GetMapIDByName then
-    return QuestieOcto.DatabaseAPI:GetMapIDByName(GetRealZoneText())
+    local zoneName=GetRealZoneText()
+    local id=zoneName and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneName)
+    if id then
+      MM.physicalMapID=tonumber(id)
+      return MM.physicalMapID
+    end
   end
 
-  return nil
+  -- If the World Map is currently browsing somewhere else and the physical
+  -- zone name could not be resolved, keep the last known physical map rather
+  -- than adopting the browsed map context.
+  if WorldMapFrame and WorldMapFrame:IsShown() and MM.physicalMapID then
+    return MM.physicalMapID
+  end
+
+  local id=QuestieOcto.API:GetBestMapForPlayer()
+  if id then
+    MM.physicalMapID=tonumber(id)
+    return MM.physicalMapID
+  end
+
+  return MM.physicalMapID
 end
 
 local function MinimapIndoor()
@@ -256,17 +275,44 @@ local function UsesSquareMinimap()
   return false
 end
 
+local function WorldMapBrowsingAwayFromPlayer(mapID)
+  if not WorldMapFrame or not WorldMapFrame:IsShown() then return false end
+  if not QuestieOcto.Map or not QuestieOcto.Map.GetDisplayedMapID then return true end
+
+  local displayed=QuestieOcto.Map:GetDisplayedMapID()
+  -- Continent/world views have no zone map ID and therefore cannot provide
+  -- physical-zone player coordinates through Vanilla's global map context.
+  if not displayed then return true end
+  return tonumber(displayed)~=tonumber(mapID)
+end
+
 local function PlayerPosition()
-  -- Questie owns minimap refresh timing/state. The Vanilla compatibility layer
-  -- must not force map context every 0.05s; pfQuest restores current-zone map
-  -- context only on zone/world-map transitions.
+  -- Questie owns minimap refresh timing/state. Never retarget the World Map
+  -- every 0.05s just to obtain player coordinates: that would fight the user
+  -- while they browse. Instead, keep the last physical-zone position while the
+  -- World Map is displaying another zone/continent, then resume live reads as
+  -- soon as the physical map context is available again.
   if not GetPlayerMapPosition then return nil,nil end
+
+  local physicalMapID=CurrentMapID()
+  if WorldMapBrowsingAwayFromPlayer(physicalMapID) then
+    return MM.physicalPlayerX,MM.physicalPlayerY
+  end
+
   local x,y=GetPlayerMapPosition("player")
   x=tonumber(x)
   y=tonumber(y)
 
-  if not x or not y or (x==0 and y==0) then return nil,nil end
-  return x*100,y*100
+  if not x or not y or (x==0 and y==0) then
+    if WorldMapFrame and WorldMapFrame:IsShown() then
+      return MM.physicalPlayerX,MM.physicalPlayerY
+    end
+    return nil,nil
+  end
+
+  MM.physicalPlayerX=x*100
+  MM.physicalPlayerY=y*100
+  return MM.physicalPlayerX,MM.physicalPlayerY
 end
 
 local function EntryKey(node)
@@ -798,14 +844,24 @@ function MM:Start()
 
   if WorldMapFrame and not self.worldMapHideHooked then
     self.worldMapHideHooked=true
-    local previousOnHide=WorldMapFrame:GetScript("OnHide")
-    WorldMapFrame:SetScript("OnHide",function()
-      if previousOnHide then previousOnHide() end
+    local function OnWorldMapHide()
       QuestieOcto.Scheduler:After(0.01,function()
         RestoreCurrentZoneMapContext("WORLD_MAP_HIDE")
         MM:RefreshPlan()
       end,"minimap-worldmap-close")
-    end)
+    end
+
+    -- Use an additive script hook when available so map UI addons can install
+    -- or replace their own OnHide behavior without erasing the minimap refresh.
+    if WorldMapFrame.HookScript then
+      WorldMapFrame:HookScript("OnHide",OnWorldMapHide)
+    else
+      local previousOnHide=WorldMapFrame:GetScript("OnHide")
+      WorldMapFrame:SetScript("OnHide",function()
+        if previousOnHide then previousOnHide() end
+        OnWorldMapHide()
+      end)
+    end
   end
 
   QuestieOcto.Scheduler:After(0.01,function()

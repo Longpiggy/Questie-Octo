@@ -163,28 +163,56 @@ function Q:ShowQuest(questID,text)
   return true
 end
 
+function Q:HandleSetItemRef(link,text,button)
+  -- Do not steal any existing modifier-click behavior. In particular this
+  -- preserves the user's existing Shift+RightClick chat-link path. Tracker
+  -- Shift+LeftClick lives on QuestLogTitleButton_OnClick and is untouched.
+  if AnyModifierDown() then return false end
+
+  -- Normal left- or right-click opens quest details, matching pfQuest's
+  -- Vanilla behavior. Modifier clicks were already returned above, so the
+  -- existing Shift+RightClick link-to-chat path remains untouched.
+  if button and button~="LeftButton" and button~="RightButton" then return false end
+
+  if IsQuestLink(link) then
+    local questID=ResolveQuestID(link,text)
+    if questID and Q:ShowQuest(questID,text) then return true end
+  else
+    -- A normal item/player/etc. hyperlink replaces ItemRefTooltip ownership.
+    -- Forget the previous quest signature so returning to that quest does not
+    -- incorrectly look like a second click on an already-open quest tooltip.
+    Q.lastQuestLink=nil
+  end
+  return false
+end
+
 function Q:InstallHook()
   if self.hooked or type(SetItemRef)~="function" then return end
+
+  -- Prefer an additive post-hook. This lets Blizzard, pfUI and other addons
+  -- keep ownership of their SetItemRef chain while Questie-Octo replaces only
+  -- the final quest-link presentation. It also avoids cutting off wrappers
+  -- installed before us. The current Turtle/ClassicAPI environment exposes
+  -- hooksecurefunc; retain the old forwarding wrapper only as a compatibility
+  -- fallback for clients where it is unavailable.
+  if type(hooksecurefunc)=="function" then
+    hooksecurefunc("SetItemRef",function(link,text,button)
+      Q:HandleSetItemRef(link,text,button)
+    end)
+    self.hookMode="post"
+    self.hooked=true
+    return
+  end
+
   local original=SetItemRef
   self.originalSetItemRef=original
 
   SetItemRef=function(link,text,button)
-    -- Do not steal any existing modifier-click behavior. In particular this
-    -- preserves the user's existing Shift+RightClick chat-link path. Tracker
-    -- Shift+LeftClick lives on QuestLogTitleButton_OnClick and is untouched.
-    if AnyModifierDown() then return original(link,text,button) end
-
-    -- Only normal left-click (or Vanilla's nil-button equivalent) opens our
-    -- quest details. Right-click and any other button keep native behavior.
-    if button and button~="LeftButton" then return original(link,text,button) end
-
-    if IsQuestLink(link) then
-      local questID=ResolveQuestID(link,text)
-      if questID and Q:ShowQuest(questID,text) then return end
-    end
+    if Q:HandleSetItemRef(link,text,button) then return end
     return original(link,text,button)
   end
 
+  self.hookMode="wrapper"
   self.hooked=true
 end
 

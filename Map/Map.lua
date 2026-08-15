@@ -1387,12 +1387,23 @@ end)
 -- plan on every show as a second, deterministic refresh boundary.
 if WorldMapFrame and not M.worldMapShowHooked then
   M.worldMapShowHooked=true
-  local previousOnShow=WorldMapFrame:GetScript("OnShow")
-  WorldMapFrame:SetScript("OnShow",function()
-    if previousOnShow then previousOnShow() end
+  local function OnWorldMapShow()
     QuestieOcto.Scheduler:After(0.01,function()
       M:EnsureDisplayedContextCurrent()
     end,"map-show-density-sync")
-  end)
+  end
+
+  -- HookScript is additive: UI replacements can keep their own OnShow handler
+  -- without taking ownership away from Questie-Octo (and vice versa). Keep a
+  -- forwarding SetScript fallback for older clients that do not expose it.
+  if WorldMapFrame.HookScript then
+    WorldMapFrame:HookScript("OnShow",OnWorldMapShow)
+  else
+    local previousOnShow=WorldMapFrame:GetScript("OnShow")
+    WorldMapFrame:SetScript("OnShow",function()
+      if previousOnShow then previousOnShow() end
+      OnWorldMapShow()
+    end)
+  end
 end
 

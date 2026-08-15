@@ -578,6 +578,9 @@ local function ObjectiveDisplayText(objective)
       text=tostring(current).."/"..tostring(required)
     end
   end
+  if text~="" then
+    text="- "..text
+  end
   return text
 end
 
