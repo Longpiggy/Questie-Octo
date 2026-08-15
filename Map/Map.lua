@@ -29,16 +29,11 @@ local function IsPvPQuestNodeEnabled(node)
   return true
 end
 
-local function IsRoleEnabled(role,isContinentOverview)
+local function IsRoleEnabled(role)
   local settings=DisplaySettings()
   if role=="auctioneer" then return settings:Get("showMapAuctioneer") and true or false end
   if role=="banker" then return settings:Get("showMapBanker") and true or false end
-  if role=="flightMaster" then
-    if isContinentOverview then
-      return settings:Get("showWorldMapFlightMaster") and true or false
-    end
-    return settings:Get("showMapFlightMaster") and true or false
-  end
+  if role=="flightMaster" then return settings:Get("showMapFlightMaster") and true or false end
   if role=="mailbox" then return settings:Get("showMapMailbox") and true or false end
   if role=="rareMob" then return settings:Get("showMapRareMonsters") and true or false end
   if not settings:Get("enableMapIcons") then return false end
@@ -314,8 +309,8 @@ local function DisplayedContextKey()
   return nil
 end
 
-function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind,isContinentOverview)
-  if not IsRoleEnabled(node.role,isContinentOverview) or not IsPvPQuestNodeEnabled(node) then return nil end
+function M:GetOrCreate(key,node,x,y,clusterCount,generation,kind)
+  if not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) then return nil end
 
   local pin=self.frames[key]
 
@@ -728,7 +723,7 @@ local function ContinentPinKey(node,mapID,x,y)
 end
 
 function M:RenderContinentNode(node,mapID,generation)
-  if not node or not IsRoleEnabled(node.role,true) or not IsPvPQuestNodeEnabled(node) then return 0 end
+  if not node or not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) then return 0 end
   -- World Map Visibility toggles apply only to continent/world overviews.
   -- Selected zone and city maps keep normal/special quest markers visible and
   -- are controlled by Enable Available/Completed Quest Icons instead.
@@ -754,7 +749,7 @@ function M:RenderContinentNode(node,mapID,generation)
     end
     if n>0 then
       local x,y=sx/n,sy/n
-      self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact",true)
+      self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
       return 1
     end
     return 0
@@ -763,7 +758,7 @@ function M:RenderContinentNode(node,mapID,generation)
   for _,point in pairs(points) do
     local x,y=projection:Project(mapID,point.x,point.y)
     if x and y then
-      self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact",true)
+      self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
       rendered=rendered+1
     end
   end
@@ -975,7 +970,7 @@ function M:OnSettingChanged(key,value)
   if key=="enableMapIcons" or key=="showAllQuestsWorldMap" or key=="showSpecialQuestsWorldMap" or key=="showPvPRelatedQuests" or key=="enableObjectives" or key=="enableTurnins" or
      key=="enableAvailable" or key=="showItemStartQuests" or key=="showItemStartMap" or
      key=="showMapAuctioneer" or key=="showMapBanker" or
-     key=="showMapFlightMaster" or key=="showWorldMapFlightMaster" or key=="showMapMailbox" or
+     key=="showMapFlightMaster" or key=="showMapMailbox" or
      key=="showMapRareMonsters" then
     self:RequestSync(true)
   end

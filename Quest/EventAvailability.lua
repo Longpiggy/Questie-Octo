@@ -107,7 +107,7 @@ end
 
 local function ParseWallTimestamp(value)
   if type(value)~="string" or value=="" or string.sub(value,1,4)=="0000" then return nil end
-  local y,mo,d,h,mi,s=string.match(value,"^(%d+)%-(%d+)%-(%d+)%s+(%d+):(%d+):(%d+)$")
+  local matchStart,matchEnd,y,mo,d,h,mi,s=string.find(value,"^(%d+)%-(%d+)%-(%d+)%s+(%d+):(%d+):(%d+)$")
   y=tonumber(y); mo=tonumber(mo); d=tonumber(d); h=tonumber(h); mi=tonumber(mi); s=tonumber(s)
   if not y or y<1 or not mo or not d then return nil end
   if type(time)~="function" then return nil end

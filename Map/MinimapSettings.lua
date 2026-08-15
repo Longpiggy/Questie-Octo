@@ -44,11 +44,7 @@ S.defaults={
   showMapRareMonsters=true,
   showMapAuctioneer=true,
   showMapBanker=true,
-  -- Selected zone/city map Flight Masters are independent from continent/world
-  -- overview Flight Masters. This mirrors the separate Map and World Map
-  -- visibility controls exposed in the options UI.
   showMapFlightMaster=true,
-  showWorldMapFlightMaster=true,
   showMapMailbox=true,
   showMinimapRareMonsters=true,
   showMinimapAuctioneer=true,
@@ -129,13 +125,6 @@ function S:Initialize()
     "rareMonsterScale","auctioneerScale","bankerScale","flightMasterScale","mailboxScale"}
   for _,key in pairs(obsoleteScales) do db[key]=nil end
 
-  -- 1.0.3: split Flight Master visibility between selected zone/city maps and
-  -- continent/world overviews. Preserve the player's former all-map Flight
-  -- Master choice for the new overview setting on first migration.
-  if db.showWorldMapFlightMaster==nil and db.showMapFlightMaster~=nil then
-    db.showWorldMapFlightMaster=db.showMapFlightMaster and true or false
-  end
-
   for key,value in pairs(self.defaults) do
     if IsCharacterOption(key) then
       if charDB[key]==nil then
@@ -194,7 +183,7 @@ function S:Set(key,value)
       key=="showLowLevelQuests" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests" or
       key=="showItemStartQuests" or key=="showItemStartMap" or key=="showItemStartMinimap" or
       key=="showMapRareMonsters" or key=="showMapAuctioneer" or key=="showMapBanker" or
-      key=="showMapFlightMaster" or key=="showWorldMapFlightMaster" or key=="showMapMailbox" or
+      key=="showMapFlightMaster" or key=="showMapMailbox" or
       key=="showMinimapRareMonsters" or key=="showMinimapAuctioneer" or key=="showMinimapBanker" or
       key=="showMinimapFlightMaster" or key=="showMinimapMailbox" or
       key=="enableTooltips" or
@@ -305,7 +294,7 @@ function S:Set(key,value)
   end
 
   if key=="showMapRareMonsters" or key=="showMapAuctioneer" or key=="showMapBanker" or
-     key=="showMapFlightMaster" or key=="showWorldMapFlightMaster" or key=="showMapMailbox" then
+     key=="showMapFlightMaster" or key=="showMapMailbox" then
     if QuestieOcto.Map and QuestieOcto.Map.OnSettingChanged then
       QuestieOcto.Map:OnSettingChanged(key,value)
     end

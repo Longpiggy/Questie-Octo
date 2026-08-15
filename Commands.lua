@@ -7,8 +7,8 @@ end
 
 SlashCmdList["QUESTIEOCTO"]=function(msg)
   msg=string.lower(msg or "")
-  local creatureID=string.match(msg,"^creature%s+(%d+)$")
-  local minimapArg=string.match(msg,"^minimap%s+(.+)$")
+  local creatureStart,creatureEnd,creatureID=string.find(msg,"^creature%s+(%d+)$")
+  local minimapStart,minimapEnd,minimapArg=string.find(msg,"^minimap%s+(.+)$")
 
   if msg=="visualdiag" then
     local mm=QuestieOcto.Minimap
@@ -292,7 +292,7 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
 
   elseif minimapArg then
     local ms=QuestieOcto.MinimapSettings
-    local action,value=string.match(minimapArg,"^(%S+)%s*(.*)$")
+    local actionStart,actionEnd,action,value=string.find(minimapArg,"^(%S+)%s*(.*)$")
     local changed=false
 
     if action=="on" then

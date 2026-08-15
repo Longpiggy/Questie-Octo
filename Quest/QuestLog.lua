@@ -17,13 +17,13 @@ local function ParseObjectiveProgress(text)
   if not text then return nil,nil end
 
   -- Vanilla objective strings are usually "Something: 3/10".
-  local current,required=string.match(text,"(%d+)%s*/%s*(%d+)")
+  local matchStart,matchEnd,current,required=string.find(text,"(%d+)%s*/%s*(%d+)")
   return tonumber(current),tonumber(required)
 end
 
 local function ObjectiveProgressFallback(text)
   if not text then return nil,nil end
-  local current,required=string.match(text,"(%d+)%s*/%s*(%d+)")
+  local matchStart,matchEnd,current,required=string.find(text,"(%d+)%s*/%s*(%d+)")
   return tonumber(current),tonumber(required)
 end
 

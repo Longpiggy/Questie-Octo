@@ -229,7 +229,7 @@ local function CreateGeneralTab()
       world_map_visibility_header={type="header",order=3,name="World Map Visibility"},
       showAllQuestsWorldMap={type="toggle",order=3.1,name="Show Quests on the World Map",desc="Show normal available quest-start/pickup markers and normal completed quest turn-in markers on continent/world overview maps. Selected zone and city maps are unaffected. Special repeatable, PvP and verified event quest markers are controlled by the next option. Objective/slay/full-node/cluster markers are controlled separately. Minimap and tracker visibility are unchanged. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
       showSpecialQuestsWorldMap={type="toggle",order=3.2,name="Show Special Quests on the World Map",desc="Show special quest pickup/turn-in markers on continent/world overview maps: repeatable quests (blue), PvP quests (red), and verified active event quests (green). Selected zone and city maps are unaffected. Objective markers are unaffected. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
-      showWorldMapFlightMaster={type="toggle",order=3.3,name="Show Flight Master on the World Map",desc="Show or hide Flight Master markers on continent/world overview maps. Selected zone and city maps are controlled independently from the Map tab, and Minimap Flight Masters are controlled from the Minimap tab. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
+      showMapFlightMaster={type="toggle",order=3.3,name="Show Flight Master on the World Map",desc="Show or hide Flight Master markers on the World Map only. Minimap Flight Masters remain controlled independently. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
       enableMiniMapIcons={type="toggle",order=4,name="Enable Minimap Icons",desc="Show/hide all Questie icons from the minimap.",width="full",get=GetValue,set=SetValue},
       type_header={type="header",order=5,name="Quest Icon Types"},
       enableObjectives={type="toggle",order=5,name="Enable Objective Icons",desc="Show active quest objective icons on the map and minimap.",width="full",get=GetValue,set=SetValue},
@@ -280,7 +280,6 @@ local function CreateMapTab()
       showMapRareMonsters={type="toggle",order=20.1,name="Rare Monsters",desc="Show Rare Monster icons on the World Map.",width="full",get=GetValue,set=SetValue},
       showMapAuctioneer={type="toggle",order=20.2,name="Auctioneer",desc="Show Auctioneer icons on the World Map.",width="full",get=GetValue,set=SetValue},
       showMapBanker={type="toggle",order=20.3,name="Banker",desc="Show Banker icons on the World Map.",width="full",get=GetValue,set=SetValue},
-      showMapFlightMaster={type="toggle",order=20.4,name="Flight master",desc="Show Flight Master icons on selected zone and city maps. Continent/world overview Flight Masters are controlled independently from General > World Map Visibility.",width="full",get=GetValue,set=SetValue},
       showMapMailbox={type="toggle",order=20.5,name="Mailbox",desc="Show Mailbox icons on the World Map.",width="full",get=GetValue,set=SetValue},
     },
   }
