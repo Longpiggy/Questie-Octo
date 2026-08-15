@@ -225,7 +225,7 @@ local function CreateGeneralTab()
     name="General", type="group", order=1,
     args={
       icon_header={type="header",order=1,name="Icon Settings"},
-      enableMapIcons={type="toggle",order=2,name="Enable Map Icons",desc="Show/hide all Questie icons from the main map.",width="full",get=GetValue,set=SetValue},
+      enableMapIcons={type="toggle",order=2,name="Show Quests",desc="Show/hide Questie quest icons from the main map.",width="full",get=GetValue,set=SetValue},
       world_map_visibility_header={type="header",order=3,name="World Map Visibility"},
       showAllQuestsWorldMap={type="toggle",order=3.1,name="Show Quests on the World Map",desc="Show normal available quest-start/pickup markers and normal completed quest turn-in markers on continent/world overview maps. Selected zone and city maps are unaffected. Special repeatable, PvP and verified event quest markers are controlled by the next option. Objective/slay/full-node/cluster markers are controlled separately. Minimap and tracker visibility are unchanged. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
       showSpecialQuestsWorldMap={type="toggle",order=3.2,name="Show Special Quests on the World Map",desc="Show special quest pickup/turn-in markers on continent/world overview maps: repeatable quests (blue), PvP quests (red), and verified active event quests (green). Selected zone and city maps are unaffected. Objective markers are unaffected. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
@@ -276,7 +276,7 @@ local function CreateMapTab()
     name="Map", type="group", order=10,
     args={
       map_options={type="header",order=1,name="Map Options"},
-      alwaysGlowMap={type="toggle",order=1.1,name="Enable Map Icon Glow",desc="Draw Questie's glow texture behind objective map icons, colored uniquely per objective. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
+      alwaysGlowMap={type="toggle",order=1.1,name="Enable Map Icon Glow",desc="Draw Questie's glow texture behind objective map icons, colored uniquely per objective.",width="full",get=GetValue,set=SetValue},
       questObjectiveColors={type="toggle",order=1.2,name="Enable Different Map Icon Color for Each Quest",desc="Tint objective map icons with Questie's deterministic per-quest color.",width="full",get=GetValue,set=SetValue},
       notes_header={type="header",order=2,name="Map Note Options"},
       globalScale={type="range",order=2.2,name="Global Scale for Map Icons",desc="How large the Map Icons are. Full Nodes use pfQuest's native 14px baseline at scale 1. ( Default: 1 )",width="double",min=0.01,max=4,step=0.01,disabled=function() return not Settings():Get("enableMapIcons") end,get=GetValue,set=SetValue},
@@ -342,8 +342,8 @@ local function CreateTrackerTab()
       trackerSort={type="select",order=11,name="Sort Quests",desc="Choose how tracked quests are ordered.",width="double",values={zone="Zone",proximity="Proximity",level="Level"},get=GetValue,set=SetValue},
       appearance_header={type="header",order=20,name="Appearance"},
       trackerHideInCombat={type="toggle",order=12,name="Hide Tracker in Combat",desc="Temporarily hide the Questie tracker while you are in combat. Tracking and collapse state are unchanged.",width="full",get=GetValue,set=SetValue},
-      trackerOutlineText={type="toggle",order=20.1,name="Outline",desc="Use WoW's OUTLINE font flag for tracker text. Temporary comparison option.",width="full",get=GetValue,set=SetValue},
-      trackerThickOutlineText={type="toggle",order=20.2,name="Thick Outline",desc="Use WoW's THICKOUTLINE font flag for tracker text. Enabling this disables Outline so the two styles can be compared cleanly.",width="full",get=GetValue,set=SetValue},
+      trackerOutlineText={type="toggle",order=20.1,name="Outline",desc="Add an outline to tracker text.",width="full",get=GetValue,set=SetValue},
+      trackerThickOutlineText={type="toggle",order=20.2,name="Thick Outline",desc="Add a thicker outline to tracker text.",width="full",get=GetValue,set=SetValue},
       trackerFontSize={type="range",order=21,name="Font Size",desc="Font size used by the Questie tracker. ( Default: 11 )",width="double",min=8,max=18,step=1,get=GetValue,set=SetValue},
       trackerMaxWidth={type="range",order=22,name="Width",desc="Maximum width of the Questie tracker in pixels. Long objectives wrap inside this width. ( Default: 280 )",width="double",min=200,max=500,step=10,get=GetValue,set=SetValue},
       trackerVisibleRows={type="range",order=23,name="Visible Rows",desc="Maximum number of complete tracker rows shown at once. The tracker height is calculated automatically so text is never partially cropped. ( Default: 30 )",width="double",min=6,max=60,step=1,get=GetValue,set=SetValue},

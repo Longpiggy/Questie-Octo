@@ -35,6 +35,17 @@ The filenames used for upload can carry duplicate suffixes such as `(2)` or
 `(3)`. The SHA-256 values above identify the actual snapshots independently of
 those local upload names.
 
+## Later compatibility reference snapshots
+
+The following snapshots were supplied later in the same project and were used
+only to cross-check UI compatibility behavior. They are not bundled with
+Questie-Octo and this record does not change their licensing or ownership.
+
+| Compatibility reference | SHA-256 | Role / note |
+| --- | --- | --- |
+| pfUI-classicAPI-octo | `5b4ed17b4ca94712ea7cc35cd86f31dfdc7b5d94a83bb51abb3cfca2e8e4911b` | Tooltip lifecycle, minimap shape, and Vanilla/ClassicAPI UI compatibility reference. |
+| DragonflightUI-Reforged | `2c08e1ae203f54d7969262b65056d58d5e9e8c26f3b61f2c935ff0825525ac68` | Replacement ESC/GameMenu behavior and square-minimap compatibility reference. |
+
 ## Historical sources no longer available as exact archives
 
 Existing Questie-Octo comments and README history establish that Questie 3.3.5,
