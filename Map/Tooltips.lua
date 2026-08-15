@@ -185,6 +185,27 @@ local function NormalizeFirstRowFont(tooltip)
 end
 
 
+-- Map/minimap node geometry intentionally ignores numeric objective progress
+-- (for example 3/10 -> 4/10) so a simple kill/loot counter does not rebuild
+-- thousands of pins. Tooltips must therefore resolve the current quest-log row
+-- at hover time instead of trusting the objective text snapshot stored on the
+-- node when its geometry was last published.
+local function LiveObjectiveText(node)
+  local questID=tonumber(node and node.questID)
+  local objectiveIndex=tonumber(node and node.objectiveIndex)
+  local state=questID and QuestieOcto.QuestLog and QuestieOcto.QuestLog.active and QuestieOcto.QuestLog.active[questID] or nil
+
+  if state and objectiveIndex then
+    for _,row in pairs(state.objectives or {}) do
+      if tonumber(row.index)==objectiveIndex then
+        return row.text or row.rawText or node.objectiveText
+      end
+    end
+  end
+
+  return node and node.objectiveText or nil
+end
+
 local function Extra(node)
   if node.role=="itemStart" and node.itemName then
     local text
@@ -196,8 +217,9 @@ local function Extra(node)
   if node.role=="objectiveCreature"
      or node.role=="objectiveObject"
      or node.role=="objectiveItemSource" then
-    if node.objectiveText and node.objectiveText~="" then
-      local text=node.objectiveText
+    local liveText=LiveObjectiveText(node)
+    if liveText and liveText~="" then
+      local text=liveText
       if node.role=="objectiveItemSource" and node.chance and Settings():Get("enableTooltipDroprates") then
         local rate=FormatDropRate(node.chance)
         if rate then text=text.." |cff999999["..rate.."%]|r" end
@@ -577,22 +599,6 @@ function T:ScheduleHoverIndex()
   QuestieOcto.Scheduler:After(0.05,function()
     T:RebuildHoverIndex()
   end,"tooltip-hover-index")
-end
-
-local function LiveObjectiveText(node)
-  local questID=tonumber(node and node.questID)
-  local objectiveIndex=tonumber(node and node.objectiveIndex)
-  local state=questID and QuestieOcto.QuestLog and QuestieOcto.QuestLog.active and QuestieOcto.QuestLog.active[questID] or nil
-
-  if state and objectiveIndex then
-    for _,row in pairs(state.objectives or {}) do
-      if tonumber(row.index)==objectiveIndex then
-        return row.text or row.rawText or node.objectiveText
-      end
-    end
-  end
-
-  return node and node.objectiveText or nil
 end
 
 local function HoverExtra(node,subjectKind)
