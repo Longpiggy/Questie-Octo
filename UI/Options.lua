@@ -344,10 +344,10 @@ local function CreateTrackerTab()
       trackerHideInCombat={type="toggle",order=12,name="Hide Tracker in Combat",desc="Temporarily hide the Questie tracker while you are in combat. Tracking and collapse state are unchanged.",width="full",get=GetValue,set=SetValue},
       trackerOutlineText={type="toggle",order=20.1,name="Outline",desc="Use WoW's OUTLINE font flag for tracker text. Temporary comparison option.",width="full",get=GetValue,set=SetValue},
       trackerThickOutlineText={type="toggle",order=20.2,name="Thick Outline",desc="Use WoW's THICKOUTLINE font flag for tracker text. Enabling this disables Outline so the two styles can be compared cleanly.",width="full",get=GetValue,set=SetValue},
-      trackerFontSize={type="range",order=21,name="Tracker Font Size",desc="Font size used by the Questie tracker. ( Default: 11 )",width="double",min=8,max=18,step=1,get=GetValue,set=SetValue},
-      trackerMaxWidth={type="range",order=22,name="Maximum Tracker Width",desc="Maximum width of the Questie tracker in pixels. Long objectives wrap inside this width. ( Default: 280 )",width="double",min=200,max=500,step=10,get=GetValue,set=SetValue},
+      trackerFontSize={type="range",order=21,name="Font Size",desc="Font size used by the Questie tracker. ( Default: 11 )",width="double",min=8,max=18,step=1,get=GetValue,set=SetValue},
+      trackerMaxWidth={type="range",order=22,name="Width",desc="Maximum width of the Questie tracker in pixels. Long objectives wrap inside this width. ( Default: 280 )",width="double",min=200,max=500,step=10,get=GetValue,set=SetValue},
       trackerVisibleRows={type="range",order=23,name="Visible Rows",desc="Maximum number of complete tracker rows shown at once. The tracker height is calculated automatically so text is never partially cropped. ( Default: 30 )",width="double",min=6,max=60,step=1,get=GetValue,set=SetValue},
-      trackerBackgroundOpacity={type="range",order=24,name="Tracker Background Opacity",desc="Opacity of the tracker background. 0 is fully transparent, matching old Questie's default tracker presentation. ( Default: 0 )",width="double",min=0,max=1,step=0.05,get=GetValue,set=SetValue},
+      trackerBackgroundOpacity={type="range",order=24,name="Background Opacity",desc="Opacity of the tracker background. 0 is fully transparent, matching old Questie's default tracker presentation. ( Default: 0 )",width="double",min=0,max=1,step=0.05,get=GetValue,set=SetValue},
       manual_hint={type="description",order=30,name="Shift + Left Click a quest in the Quest Log to track or untrack it manually.",fontSize="medium"},
     },
   }
