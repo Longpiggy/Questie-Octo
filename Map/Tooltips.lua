@@ -431,7 +431,7 @@ local function ShowCombinedNearbyFullNodeTooltip(pin,pins)
   -- or quest relationships into one giant tooltip. No map/node data is removed.
   local title=QuestSourceTitle(pin)
   if table.getn(pins)>1 then
-    title=title.." |cffaaaaaa("..tostring(table.getn(pins)).." nearby nodes)|r"
+    title=title.." |cffaaaaaa("..tostring(table.getn(pins)).." nearby)|r"
   end
 
   tooltip:AddLine(title,.2,1,.35)
