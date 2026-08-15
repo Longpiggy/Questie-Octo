@@ -77,6 +77,11 @@ S.defaults={
   trackerShowCompleted=true,
   trackerHideCompletedObjectives=false,
   trackerSort="zone",
+  -- Temporary tracker font-flag comparison options. Keep both off by default
+  -- so existing profiles retain the historical Questie-Octo presentation.
+  -- They are mutually exclusive when changed through Set().
+  trackerOutlineText=false,
+  trackerThickOutlineText=false,
   trackerFontSize=11,
   trackerMaxWidth=280,
   trackerVisibleRows=30,
@@ -119,6 +124,9 @@ function S:Initialize()
   -- settings in SavedVariables.
   db.databaseLocale=nil
   db.enableTooltipsObjectID=nil
+  -- 1.0.31 replaces the experimental Thicker Text toggle with explicit WoW
+  -- OUTLINE / THICKOUTLINE comparison toggles. Ignore the old saved value.
+  db.trackerThickerText=nil
 
   -- 0.3.3: per-category size sliders were removed. Questie-Octo now has one
   -- World Map scale and one Minimap scale; discard hidden stale multipliers.
@@ -193,7 +201,8 @@ function S:Set(key,value)
       key=="enableTooltipDroprates" or
       key=="questLogShowLevels" or key=="questLogDifficultyColors" or
       key=="trackerEnabled" or key=="trackerLocked" or key=="trackerAutoTrack" or
-      key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" then
+      key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
+      key=="trackerOutlineText" or key=="trackerThickOutlineText" then
     value=value and true or false
   elseif key=="globalScale" then
     value=Clamp(value,0.01,4)
@@ -218,6 +227,16 @@ function S:Set(key,value)
   end
 
   if value==nil then return false end
+
+  -- OUTLINE and THICKOUTLINE are comparison modes, not cumulative effects.
+  -- Keep them mutually exclusive even if a caller changes settings outside
+  -- the AceConfig UI.
+  if value==true and key=="trackerOutlineText" then
+    self.db.trackerThickOutlineText=false
+  elseif value==true and key=="trackerThickOutlineText" then
+    self.db.trackerOutlineText=false
+  end
+
   if IsCharacterOption(key) then
     self.charDB[key]=value
   else

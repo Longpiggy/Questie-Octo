@@ -2,7 +2,7 @@
 QuestieOcto = QuestieOcto or {}
 local QO = QuestieOcto
 
-QO.version = "1.0.27"
+QO.version = "1.0.31"
 QO.enabled = false
 QO.ready = false
 QO.messages = {}

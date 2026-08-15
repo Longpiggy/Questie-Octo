@@ -116,7 +116,13 @@ end
 local function SetFont(fs,size,r,g,b)
   if not fs then return end
   local font=STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
-  fs:SetFont(font,size or 10,"")
+  local flags=""
+  if Settings():Get("trackerThickOutlineText") then
+    flags="THICKOUTLINE"
+  elseif Settings():Get("trackerOutlineText") then
+    flags="OUTLINE"
+  end
+  fs:SetFont(font,size or 10,flags)
   if r then fs:SetTextColor(r,g,b) end
 end
 
@@ -434,7 +440,13 @@ local function ApplyRowStyle(row, contentWidth, constrainWidth)
   SetFont(row.text,size,r,g,b)
   if kind=="zone" and row.text.SetFont then
     local font=STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
-    row.text:SetFont(font,size,"")
+    local flags=""
+    if Settings():Get("trackerThickOutlineText") then
+      flags="THICKOUTLINE"
+    elseif Settings():Get("trackerOutlineText") then
+      flags="OUTLINE"
+    end
+    row.text:SetFont(font,size,flags)
     row.text:SetTextColor(r,g,b)
   end
 
@@ -946,6 +958,7 @@ function T:OnTrackerSettingChanged(key,value)
   elseif key=="trackerBackgroundOpacity" then
     self:ApplyBackgroundOpacity()
   elseif key=="trackerFontSize" or key=="trackerMaxWidth" or key=="trackerVisibleRows" or key=="trackerSort" or
+         key=="trackerOutlineText" or key=="trackerThickOutlineText" or
          key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or
          key=="trackerAutoTrack" or key=="trackerHideInCombat" then
     self:Render()
