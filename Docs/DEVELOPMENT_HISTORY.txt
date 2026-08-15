@@ -1,4 +1,16 @@
-Questie-Octo 1.0.2
+Questie-Octo 1.0.3
+
+
+1.0.3 release notes
+-------------------
+- Restored a Flight master toggle under Map > Miscellaneous icons. It controls
+  Flight Master markers on selected zone and city maps.
+- Kept General > World Map Visibility > Show Flight Master on the World Map as
+  a separate option. It now controls Flight Masters on continent/world overview
+  maps only, so players can configure overview maps, zone/city maps, and the
+  minimap independently.
+- Existing profiles migrate their previous World Map Flight Master preference
+  to both map scopes, preserving the behavior they had before the split.
 
 
 1.0.2 release notes

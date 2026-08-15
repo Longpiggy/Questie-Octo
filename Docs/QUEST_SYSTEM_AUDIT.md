@@ -4,7 +4,7 @@
 - First-time quest acceptance keeps the native quest-log priming/fast-poll path validated during post-1.0 testing.
 - World-map objective glow defaults OFF with the existing one-time migration from the former default ON state.
 - World Map density refresh prioritizes the currently displayed map zone, then the player's minimap zone, before background prepared-map work.
-- Official release metadata is version `1.0.1`; future patch releases follow `1.0.2`, `1.0.3`, and so on.
+- Official release metadata is version `1.0.3`; future patch releases continue as `1.0.4`, `1.0.5`, and so on.
 
 ## 1.0 final quest-option and branding pass
 
