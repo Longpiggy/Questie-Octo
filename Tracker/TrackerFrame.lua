@@ -33,7 +33,7 @@ T.maxWidth=2000
 T.maxHeight=2000
 T.padding=8
 T.autoFitMinWidth=100
-T.autoFitMaxWidth=2000
+T.autoFitMaxWidth=280
 
 local function Settings()
   return QuestieOcto.MinimapSettings
@@ -124,8 +124,10 @@ function T:AutoFitWidth()
   if not self.frame then return self.defaultWidth,self.defaultWidth-16 end
 
   -- pfQuest's proven Vanilla technique: measure the actual FontStrings that
-  -- are already being rendered. Do not use a separate measuring FontString
-  -- and do not constrain the text width before asking GetStringWidth().
+  -- are already being rendered at their natural one-line width. Questie-Octo
+  -- then applies the player-selected practical tracker cap (280px by default).
+  -- Long quest/objective text is wrapped during the second layout pass instead
+  -- of being allowed to stretch the entire tracker across the screen.
   local longest=0
   for i=1,self.rowCount do
     local row=self.rows[i]
@@ -142,7 +144,10 @@ function T:AutoFitWidth()
   -- room after the longest rendered line. The fixed TOPRIGHT anchor means
   -- this width change grows/shrinks leftward without moving the right edge.
   local frameWidth=longest+16
-  frameWidth=Clamp(frameWidth,self.autoFitMinWidth,screenW)
+  local configuredMax=tonumber(Settings():Get("trackerMaxWidth")) or self.autoFitMaxWidth or 280
+  configuredMax=Clamp(configuredMax,200,500)
+  local maxWidth=math.min(configuredMax,screenW)
+  frameWidth=Clamp(frameWidth,self.autoFitMinWidth,maxWidth)
   local scrollWidth=math.max(1,frameWidth-16)
   local contentWidth=scrollWidth
 
@@ -352,7 +357,43 @@ function T:ClearRows()
   self.timerRows={}
 end
 
-local function ApplyRowStyle(row, contentWidth)
+local function WrapTextToWidth(fs,text,maxWidth)
+  text=tostring(text or "")
+  maxWidth=tonumber(maxWidth) or 0
+  if text=="" or maxWidth<=0 or not fs or not fs.SetText or not fs.GetStringWidth then
+    return text,1
+  end
+
+  -- Do not rely on Vanilla/Turtle FontString auto-wrapping. Some client/UI
+  -- combinations keep drawing a constrained FontString at its natural one-line
+  -- width. Build the line breaks explicitly from the exact rendered font width
+  -- so long event/exploration objectives are deterministic on every client.
+  local lines={}
+  local line=""
+  local pos=1
+  while true do
+    local s,e=string.find(text,"%S+",pos)
+    if not s then break end
+    local word=string.sub(text,s,e)
+    local candidate=(line=="") and word or (line.." "..word)
+    fs:SetText(candidate)
+    local candidateWidth=tonumber(fs:GetStringWidth()) or 0
+    if line~="" and candidateWidth>maxWidth then
+      table.insert(lines,line)
+      line=word
+    else
+      line=candidate
+    end
+    pos=e+1
+  end
+
+  if line~="" then table.insert(lines,line) end
+  local count=table.getn(lines)
+  if count<1 then return text,1 end
+  return table.concat(lines,"\n"),count
+end
+
+local function ApplyRowStyle(row, contentWidth, constrainWidth)
   local size=tonumber(Settings():Get("trackerFontSize")) or 10
   local left=0
   local r,g,b=1,1,1
@@ -388,21 +429,33 @@ local function ApplyRowStyle(row, contentWidth)
   row.text:ClearAllPoints()
   row.text:SetPoint("TOPLEFT",row,"TOPLEFT",left,0)
 
-  -- Vanilla-safe natural text geometry: no TOPRIGHT anchor, no explicit
-  -- FontString width, and no wrapping override. pfQuest simply lets the real
-  -- displayed FontString assume its natural one-line width, then measures it.
+  -- Measure before adding a right-side constraint. GetStringWidth() must see
+  -- each candidate at its natural width so explicit wrapping is deterministic.
   SetFont(row.text,size,r,g,b)
   if kind=="zone" and row.text.SetFont then
     local font=STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
     row.text:SetFont(font,size,"")
     row.text:SetTextColor(r,g,b)
   end
-  row.text:SetText(row.displayText or "")
+
+  local displayText=row.displayText or ""
+  local lineCount=1
+  if constrainWidth and kind=="objective" then
+    local available=math.max(1,(tonumber(contentWidth) or 1)-left)
+    displayText,lineCount=WrapTextToWidth(row.text,displayText,available)
+  end
+
+  -- Preserve the normal right boundary too, but explicit newlines above are
+  -- what guarantee the visual wrap on old clients where anchors alone do not.
+  if constrainWidth then
+    row.text:SetPoint("TOPRIGHT",row,"TOPRIGHT",0,0)
+  end
+  row.text:SetText(displayText)
   row.textIndent=left
 
-  local height=size+4
+  local baseHeight=size+4
+  local height=baseHeight*math.max(1,lineCount)
   row:SetHeight(height)
-  if row.text.SetHeight then row.text:SetHeight(height) end
 end
 
 function T:AddRow(text,kind,questID,complete,questLevel,failed)
@@ -580,12 +633,13 @@ function T:Render()
   end
 
   -- First pass has already created the visible FontStrings at natural width.
-  -- Measure those exact strings, resize the outer geometry once, then only
-  -- resize the clickable row containers; text geometry remains untouched.
+  -- Measure those exact strings and choose a tracker width capped like pfQuest.
+  -- Then perform one constrained pass so only text that exceeds the available
+  -- width wraps, and row heights expand to keep every wrapped line visible.
   local frameWidth,contentWidth=self:AutoFitWidth()
 
   for i=1,self.rowCount do
-    self.rows[i]:SetWidth(contentWidth)
+    ApplyRowStyle(self.rows[i],contentWidth,true)
   end
   self:ApplyVisibleRowsHeight()
   self:LayoutVisibleRows()
@@ -891,7 +945,7 @@ function T:OnTrackerSettingChanged(key,value)
     self:Render()
   elseif key=="trackerBackgroundOpacity" then
     self:ApplyBackgroundOpacity()
-  elseif key=="trackerFontSize" or key=="trackerVisibleRows" or key=="trackerSort" or
+  elseif key=="trackerFontSize" or key=="trackerMaxWidth" or key=="trackerVisibleRows" or key=="trackerSort" or
          key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or
          key=="trackerAutoTrack" or key=="trackerHideInCombat" then
     self:Render()

@@ -78,6 +78,7 @@ S.defaults={
   trackerHideCompletedObjectives=false,
   trackerSort="zone",
   trackerFontSize=11,
+  trackerMaxWidth=280,
   trackerVisibleRows=30,
   trackerBackgroundOpacity=0,
   trackerHideInCombat=false
@@ -204,6 +205,9 @@ function S:Set(key,value)
     if value~="zone" and value~="level" and value~="proximity" then return false end
   elseif key=="trackerFontSize" then
     value=Clamp(value,8,18)
+  elseif key=="trackerMaxWidth" then
+    value=Clamp(value,200,500)
+    if value then value=math.floor(value+0.5) end
   elseif key=="trackerVisibleRows" then
     value=Clamp(value,6,60)
     if value then value=math.floor(value+0.5) end
