@@ -53,6 +53,10 @@ S.defaults={
   showMinimapMailbox=true,
 
   showLowLevelQuests=true,
+  -- Maximum number of displayed quest levels below the player to expose when
+  -- Show Low-Level Quests is enabled. 30 is the UI's "All" sentinel; it is
+  -- intentionally not interpreted as a literal 30-level cutoff.
+  lowLevelQuestRange=30,
   showEventQuests=false,
   showRepeatableQuests=true,
   showPvPRelatedQuests=true,
@@ -98,7 +102,7 @@ local function Clamp(value,minValue,maxValue)
 end
 
 local function IsCharacterOption(key)
-  return key=="showLowLevelQuests" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests"
+  return key=="showLowLevelQuests" or key=="lowLevelQuestRange" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests"
 end
 
 -- Vanilla/Turtle can restore SavedVariables after addon files have executed.
@@ -204,6 +208,9 @@ function S:Set(key,value)
       key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
       key=="trackerOutlineText" or key=="trackerThickOutlineText" then
     value=value and true or false
+  elseif key=="lowLevelQuestRange" then
+    value=tonumber(value)
+    if value~=0 and value~=5 and value~=10 and value~=15 and value~=20 and value~=25 and value~=30 then return false end
   elseif key=="globalScale" then
     value=Clamp(value,0.01,4)
   elseif key=="objectiveNodeDensity" or key=="itemStartDensity" then
@@ -262,7 +269,7 @@ function S:Set(key,value)
     return true
   end
 
-  if key=="showLowLevelQuests" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests" then
+  if key=="showLowLevelQuests" or key=="lowLevelQuestRange" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests" then
     if QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.FastRefresh then
       QuestieOcto.AvailableQuests:FastRefresh()
     end

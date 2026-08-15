@@ -4,7 +4,7 @@
 -- @release $Id: AceConfigDialog-3.0.lua 1139 2016-07-03 07:43:51Z nevcairiel $
 
 local LibStub = LibStub
-local MAJOR, MINOR = "AceConfigDialog-3.0", 61
+local MAJOR, MINOR = "AceConfigDialog-3.0", 63
 local AceConfigDialog, oldminor = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not AceConfigDialog then return end
@@ -827,14 +827,52 @@ local function ActivateControl(widget, event, argc, a1,a2,a3,a4,a5,a6,a7,a8,a9,a
 end
 
 local function ActivateSlider(widget, event, _, value)
+	local option = widget:GetUserData("option")
+	local min, max, step = option.min or (not option.softMin and 0 or nil), option.max or (not option.softMax and 100 or nil), option.step
+
+	local function NormalizeSliderValue(v)
+		v = tonumber(v) or 0
+		if min then
+			if step then
+				v = math_floor((v - min) / step + 0.5) * step + min
+			end
+			v = math_max(v, min)
+		end
+		if max then v = math_min(v, max) end
+		return v
+	end
+
+	-- Questie-Octo: availability filters are expensive semantic changes.  For
+	-- the compact low-level range control, let the handle move freely but only
+	-- commit once when the player releases it.  Committing every intermediate
+	-- 5-level stop started multiple availability/node/map rebuilds while a drag
+	-- was still in progress, which made quest icons visibly flash between states.
+	local commitOnMouseUp = option.arg and option.arg.questieCommitOnMouseUp
+	if commitOnMouseUp then
+		local current = NormalizeSliderValue((widget.GetValue and widget:GetValue()) or value)
+		if event == "OnValueChanged" then
+			local prefix = option.arg and option.arg.questieLiveLabelPrefix
+			if prefix and widget.SetLabel then
+				local maxLabel = option.arg.questieMaxLabel
+				if max and current >= max and maxLabel then
+					widget:SetLabel(prefix..tostring(maxLabel))
+				else
+					widget:SetLabel(prefix..tostring(current))
+				end
+			end
+			return
+		end
+		if event == "OnMouseUp" then
+			ActivateControl(widget,event,1,current)
+			return
+		end
+	end
+
 	-- Ace3v / Vanilla compatibility:
-	-- Questie's AceGUI commits range changes continuously through
-	-- OnValueChanged and uses OnMouseUp to trigger AceConfigDialog's full
-	-- refresh. On Turtle's 1.12 slider implementation the release callback
-	-- can carry the widget's pre-drag value, which causes a second setter call
-	-- to overwrite the value that was already committed correctly while
-	-- dragging. Keep Questie's external behavior (live setting + refresh on
-	-- release), but do not write the setting a second time on release.
+	-- Questie's normal sliders commit continuously through OnValueChanged and
+	-- use OnMouseUp only to refresh AceConfigDialog.  On Turtle's 1.12 slider
+	-- implementation the release callback can carry the widget's pre-drag value,
+	-- so do not write the setting a second time on release.
 	if event == "OnMouseUp" then
 		local user = widget:GetUserDataTable()
 		local iscustom = user.rootframe:GetUserData("iscustom")
@@ -847,18 +885,7 @@ local function ActivateSlider(widget, event, _, value)
 		return
 	end
 
-	local option = widget:GetUserData("option")
-	local min, max, step = option.min or (not option.softMin and 0 or nil), option.max or (not option.softMax and 100 or nil), option.step
-	if min then
-		if step then
-			value = math_floor((value - min) / step + 0.5) * step + min
-		end
-		value = math_max(value, min)
-	end
-	if max then
-		value = math_min(value, max)
-	end
-	ActivateControl(widget,event,1,value)
+	ActivateControl(widget,event,1,NormalizeSliderValue(value))
 end
 
 --called from a checkbox that is part of an internally created multiselect group
@@ -1178,12 +1205,24 @@ local function FeedOptions(appName, options,container,rootframe,path,group,inlin
 					control = gui:Create("Slider")
 					control:SetLabel(name)
 					control:SetSliderValues(v.softMin or v.min or 0, v.softMax or v.max or 100, v.bigStep or v.step or 0)
+					-- Questie-Octo: discrete sliders can opt out of AceGUI's editable numeric box.
+					-- Always restore it for normal sliders because AceGUI widgets may be reused.
+					if control.editbox then
+						if v.arg and v.arg.questieHideEditBox then control.editbox:Hide() else control.editbox:Show() end
+					end
 					control:SetIsPercent(v.isPercent)
 					local value = GetOptionsMemberValue("get",v, options, path, appName)
 					if type(value) ~= "number" then
 						value = 0
 					end
 					control:SetValue(value)
+					-- Do not rely on Questie-Octo's extended Slider widget being the active
+					-- AceGUI registration: another addon may have registered a newer Slider
+					-- first.  Every Ace slider exposes hightext, so set the endpoint label
+					-- directly when this option asks for a textual maximum such as "All".
+					if v.arg and v.arg.questieMaxLabel and control.hightext then
+						control.hightext:SetText(v.arg.questieMaxLabel)
+					end
 					control:SetCallback("OnValueChanged",ActivateSlider)
 					control:SetCallback("OnMouseUp",ActivateSlider)
 

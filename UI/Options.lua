@@ -249,7 +249,12 @@ local function CreateGeneralTab()
 
       quest_options={type="group",order=10,name="Quest Options",inline=true,args={
         questLogShowLevels={type="toggle",order=1,name="Show Quest Levels",desc="Show the quest level before each quest title in the native Quest Log.",width="full",get=GetValue,set=SetValue},
-        showLowLevelQuests={type="toggle",order=2,name="Show Low-Level Quests",desc="Show otherwise-valid quests below the normal green quest range. Questie-Octo default: enabled.",width="full",get=GetValue,set=SetValue},
+        showLowLevelQuests={type="toggle",order=2,name="Show Low-Level Quests",desc="Show otherwise-valid quests below the normal green quest range. Use Levels Below to limit how far below your current level they are shown. Questie-Octo default: enabled.",get=GetValue,set=SetValue},
+        lowLevelQuestRange={type="range",order=2.1,name=function()
+          local value=tonumber(Settings():Get("lowLevelQuestRange")) or 30
+          if value>=30 then return "Levels Below: All" end
+          return "Levels Below: "..tostring(value)
+        end,desc="How many displayed quest levels below your current level may be shown. Example: at level 60, 15 shows level 45+ quests. All preserves the unrestricted low-level quest view. ( Default: All )",width="normal",min=0,max=30,step=5,arg={questieHideEditBox=true,questieMaxLabel="All",questieCommitOnMouseUp=true,questieLiveLabelPrefix="Levels Below: "},disabled=function() return not Settings():Get("showLowLevelQuests") end,get=GetValue,set=SetValue},
         showRepeatableQuests={type="toggle",order=3,name="Show Repeatable Quests",desc="Show available repeatable quests. Active objectives and turn-ins remain visible. ( Default: enabled )",width="full",get=GetValue,set=SetValue},
         showEventQuests={type="toggle",order=4,name="Show Event Quests",desc="Show or hide available event quests on the map and minimap. Event quests use Questie's event quest artwork. Accepted objectives and turn-ins remain visible. ( Default: disabled )",width="full",get=GetValue,set=SetValue},
         showPvPRelatedQuests={type="toggle",order=5,name="Show PVP Related Quests",desc="Show or hide PvP-related quest markers on the map and minimap. When disabled, all PvP quest markers are hidden, including available quests, active objectives, and turn-ins. ( Default: enabled )",width="full",get=GetValue,set=SetValue},

@@ -362,58 +362,52 @@ local function DecrementNodeStats(node)
   if key then N.stats[key]=math.max(0,(N.stats[key] or 0)-1) end
 end
 
-function N:RefreshQuests(changedQuests)
-  if not self.ready or self.running or not QuestieOcto.Objectives.ready then
-    self:Rebuild()
-    return
-  end
-
+local function NormalizeChangedQuests(changedQuests)
   local changed={}
   for questID in pairs(changedQuests or {}) do
     questID=tonumber(questID)
     if questID and questID>0 then changed[questID]=true end
   end
-  if not next(changed) then return end
+  return changed
+end
 
+local function RemoveChangedQuestNodes(changed)
   local affectedMaps={}
 
   -- Update global node/stat accounting once per canonical node. A canonical
   -- source can belong to more than one map, so decrementing while filtering
   -- per-map arrays would count the same node more than once.
   local keptGlobal={}
-  for _,node in pairs(self.nodes or {}) do
+  for _,node in pairs(N.nodes or {}) do
     if changed[tonumber(node.questID)] then
       DecrementNodeStats(node)
     else
       table.insert(keptGlobal,node)
     end
   end
-  self.nodes=keptGlobal
+  N.nodes=keptGlobal
 
-  -- Remove only the changed quests from map indexes. The reverse quest->map
-  -- index is the same idea as pfQuest's titleIndex and avoids scanning
-  -- unrelated zone tables.
+  -- Remove only changed quests from map indexes. Keep the old map IDs in the
+  -- affected set so a quest that disappears entirely can still remove its
+  -- prepared/map presentation from those zones.
   for questID in pairs(changed) do
-    for mapID in pairs(self.questMaps[questID] or {}) do
+    for mapID in pairs(N.questMaps[questID] or {}) do
       affectedMaps[mapID]=true
       local kept={}
-      for _,node in pairs(self.byMap[mapID] or {}) do
+      for _,node in pairs(N.byMap[mapID] or {}) do
         if tonumber(node.questID)~=questID then table.insert(kept,node) end
       end
-      self.byMap[mapID]=kept
+      N.byMap[mapID]=kept
     end
-    self.questMaps[questID]=nil
+    N.questMaps[questID]=nil
   end
 
-  -- Add the current semantic state for only those quests (objective nodes or
-  -- turn-in nodes). AddNode repopulates questMaps and may touch new maps.
-  for questID in pairs(changed) do
-    BuildActiveQuestNodes(questID)
-    for mapID in pairs(self.questMaps[questID] or {}) do affectedMaps[mapID]=true end
-  end
+  return affectedMaps
+end
 
-  for mapID in pairs(affectedMaps) do
-    local mapNodes=self.byMap[mapID]
+local function SortAffectedMaps(affectedMaps)
+  for mapID in pairs(affectedMaps or {}) do
+    local mapNodes=N.byMap[mapID]
     if mapNodes then
       table.sort(mapNodes,function(a,b)
         if a.questID~=b.questID then return a.questID<b.questID end
@@ -423,7 +417,60 @@ function N:RefreshQuests(changedQuests)
       end)
     end
   end
+end
 
+function N:RefreshQuests(changedQuests)
+  if not self.ready or self.running or not QuestieOcto.Objectives.ready then
+    self:Rebuild()
+    return
+  end
+
+  local changed=NormalizeChangedQuests(changedQuests)
+  if not next(changed) then return end
+
+  local affectedMaps=RemoveChangedQuestNodes(changed)
+
+  -- Objective/progress refreshes re-add only the active semantic state.
+  for questID in pairs(changed) do
+    BuildActiveQuestNodes(questID)
+    for mapID in pairs(self.questMaps[questID] or {}) do affectedMaps[mapID]=true end
+  end
+
+  SortAffectedMaps(affectedMaps)
+  QuestieOcto:SendMessage("NODES_CHANGED",affectedMaps,changed)
+end
+
+-- Availability filters used to rebuild the complete canonical node graph even
+-- when only a handful of quests crossed the visible/hidden boundary. On dense
+-- continent maps that forced every existing icon through another render pass
+-- and looked like flicker. Patch just the changed quests instead.
+function N:RefreshAvailability(changedQuests)
+  if not self.ready or self.running or not QuestieOcto.Objectives.ready
+     or not QuestieOcto.ItemStarts.ready then
+    self:Rebuild()
+    return
+  end
+
+  local changed=NormalizeChangedQuests(changedQuests)
+  if not next(changed) then return end
+
+  local affectedMaps=RemoveChangedQuestNodes(changed)
+  local availableSet=QuestieOcto.AvailableQuests.available or {}
+  local itemStarts=QuestieOcto.ItemStarts.byQuest or {}
+
+  for questID in pairs(changed) do
+    -- This normally covers available quests only, but rebuilding the current
+    -- semantic state makes the patch safe if another producer races the filter.
+    if QuestieOcto.QuestLog.active and QuestieOcto.QuestLog.active[questID] then
+      BuildActiveQuestNodes(questID)
+    elseif availableSet[questID] then
+      BuildAvailableQuestNodes(questID)
+      BuildItemStartQuestNodes(questID,itemStarts[questID],availableSet)
+    end
+    for mapID in pairs(self.questMaps[questID] or {}) do affectedMaps[mapID]=true end
+  end
+
+  SortAffectedMaps(affectedMaps)
   QuestieOcto:SendMessage("NODES_CHANGED",affectedMaps,changed)
 end
 
@@ -574,7 +621,11 @@ function N:OnObjectivesChanged(changedQuests)
   self:RefreshQuests(changedQuests)
 end
 
+function N:OnItemStartsChanged(changedQuests)
+  self:RefreshAvailability(changedQuests)
+end
+
 QuestieOcto:RegisterMessage("OBJECTIVES_READY",N,"OnInputReady")
 QuestieOcto:RegisterMessage("OBJECTIVES_CHANGED",N,"OnObjectivesChanged")
 QuestieOcto:RegisterMessage("ITEM_STARTS_READY",N,"OnInputReady")
-QuestieOcto:RegisterMessage("AVAILABLE_QUESTS_READY",N,"OnInputReady")
+QuestieOcto:RegisterMessage("ITEM_STARTS_CHANGED",N,"OnItemStartsChanged")

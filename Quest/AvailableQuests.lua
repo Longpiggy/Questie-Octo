@@ -339,9 +339,21 @@ function A:EvaluateQuest(questID,trackStats)
   local showLowLevel=settings:Get("showLowLevelQuests") and true or false
 
   -- lvl is presentation/triviality; it is NOT the high-level acceptance gate.
-  if not showLowLevel and q.level and q.level>0 and q.level<level-4 then
-    Track(self,"level",trackStats)
-    return false,"lowLevel"
+  -- When low-level quests are enabled, players may optionally bound how far
+  -- below their current level Questie-Octo exposes them. The value 30 is the
+  -- options UI's "All" sentinel and preserves the historical unrestricted
+  -- Show Low-Level Quests behavior.
+  if q.level and q.level>0 then
+    if not showLowLevel and q.level<level-4 then
+      Track(self,"level",trackStats)
+      return false,"lowLevel"
+    elseif showLowLevel then
+      local below=tonumber(settings:Get("lowLevelQuestRange")) or 30
+      if below<30 and q.level<level-below then
+        Track(self,"level",trackStats)
+        return false,"lowLevel"
+      end
+    end
   end
 
   -- Actual upper eligibility uses the minimum required level. Future quests are
@@ -587,13 +599,27 @@ function A:Recalculate(fastRefresh)
     end
 
     -- Publish once, atomically, only after the complete scan is ready.
-    A.available=A.pendingAvailable or {}
+    -- Also publish the exact availability delta. Filter-only changes (such as
+    -- Low-Level Quest range) can then patch only quests that actually crossed
+    -- the visibility boundary instead of rebuilding/rebinding every map pin.
+    local previous=A.available or {}
+    local replacement=A.pendingAvailable or {}
+    local changed={}
+    local id
+    for id in pairs(previous) do
+      if not replacement[id] then changed[id]=true end
+    end
+    for id in pairs(replacement) do
+      if not previous[id] then changed[id]=true end
+    end
+
+    A.available=replacement
     A.stats=A.scanStats or A.stats
     A.pendingAvailable=nil
     A.scanStats=nil
     A.running=false
     A.ready=true
-    QuestieOcto:SendMessage("AVAILABLE_QUESTS_READY")
+    QuestieOcto:SendMessage("AVAILABLE_QUESTS_READY",changed)
   end
 
   QuestieOcto.Scheduler:Enqueue(step,"available-scan")

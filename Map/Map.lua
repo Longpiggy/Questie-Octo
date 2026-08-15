@@ -1139,14 +1139,151 @@ function M:RequestSync(doPrune)
   end,"map-sync")
 end
 
+function M:PatchContinentQuests(changedQuests)
+  if not WorldMapFrame or not WorldMapFrame:IsVisible() then return false end
+  local continentMapID=DisplayedContinentMapID()
+  if continentMapID==nil or not QuestieOcto.ContinentProjection then return false end
+
+  -- If a full continent render is already in flight, let it finish against the
+  -- newest canonical Nodes snapshot rather than mutating its frame set midway.
+  if self.syncing then
+    self.resync=true
+    self.prune=true
+    return true
+  end
+
+  local changed={}
+  for questID in pairs(changedQuests or {}) do
+    questID=tonumber(questID)
+    if questID and questID>0 then changed[questID]=true end
+  end
+  if not next(changed) then return true end
+
+  local contextKey=-1000-tonumber(continentMapID)
+  if tonumber(self.mapID)~=contextKey then return false end
+
+  -- Remove only changed quest relationships from the currently visible pins,
+  -- but do not hide them yet. A quest can disappear and reappear on the same
+  -- physical source key during a filter change; deferring visibility decisions
+  -- until after additions prevents an off/on frame flash.
+  local touched={}
+  for _,pin in pairs(self.activeFrames or {}) do
+    if pin.itemStartArea and changed[tonumber(pin.itemStartArea.questID)] then
+      pin.itemStartArea=nil
+      touched[pin]=true
+    end
+
+    for key,entry in pairs(pin.entries or {}) do
+      if entry and entry.node and changed[tonumber(entry.node.questID)] then
+        pin.entries[key]=nil
+        touched[pin]=true
+      end
+    end
+  end
+
+  -- A pin hidden by an earlier incremental filter patch can be reused later in
+  -- this same continent generation. Reset only those empty hidden frames so a
+  -- stale visual priority cannot prevent a newly visible quest from owning it.
+  for _,pin in pairs(self.frames or {}) do
+    if pin.seenGeneration==self.generation and not pin:IsShown()
+       and not pin.itemStartArea and not next(pin.entries or {}) then
+      pin.visualPriority=nil
+      pin.role=nil
+      pin.questID=nil
+      pin.sourceID=nil
+      pin.event=nil
+      pin.pvp=nil
+      pin.repeatable=nil
+      pin.fullNode=nil
+      pin.fullNodeNode=nil
+      pin.iconScaleKey=nil
+    end
+  end
+
+  -- Add only the new semantic state for the changed quests. Unrelated continent
+  -- icons never get rebound, cleared or recreated when Low-Level Quest range
+  -- changes, so they remain visually stable throughout the update.
+  local mapIDs=QuestieOcto.ContinentProjection:GetZoneMapIDs(continentMapID)
+  for _,mapID in ipairs(mapIDs or {}) do
+    local rareGroups={}
+    for _,node in pairs(QuestieOcto.Nodes:GetMapNodes(mapID) or {}) do
+      if changed[tonumber(node.questID)] then
+        if not AddContinentRareItemStart(rareGroups,node,mapID) then
+          self:RenderContinentNode(node,mapID,self.generation)
+        end
+      end
+    end
+    RenderContinentRareItemStarts(rareGroups,mapID,self.generation)
+  end
+
+  -- Re-evaluate only pins that lost old relationships. AddEntry already handles
+  -- newly added relationships, but a removed high-priority entry can otherwise
+  -- leave its old visual owner cached on a shared coordinate.
+  for pin in pairs(touched) do
+    if pin.itemStartArea then
+      -- RenderItemStartArea already refreshed this pin's complete visual state.
+    elseif next(pin.entries or {}) then
+      RefreshPinVisual(pin)
+    else
+      if pin:IsShown() then
+        pin:Hide()
+        self.stats.hidden=self.stats.hidden+1
+      end
+    end
+  end
+
+  -- Rebuild the small active-frame index from already-bound frames. Frames from
+  -- older map contexts have a different generation and stay excluded.
+  local active={}
+  for _,pin in pairs(self.frames or {}) do
+    if pin.seenGeneration==self.generation and (pin.itemStartArea or next(pin.entries or {})) then
+      if not pin:IsShown() then pin:Show() end
+      table.insert(active,pin)
+    end
+  end
+  self.activeFrames=active
+  ResetVisibleOffsets(self.generation,self.activeFrames)
+
+  local visibleAvailable,visibleItemStart,visibleObjective,visibleTurnin=0,0,0,0
+  for _,pin in pairs(self.activeFrames) do
+    if pin.role=="available" then visibleAvailable=visibleAvailable+1
+    elseif pin.role=="itemStart" then visibleItemStart=visibleItemStart+1
+    elseif pin.role=="turnin" then visibleTurnin=visibleTurnin+1
+    else visibleObjective=visibleObjective+1 end
+  end
+  self.stats.active=table.getn(self.activeFrames)
+  self.stats.visibleAvailable=visibleAvailable
+  self.stats.visibleItemStart=visibleItemStart
+  self.stats.visibleObjective=visibleObjective
+  self.stats.visibleTurnin=visibleTurnin
+  self.stats.incrementalContinentPatches=(self.stats.incrementalContinentPatches or 0)+1
+  return true
+end
+
+function M:OnNodesChanged(mapSet,changedQuests)
+  if not WorldMapFrame or not WorldMapFrame:IsVisible() then return end
+
+  -- Zone maps consume PreparedMap's transactional replacement and refresh on
+  -- PREPARED_MAP_READY. Continent maps do not use PreparedMap, so patch their
+  -- changed quest relationships directly instead of starting a full re-render.
+  if DisplayedMapID() then return end
+  if DisplayedContinentMapID()~=nil then
+    if not self:PatchContinentQuests(changedQuests) then self:RequestSync(true) end
+  end
+end
+
 function M:OnNodesReady()
-  -- A hidden World Map does not need to walk/rebind a dense Full Nodes plan
-  -- after every semantic quest change. It synchronizes when opened instead.
-  if WorldMapFrame and WorldMapFrame:IsVisible() then
+  -- Full node publications still drive continent maps directly. Selected zone
+  -- maps must wait for PREPARED_MAP_READY; syncing here would consume the old
+  -- prepared plan once and then the replacement plan moments later, producing
+  -- an unnecessary visible rebind.
+  if WorldMapFrame and WorldMapFrame:IsVisible()
+     and not DisplayedMapID() and DisplayedContinentMapID()~=nil then
     self:RequestSync(true)
   end
 end
 
+QuestieOcto:RegisterMessage("NODES_CHANGED",M,"OnNodesChanged")
 QuestieOcto:RegisterMessage("NODES_READY",M,"OnNodesReady")
 
 function M:OnPreparedMapReady(mapID)
