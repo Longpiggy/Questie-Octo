@@ -410,12 +410,10 @@ local function ApplyRowStyle(row, contentWidth, constrainWidth)
     r,g,b=1,0.82,0
     left=0
   elseif kind=="quest" then
-    -- Preserve Questie-Octo's explicit completed-quest cue. Active quest
-    -- titles use Turtle/OctoWoW's own native difficulty color rules.
+    -- Match the classic Questie/Quest Log presentation: completion is shown
+    -- by appending "(Complete)" to the title, not by replacing difficulty color.
     if row.failed then
       r,g,b=1,0.35,0.35
-    elseif row.complete then
-      r,g,b=0.35,0.80,0.35
     elseif QuestieOcto.GetNativeQuestDifficultyColor then
       local nr,ng,nb=QuestieOcto:GetNativeQuestDifficultyColor(row.questLevel,row.questID)
       if nr then r,g,b=nr,ng,nb else r,g,b=1,0.82,0 end
@@ -630,13 +628,22 @@ function T:Render()
       prefix="["..tostring(quest.level).."] "
     end
     local title=tostring(quest.title or "Quest")
-    if quest.failed then title=title.." (Failed)" end
+    if quest.failed then
+      title=title.." (Failed)"
+    elseif quest.complete then
+      title=title.." ("..tostring(_G["COMPLETE"] or "Complete")..")"
+    end
     self:AddRow(prefix..title,"quest",quest.id,quest.complete,quest.level,quest.failed)
     self:AddTimerRow(quest)
 
-    for j=1,table.getn(quest.objectives or {}) do
-      local objective=quest.objectives[j]
-      self:AddRow(ObjectiveDisplayText(objective),"objective",nil,objective.complete)
+    -- A completed quest is represented by "(Complete)" in its title, matching
+    -- the classic Questie/Quest Log presentation. Do not keep redundant 8/8,
+    -- 10/10, etc. objective rows beneath an already-complete quest.
+    if not quest.complete then
+      for j=1,table.getn(quest.objectives or {}) do
+        local objective=quest.objectives[j]
+        self:AddRow(ObjectiveDisplayText(objective),"objective",nil,objective.complete)
+      end
     end
   end
 

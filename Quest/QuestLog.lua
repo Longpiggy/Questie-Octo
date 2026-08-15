@@ -47,7 +47,21 @@ local function ReadObjectives(index,questID)
       local text=row.text
       local current=tonumber(row.numFulfilled)
       local required=tonumber(row.numRequired)
+      if current==nil or required==nil then
+        local parsedCurrent,parsedRequired=ParseObjectiveProgress(text)
+        if current==nil then current=parsedCurrent end
+        if required==nil then required=parsedRequired end
+      end
       local finished=row.finished and true or false
+
+      -- ClassicAPI/Turtle can publish the numerical counter before its separate
+      -- `finished` boolean catches up. Treat a fulfilled numerical objective as
+      -- complete immediately, matching the legacy leaderboard fallback below.
+      -- Without this, the Tracker can already display 10/10 while the semantic
+      -- quest state (and therefore the map) remains stuck on the objective.
+      if not finished and current and required and required>0 and current>=required then
+        finished=true
+      end
 
       if typ~="log" then
         nonLogCount=nonLogCount+1
@@ -607,6 +621,7 @@ function QL:Start()
   f:RegisterEvent("QUEST_LOG_UPDATE")
   f:RegisterEvent("QUEST_ACCEPTED")
   f:RegisterEvent("QUEST_REMOVED")
+  f:RegisterEvent("QUEST_TURNED_IN")
   f:RegisterEvent("PLAYER_LEVEL_UP")
   f:SetScript("OnEvent",function()
     if event=="QUEST_REMOVED" then
@@ -634,6 +649,19 @@ function QL:Start()
       -- cache immediately. Availability/objectives will then publish the new
       -- authoritative state; abandon redraws !, turn-in stays removed.
       QL:Schedule(0.01,true)
+      return
+    end
+
+    if event=="QUEST_TURNED_IN" then
+      -- QUEST_REMOVED/QUEST_LOG_UPDATE normally follow a turn-in, but some
+      -- compatibility layers can delay or omit one of them. Force a fast cache
+      -- pass so the Tracker cannot retain a rewarded quest until another UI
+      -- action happens. A settled pass below/through QUEST_LOG_UPDATE remains
+      -- harmless if the normal event sequence also arrives.
+      QL:Schedule(0.01,true)
+      QuestieOcto.Scheduler:After(1.00,function()
+        QL:Schedule(0.01,true)
+      end,"questlog-turnin-settle")
       return
     end
 
@@ -665,6 +693,18 @@ function QL:Start()
       QL:Schedule(0.01,true)
     else
       QL:Schedule(0.20)
+    end
+
+    if event=="QUEST_LOG_UPDATE" then
+      -- Questie 5.2.3 and 6.0.0 intentionally bucket QUEST_LOG_UPDATE for about
+      -- one second because completion/leaderboard data can propagate through
+      -- Blizzard's API after the event itself. Keep our fast 0.20s pass for
+      -- responsive counters, then perform one keyed settled pass for semantic
+      -- todo -> complete transitions that arrive late. Repeated QLU events simply
+      -- move this one follow-up pass rather than creating a polling storm.
+      QuestieOcto.Scheduler:After(1.00,function()
+        QL:Schedule(0.01,true)
+      end,"questlog-settled-refresh")
     end
   end)
 

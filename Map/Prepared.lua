@@ -6,11 +6,29 @@ P.readyMaps={}
 P.cacheRevision={}
 P.worldItemStartCache={}
 P.worldItemStartRevision={}
+P.cacheDensity={}
 P.stateRevision=1
 P.running=false
 P.generation=0
 P.dirtyGeneration=0
-P.stats={preparedMaps=0,descriptors=0,currentMap=nil,currentReady=false,stateRevision=1,revisionBumps=0}
+P.stats={preparedMaps=0,descriptors=0,currentMap=nil,currentReady=false,stateRevision=1,revisionBumps=0,densitySignature="unknown"}
+
+local function CurrentDensitySignature()
+  local settings=QuestieOcto.MinimapSettings
+  if not settings or not settings.Get then return "clustered:clustered" end
+  return tostring(settings:Get("objectiveNodeDensity") or "clustered")..":"..
+    tostring(settings:Get("itemStartDensity") or "clustered")
+end
+
+function P:GetDensitySignature(mapID)
+  mapID=tonumber(mapID)
+  if not mapID then return nil end
+  return self.cacheDensity[mapID]
+end
+
+function P:GetCurrentDensitySignature()
+  return CurrentDensitySignature()
+end
 
 local function ExactRole(role)
   return role=="available" or role=="turnin" or role=="flightMaster"
@@ -197,7 +215,7 @@ function P:BuildWorldItemStartPlanFromNodes(mapID,nodes)
   return plan
 end
 
-function P:SetPreparedMap(mapID,plan,worldItemStartPlan)
+function P:SetPreparedMap(mapID,plan,worldItemStartPlan,densitySignature)
   mapID=tonumber(mapID)
   if not mapID or not plan then return nil end
 
@@ -210,6 +228,7 @@ function P:SetPreparedMap(mapID,plan,worldItemStartPlan)
   self.cacheRevision[mapID]=self.stateRevision
   self.worldItemStartCache[mapID]=worldItemStartPlan or {}
   self.worldItemStartRevision[mapID]=self.stateRevision
+  self.cacheDensity[mapID]=densitySignature or CurrentDensitySignature()
 
   if not wasReady then
     self.stats.preparedMaps=self.stats.preparedMaps+1
@@ -232,13 +251,14 @@ function P:BuildMap(mapID)
   local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
   local plan=self:BuildPlanFromNodes(mapID,nodes)
   local worldItemStartPlan=self:BuildWorldItemStartPlanFromNodes(mapID,nodes)
-  return self:SetPreparedMap(mapID,plan,worldItemStartPlan)
+  return self:SetPreparedMap(mapID,plan,worldItemStartPlan,CurrentDensitySignature())
 end
 
 function P:Get(mapID)
   mapID=tonumber(mapID)
   if not mapID then return nil end
   if self.cacheRevision[mapID]~=self.stateRevision then return nil end
+  if self.cacheDensity[mapID]~=CurrentDensitySignature() then return nil end
   return self.cache[mapID]
 end
 
@@ -246,6 +266,7 @@ function P:GetWorldItemStarts(mapID)
   mapID=tonumber(mapID)
   if not mapID then return nil end
   if self.worldItemStartRevision[mapID]~=self.stateRevision then return nil end
+  if self.cacheDensity[mapID]~=CurrentDensitySignature() then return nil end
   return self.worldItemStartCache[mapID]
 end
 
@@ -254,6 +275,7 @@ function P:IsReady(mapID)
   return mapID
      and self.readyMaps[mapID]
      and self.cacheRevision[mapID]==self.stateRevision
+     and self.cacheDensity[mapID]==CurrentDensitySignature()
      and true or false
 end
 
@@ -351,14 +373,23 @@ function P:Invalidate()
   self.cacheRevision={}
   self.worldItemStartCache={}
   self.worldItemStartRevision={}
+  self.cacheDensity={}
   self.running=false
   self.stats.preparedMaps=0
   self.stats.descriptors=0
   self.stats.currentReady=false
 end
 
-function P:PrepareAll()
+function P:PrepareAll(reason)
   if not QuestieOcto.Nodes.ready then return end
+
+  -- A full preparation pass supersedes every queued incremental prepared-map
+  -- patch. Density changes in particular must not let an older dirty job publish
+  -- a mixed Clustered/Full plan after the authoritative rebuild has started.
+  self.dirtyGeneration=(self.dirtyGeneration or 0)+1
+  local densitySignature=CurrentDensitySignature()
+  self.stats.densitySignature=densitySignature
+  self.lastPrepareReason=reason or "full"
 
   -- Transactional map-plan rebuild. Keep every currently published plan alive
   -- until that specific map's replacement is ready; density/filter toggles
@@ -377,9 +408,15 @@ function P:PrepareAll()
   -- presentation instead of waiting for the displayed World Map zone to be
   -- reached by the background PrepareAll pass.
   local displayed=nil
-  if WorldMapFrame and WorldMapFrame:IsVisible() and QuestieOcto.Map and
-     QuestieOcto.Map.GetDisplayedMapID then
-    displayed=QuestieOcto.Map:GetDisplayedMapID()
+  if QuestieOcto.Map then
+    if WorldMapFrame and WorldMapFrame:IsVisible() and QuestieOcto.Map.GetDisplayedMapID then
+      displayed=QuestieOcto.Map:GetDisplayedMapID()
+    elseif tonumber(QuestieOcto.Map.mapID) and tonumber(QuestieOcto.Map.mapID)>0 then
+      -- The options window can be used while the World Map is hidden. Preserve
+      -- the last selected zone as a priority target so reopening that same zone
+      -- never sees the previous density plan.
+      displayed=tonumber(QuestieOcto.Map.mapID)
+    end
   end
 
   local mapSet={}
@@ -397,7 +434,7 @@ function P:PrepareAll()
     local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
     local plan=P:BuildPlanFromNodes(mapID,nodes) or {}
     local worldItemStartPlan=P:BuildWorldItemStartPlanFromNodes(mapID,nodes) or {}
-    P:SetPreparedMap(mapID,plan,worldItemStartPlan)
+    P:SetPreparedMap(mapID,plan,worldItemStartPlan,densitySignature)
     return true
   end
 
@@ -443,13 +480,29 @@ function P:PrepareAll()
 end
 
 function P:OnNodesReady()
-  self:PrepareAll()
+  self:PrepareAll("nodes-ready")
 end
 
 QuestieOcto:RegisterMessage("NODES_READY",P,"OnNodesReady")
 
 local function DescriptorKeyValue(desc)
   return desc and tostring(desc.key or "") or ""
+end
+
+local function ClonePreparedDescriptor(desc)
+  if not desc then return nil end
+  if desc.type~="nodeSlot" then return desc end
+
+  -- PatchMaps removes quest entries from a descriptor. Clone the slot first so
+  -- the currently published PreparedMap (which the minimap may still be using)
+  -- is never mutated before its replacement is complete and published.
+  local copy={}
+  for key,value in pairs(desc) do
+    if key~="entries" then copy[key]=value end
+  end
+  copy.entries={}
+  for _,entry in pairs(desc.entries or {}) do table.insert(copy.entries,entry) end
+  return copy
 end
 
 local function MergePreparedDescriptor(byKey,plan,desc)
@@ -498,7 +551,12 @@ function P:PatchMaps(mapSet,changedQuests)
   table.sort(ids)
   if table.getn(ids)==0 then return end
 
-  self.dirtyGeneration=(self.dirtyGeneration or 0)+1
+  -- Incremental node publications may arrive close together (for example two
+  -- quests completing in adjacent frames). They all read the latest canonical
+  -- Nodes state and are safe to interleave. Do NOT advance dirtyGeneration here:
+  -- doing so cancelled the older patch outright and could leave one quest's map
+  -- state stale until an unrelated option forced a rebuild. Full PrepareAll /
+  -- Invalidate still advance dirtyGeneration and therefore remain authoritative.
   local generation=self.dirtyGeneration
   local pos=1
 
@@ -520,14 +578,15 @@ function P:PatchMaps(mapSet,changedQuests)
         local plan={}
         local byKey={}
         for _,desc in pairs(existing) do
+          local candidate=ClonePreparedDescriptor(desc)
           local drop=false
           for questID in pairs(changed) do
-            local remove=RemoveQuestFromDescriptor(desc,questID)
+            local remove=RemoveQuestFromDescriptor(candidate,questID)
             if remove then drop=true end
           end
           if not drop then
-            table.insert(plan,desc)
-            byKey[DescriptorKeyValue(desc)]=desc
+            table.insert(plan,candidate)
+            byKey[DescriptorKeyValue(candidate)]=candidate
           end
         end
 
@@ -541,7 +600,7 @@ function P:PatchMaps(mapSet,changedQuests)
         table.sort(plan,function(a,b) return DescriptorKeyValue(a)<DescriptorKeyValue(b) end)
         local allNodes=QuestieOcto.Nodes:GetMapNodes(mapID)
         local worldItemStartPlan=P:BuildWorldItemStartPlanFromNodes(mapID,allNodes) or {}
-        P:SetPreparedMap(mapID,plan,worldItemStartPlan)
+        P:SetPreparedMap(mapID,plan,worldItemStartPlan,CurrentDensitySignature())
       end
     end
 
@@ -564,7 +623,12 @@ function P:RebuildMaps(mapSet)
   table.sort(ids)
   if table.getn(ids)==0 then return end
 
-  self.dirtyGeneration=(self.dirtyGeneration or 0)+1
+  -- Incremental node publications may arrive close together (for example two
+  -- quests completing in adjacent frames). They all read the latest canonical
+  -- Nodes state and are safe to interleave. Do NOT advance dirtyGeneration here:
+  -- doing so cancelled the older patch outright and could leave one quest's map
+  -- state stale until an unrelated option forced a rebuild. Full PrepareAll /
+  -- Invalidate still advance dirtyGeneration and therefore remain authoritative.
   local generation=self.dirtyGeneration
   local pos=1
 
@@ -576,7 +640,7 @@ function P:RebuildMaps(mapSet)
       local nodes=QuestieOcto.Nodes:GetMapNodes(mapID)
       local plan=P:BuildPlanFromNodes(mapID,nodes) or {}
       local worldItemStartPlan=P:BuildWorldItemStartPlanFromNodes(mapID,nodes) or {}
-      P:SetPreparedMap(mapID,plan,worldItemStartPlan)
+      P:SetPreparedMap(mapID,plan,worldItemStartPlan,CurrentDensitySignature())
     end
 
     if pos<=table.getn(ids) then

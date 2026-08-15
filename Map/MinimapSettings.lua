@@ -323,7 +323,7 @@ function S:Set(key,value)
   if key=="objectiveNodeDensity" or key=="itemStartDensity" then
     if QuestieOcto.PreparedMap and QuestieOcto.PreparedMap.PrepareAll and
        QuestieOcto.Nodes and QuestieOcto.Nodes.ready then
-      QuestieOcto.PreparedMap:PrepareAll()
+      QuestieOcto.PreparedMap:PrepareAll("density:"..tostring(key))
     end
     return true
   end

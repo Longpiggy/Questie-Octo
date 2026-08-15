@@ -8,6 +8,7 @@ N.nodes={}
 N.byMap={}
 N.questMaps={}
 N.nodeSequence=0
+N.stateRevision=0
 N.stats={
   total=0,
   availableCreature=0,
@@ -592,6 +593,7 @@ function N:RefreshQuests(changedQuests)
   end
 
   SortAffectedMaps(affectedMaps)
+  self.stateRevision=(self.stateRevision or 0)+1
   QuestieOcto:SendMessage("NODES_CHANGED",affectedMaps,changed)
 end
 
@@ -626,6 +628,7 @@ function N:RefreshAvailability(changedQuests)
   end
 
   SortAffectedMaps(affectedMaps)
+  self.stateRevision=(self.stateRevision or 0)+1
   QuestieOcto:SendMessage("NODES_CHANGED",affectedMaps,changed)
 end
 
@@ -673,6 +676,7 @@ function N:Rebuild()
     N.buildStats=nil
     N.running=false
     N.ready=true
+    N.stateRevision=(N.stateRevision or 0)+1
     QuestieOcto:SendMessage("NODES_READY")
   end
 

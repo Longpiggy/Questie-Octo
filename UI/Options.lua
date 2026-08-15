@@ -463,8 +463,11 @@ function O:Initialize()
   configFrame:SetCallback("OnClose",function()
     O.stats.closes=O.stats.closes+1
     if O.openedFromGameMenu then
+      local origin=O.openedFromGameMenu
       O.openedFromGameMenu=false
-      if GameMenuFrame and ShowUIPanel then
+      if origin=="dragonflight" and DFRL and DFRL.menuframe then
+        DFRL.menuframe:Show()
+      elseif GameMenuFrame and ShowUIPanel then
         ShowUIPanel(GameMenuFrame)
       end
       if UpdateMicroButtons then UpdateMicroButtons() end
@@ -509,8 +512,8 @@ function O:Hide()
   end
 end
 
-function O:ShowFromGameMenu()
-  self.openedFromGameMenu=true
+function O:ShowFromGameMenu(origin)
+  self.openedFromGameMenu=origin or true
   self:Show()
 end
 

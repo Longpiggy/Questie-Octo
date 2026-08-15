@@ -71,6 +71,10 @@ M.prune=false
 M.frames={}
 M.activeFrames={}
 M.buildActiveFrames=nil
+M.renderedPreparedPlan=nil
+M.syncPreparedPlan=nil
+M.renderedNodeRevision=0
+M.syncNodeRevision=nil
 M.stats={active=0,created=0,reused=0,hidden=0,exact=0,objectiveAreas=0,itemStartAreas=0,syncs=0,visibleAvailable=0,visibleItemStart=0,visibleObjective=0,visibleTurnin=0,inputNodes=0,multiEntryPins=0,itemStartRawNodes=0,itemStartAreaPins=0,preparedHits=0,preparedMisses=0,preparedDescriptors=0,mapPriorityRequests=0}
 
 local ICON_ROOT="Interface\\AddOns\\Questie-Octo\\UI\\Icons\\"
@@ -581,6 +585,8 @@ function M:SetMap(mapID)
   self.syncing=false
   self.resync=false
   self.prune=false
+  self.renderedPreparedPlan=nil
+  self.syncPreparedPlan=nil
   self:HideAll()
 end
 
@@ -755,6 +761,12 @@ function M:Finish(generation,doPrune)
   self.stats.visibleTurnin=visibleTurnin
   self.stats.multiEntryPins=multiEntryPins
   self.stats.syncs=self.stats.syncs+1
+  self.renderedPreparedPlan=self.syncPreparedPlan
+  if self.syncNodeRevision~=nil then
+    self.renderedNodeRevision=self.syncNodeRevision
+  end
+  self.syncPreparedPlan=nil
+  self.syncNodeRevision=nil
   self.syncing=false
 
   if self.resync then
@@ -927,6 +939,8 @@ function M:StartContinentSync(continentMapID,doPrune)
   self.generation=self.generation+1
   local generation=self.generation
   self.syncing=true
+  self.syncPreparedPlan=nil
+  self.syncNodeRevision=QuestieOcto.Nodes.stateRevision or 0
   self.buildActiveFrames={}
   self.stats.reused=0
   self.stats.exact=0
@@ -1029,6 +1043,7 @@ function M:StartSync(doPrune)
   end
 
   local prepared=QuestieOcto.PreparedMap:Get(mapID)
+  self.syncPreparedPlan=prepared
 
   if prepared then
     self.stats.preparedHits=self.stats.preparedHits+1
@@ -1074,6 +1089,7 @@ function M:StartSync(doPrune)
 
     QuestieOcto.PreparedMap:BuildMap(mapID)
     local ready=QuestieOcto.PreparedMap:Get(mapID)
+    M.syncPreparedPlan=ready
 
     if not ready then
       M.syncing=false
@@ -1285,7 +1301,40 @@ function M:PatchContinentQuests(changedQuests)
   self.stats.visibleObjective=visibleObjective
   self.stats.visibleTurnin=visibleTurnin
   self.stats.incrementalContinentPatches=(self.stats.incrementalContinentPatches or 0)+1
+  self.renderedNodeRevision=QuestieOcto.Nodes.stateRevision or self.renderedNodeRevision
   return true
+end
+
+function M:EnsureDisplayedContextCurrent()
+  if not WorldMapFrame or not WorldMapFrame:IsVisible() then return end
+
+  local contextKey=DisplayedContextKey()
+  if tonumber(contextKey)~=tonumber(self.mapID) then
+    self:SetMap(contextKey)
+    self:RequestSync(false)
+    return
+  end
+
+  local mapID=DisplayedMapID()
+  if mapID then
+    local prepared=QuestieOcto.PreparedMap:Get(mapID)
+    -- PREPARED_MAP_READY can fire while the World Map is hidden. Comparing the
+    -- actual published plan makes reopening the SAME zone self-healing even
+    -- when WORLD_MAP_UPDATE does not change the map context. Do not queue a
+    -- duplicate redraw if this exact plan is already the one being rendered.
+    if prepared and prepared~=self.renderedPreparedPlan and prepared~=self.syncPreparedPlan then
+      self:RequestSync(true)
+    end
+  elseif DisplayedContinentMapID()~=nil then
+    -- NODES_CHANGED is intentionally ignored while the World Map is hidden.
+    -- Remember the canonical Nodes revision rendered by the continent view so
+    -- reopening the SAME continent after a quest completes self-heals just like
+    -- selected zone maps already do through PreparedMap identity.
+    local revision=QuestieOcto.Nodes and QuestieOcto.Nodes.stateRevision or 0
+    if tonumber(self.renderedNodeRevision or 0)~=tonumber(revision) then
+      self:RequestSync(true)
+    end
+  end
 end
 
 function M:OnNodesChanged(mapSet,changedQuests)
@@ -1328,11 +1377,22 @@ f:RegisterEvent("WORLD_MAP_UPDATE")
 f:SetScript("OnEvent",function()
   if event=="WORLD_MAP_UPDATE" then
     if WorldMapFrame and WorldMapFrame:IsVisible() then
-      local contextKey=DisplayedContextKey()
-      if tonumber(contextKey)~=tonumber(M.mapID) then
-        M:SetMap(contextKey)
-        M:RequestSync(false)
-      end
+      M:EnsureDisplayedContextCurrent()
     end
   end
 end)
+
+-- WORLD_MAP_UPDATE is not guaranteed to change context when the map is reopened
+-- after a density change made while hidden. Revalidate the published prepared
+-- plan on every show as a second, deterministic refresh boundary.
+if WorldMapFrame and not M.worldMapShowHooked then
+  M.worldMapShowHooked=true
+  local previousOnShow=WorldMapFrame:GetScript("OnShow")
+  WorldMapFrame:SetScript("OnShow",function()
+    if previousOnShow then previousOnShow() end
+    QuestieOcto.Scheduler:After(0.01,function()
+      M:EnsureDisplayedContextCurrent()
+    end,"map-show-density-sync")
+  end)
+end
+

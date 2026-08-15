@@ -193,6 +193,69 @@ local function MinimapIndoor()
   return state
 end
 
+local function MaskTextureSquareHint()
+  -- Prefer the minimap's actual mask when the client/API exposes a getter.
+  -- This keeps Questie-Octo independent from whichever UI addon supplied it.
+  if not Minimap or type(Minimap.GetMaskTexture)~="function" then return nil end
+
+  local ok,mask=pcall(Minimap.GetMaskTexture,Minimap)
+  if not ok or type(mask)~="string" then return nil end
+
+  local lower=string.lower(mask)
+  lower=string.gsub(lower,"/","\\")
+
+  -- WHITE8X8 is the common Vanilla square-mask technique (ShaguTweaks and
+  -- DragonflightUI use it). Custom square masks commonly identify themselves
+  -- as a minimap/square texture; pfUI ships its own minimap mask texture.
+  if string.find(lower,"white8x8") then return true end
+  if string.find(lower,"minimap") and string.find(lower,"square") then return true end
+  if string.find(lower,"pfui") and string.find(lower,"minimap") then return true end
+
+  -- Blizzard's stock circular minimap mask.
+  if string.find(lower,"textures\\minimapmask") then return false end
+  if string.find(lower,"interface\\minimap\\minimapmask") then return false end
+
+  return nil
+end
+
+local function PfUISquareMinimap()
+  -- pfUI reparents the active Minimap into pfUI.minimap and applies its own
+  -- square mask. Checking the live parent avoids relying on a saved setting.
+  if not pfUI or not pfUI.minimap or not Minimap or type(Minimap.GetParent)~="function" then
+    return false
+  end
+  local ok,parent=pcall(Minimap.GetParent,Minimap)
+  return ok and parent==pfUI.minimap and true or false
+end
+
+local function ShaguTweaksSquareMinimap()
+  -- ShaguTweaks' MiniMap Square module creates this border only when the
+  -- square-mask module is active. Its option requires a UI reload to change.
+  return ShaguTweaks and Minimap and Minimap.border and true or false
+end
+
+local function DragonflightUISquareMinimap()
+  -- DragonflightUI can switch its map mask from round to square at runtime.
+  if not DFRL or type(DFRL.GetTempDB)~="function" then return false end
+  local okEnabled,enabled=pcall(DFRL.GetTempDB,DFRL,"Map","enabled")
+  if not okEnabled or not enabled then return false end
+  local okSquare,square=pcall(DFRL.GetTempDB,DFRL,"Map","mapSquare")
+  return okSquare and square and true or false
+end
+
+local function UsesSquareMinimap()
+  local maskHint=MaskTextureSquareHint()
+  if maskHint~=nil then return maskHint end
+
+  -- Vanilla/Turtle clients may not expose GetMaskTexture(). Fall back to
+  -- concrete live-state signals from UIs known to replace the minimap mask.
+  if PfUISquareMinimap() then return true end
+  if ShaguTweaksSquareMinimap() then return true end
+  if DragonflightUISquareMinimap() then return true end
+
+  return false
+end
+
 local function PlayerPosition()
   -- Questie owns minimap refresh timing/state. The Vanilla compatibility layer
   -- must not force map context every 0.05s; pfQuest restores current-zone map
@@ -562,6 +625,8 @@ function MM:UpdatePositions(force)
   local current=CurrentMapID()
   if tonumber(current)~=tonumber(self.mapID) then self:RefreshPlan(); return end
   if self.planRevision~=QuestieOcto.PreparedMap.stateRevision then self:RefreshPlan(); return end
+  local published=QuestieOcto.PreparedMap:Get(self.mapID)
+  if published and published~=self.plan then self:RefreshPlan(); return end
 
   local px,py=PlayerPosition()
   if not px or not py then self:HideAll(); return end
@@ -570,14 +635,17 @@ function MM:UpdatePositions(force)
   if not mapWidth or not mapHeight or mapWidth<=0 or mapHeight<=0 then self:HideAll(); return end
 
   local zoom=Minimap.GetZoom and Minimap:GetZoom() or 0
+  local squareMinimap=UsesSquareMinimap()
   local now=GetTime and GetTime() or 0
   if not force and self.lastPlayerX==px and self.lastPlayerY==py and self.lastZoom==zoom
+     and self.lastSquareMinimap==squareMinimap
      and self.nextStaticRefresh and now<self.nextStaticRefresh then
     return
   end
   self.lastPlayerX=px
   self.lastPlayerY=py
   self.lastZoom=zoom
+  self.lastSquareMinimap=squareMinimap
   self.nextStaticRefresh=now+1
 
   local indoor=MinimapIndoor()
@@ -610,7 +678,13 @@ function MM:UpdatePositions(force)
       if x and y then
         local xPos=(x-px)*xDraw
         local yPos=(y-py)*yDraw
-        if xPos*xPos+yPos*yPos<radiusSquared then
+        local inside=false
+        if squareMinimap then
+          inside=math.abs(xPos)<(width/2) and math.abs(yPos)<(height/2)
+        else
+          inside=xPos*xPos+yPos*yPos<radiusSquared
+        end
+        if inside then
           frameIndex=frameIndex+1
           local pin=self:GetOrCreate(frameIndex)
           local bound=(pin.boundDescriptor==desc and pin.boundRevision==revision)
