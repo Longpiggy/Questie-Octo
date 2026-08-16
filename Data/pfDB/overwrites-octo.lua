@@ -1537,3 +1537,30 @@ end
 -- cost 166 silently dropped corrections before 1.0.2. patchtable.lua
 -- reports it.
 pfDB["octo-overwrites-complete"] = true
+
+do -- Cloth reputation donations: event 159 is a permanent content-release gate, not quest event membership.
+  -- Verified against the supplied Turtle server data and live server behavior in August 2026.
+  -- Keep every other quest field intact: faction/race restrictions, prerequisites, objectives,
+  -- levels and the repeatable classification of the "Additional Runecloth" follow-ups.
+  --
+  -- Silvermoon Remnants (80370-80374) and Revantusk Tribe (80375-80379) already ship
+  -- without event metadata, so only the legacy capital-city donation chains need correction.
+  local clothDonationQuestIDs = {
+    7791, 7792, 7793, 7794, 7795, 7796,
+    7798, 7799, 7800, 7801,
+    7802, 7803, 7804, 7805, 7806,
+    7807, 7808, 7809, 7811, 7812,
+    7813, 7814, 7817, 7818, 7819,
+    7820, 7821, 7822, 7823, 7824, 7825,
+    7826, 7827, 7831, 7832,
+    7833, 7834, 7835, 7836, 7837,
+  }
+
+  for _, questID in ipairs(clothDonationQuestIDs) do
+    local quest = pfDB["quests"]["data-turtle"][questID]
+    if type(quest) == "table" then
+      quest["event"] = nil
+    end
+  end
+end
+
