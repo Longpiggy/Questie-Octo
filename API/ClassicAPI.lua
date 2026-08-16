@@ -43,6 +43,7 @@ function A:Validate()
     questFlaggedCompleted = type(IsQuestFlaggedCompleted)=="function" or Has(C_QuestLog,"IsQuestFlaggedCompleted"),
     mapWorldSize = Has(C_Map,"GetMapWorldSize"),
     instanceInfo = type(GetInstanceInfo)=="function",
+    leaderboardObjectiveID = type(GetQuestLogLeaderBoardID)=="function",
   }
 
   return self.valid
@@ -125,6 +126,14 @@ function A:IsInDungeonOrRaid()
   return instanceType=="party" or instanceType=="raid"
 end
 
+
+
+function A:GetQuestLogLeaderBoardID(objectiveIndex,questLogIndex)
+  if type(GetQuestLogLeaderBoardID)~="function" then return nil end
+  local ok,id=pcall(GetQuestLogLeaderBoardID,objectiveIndex,questLogIndex)
+  if not ok then return nil end
+  return tonumber(id)
+end
 
 function A:GetQuestObjectives(questID,questLogIndex)
   if C_QuestLog and type(C_QuestLog.GetQuestObjectives)=="function" then

@@ -71,6 +71,8 @@ local function ReadObjectives(index,questID)
         if required==nil then required=parsedRequired end
       end
       local finished=row.finished and true or false
+      local objectiveID=QuestieOcto.API and QuestieOcto.API.GetQuestLogLeaderBoardID
+        and QuestieOcto.API:GetQuestLogLeaderBoardID(i,index) or nil
 
       -- ClassicAPI/Turtle can publish the numerical counter before its separate
       -- `finished` boolean catches up. Treat a fulfilled numerical objective as
@@ -94,7 +96,8 @@ local function ReadObjectives(index,questID)
           current=current,
           required=required,
           numFulfilled=current,
-          numRequired=required
+          numRequired=required,
+          objectiveID=objectiveID
         })
         if not finished then allDone=false end
       end
@@ -104,6 +107,7 @@ local function ReadObjectives(index,questID)
       table.insert(snapshot,finished and "1" or "0")
       table.insert(snapshot,tostring(current or -1))
       table.insert(snapshot,tostring(required or -1))
+      table.insert(snapshot,tostring(objectiveID or 0))
 
       -- Map nodes only care whether an objective is still active. pfQuest's
       -- quest-state signature likewise records todo/done, not 3/10 -> 4/10.
@@ -113,6 +117,7 @@ local function ReadObjectives(index,questID)
         table.insert(mapSnapshot,tostring(i))
         table.insert(mapSnapshot,tostring(typ or ""))
         table.insert(mapSnapshot,finished and "1" or "0")
+        table.insert(mapSnapshot,tostring(objectiveID or 0))
       end
     end
 
@@ -129,6 +134,8 @@ local function ReadObjectives(index,questID)
     local text,typ,done=GetQuestLogLeaderBoard(i,index)
     local current,required=ObjectiveProgressFallback(text)
     local finished=done and true or false
+    local objectiveID=QuestieOcto.API and QuestieOcto.API.GetQuestLogLeaderBoardID
+      and QuestieOcto.API:GetQuestLogLeaderBoardID(i,index) or nil
 
     if current and required and required>0 and current>=required then
       finished=true
@@ -141,7 +148,8 @@ local function ReadObjectives(index,questID)
         index=i,text=text,rawText=text,type=typ,
         complete=finished,finished=finished,
         current=current,required=required,
-        numFulfilled=current,numRequired=required
+        numFulfilled=current,numRequired=required,
+        objectiveID=objectiveID
       })
       if not finished then allDone=false end
     end
@@ -151,11 +159,13 @@ local function ReadObjectives(index,questID)
     table.insert(snapshot,finished and "1" or "0")
     table.insert(snapshot,tostring(current or -1))
     table.insert(snapshot,tostring(required or -1))
+    table.insert(snapshot,tostring(objectiveID or 0))
 
     if typ~="log" then
       table.insert(mapSnapshot,tostring(i))
       table.insert(mapSnapshot,tostring(typ or ""))
       table.insert(mapSnapshot,finished and "1" or "0")
+      table.insert(mapSnapshot,tostring(objectiveID or 0))
     end
   end
 
@@ -163,32 +173,63 @@ local function ReadObjectives(index,questID)
 end
 
 
+local function ContainsObjectiveID(list,id)
+  id=tonumber(id)
+  if not id then return false end
+  for i=1,table.getn(list or {}) do
+    if tonumber(list[i])==id then return true end
+  end
+  return false
+end
+
+local function LiveObjectiveKind(q,row)
+  local id=tonumber(row and row.objectiveID)
+  if not q or not id then return nil end
+  local typ=string.lower(tostring(row.type or ""))
+
+  -- pfQuest uses ClassicAPI's GetQuestLogLeaderBoardID and then determines
+  -- whether the returned ID is a unit/object/item from the quest/database.
+  -- Vanilla can report some object interactions as "monster", so prefer the
+  -- native type but allow the live ID to disambiguate creature vs game object.
+  if typ=="item" and ContainsObjectiveID(q.objectives.item,id) then return "item" end
+  if (typ=="object" or typ=="gameobject") and ContainsObjectiveID(q.objectives.gameObject,id) then return "gameObject" end
+  if typ=="monster" or typ=="creature" or typ=="kill" then
+    if ContainsObjectiveID(q.objectives.creature,id) then return "creature" end
+    if ContainsObjectiveID(q.objectives.gameObject,id) then return "gameObject" end
+  end
+
+  if ContainsObjectiveID(q.objectives.creature,id) then return "creature" end
+  if ContainsObjectiveID(q.objectives.gameObject,id) then return "gameObject" end
+  if ContainsObjectiveID(q.objectives.item,id) then return "item" end
+  return nil
+end
+
 local function LocalizeObjectiveRows(questID,objectives)
   if not questID or type(objectives)~="table" then return objectives end
   if not QuestieOcto.DatabaseAPI or not QuestieOcto.DatabaseAPI:IsReady() then return objectives end
 
   local q=QuestieOcto.QuestModel and QuestieOcto.QuestModel:Get(questID) or nil
-  local defs=q and q.objectiveData or nil
-  if type(defs)~="table" then return objectives end
+  if not q then return objectives end
 
   for i=1,table.getn(objectives) do
     local row=objectives[i]
-    local def=defs[i]
-    if row and def and def.id then
-      local name
-      if def.kind=="creature" then name=QuestieOcto.DatabaseAPI:GetCreatureName(def.id)
-      elseif def.kind=="gameObject" then name=QuestieOcto.DatabaseAPI:GetObjectName(def.id)
-      elseif def.kind=="item" then name=QuestieOcto.DatabaseAPI:GetItemName(def.id) end
+    local id=tonumber(row and row.objectiveID)
+    local kind=LiveObjectiveKind(q,row)
+    local name=nil
 
-      -- Preserve live progress/completion from the quest log; replace only the
-      -- database-backed entity label. If this objective cannot be represented
-      -- by the DB, leave Turtle's native text untouched as the final fallback.
-      if name and name~="" then
-        if row.current~=nil and row.required~=nil then
-          row.text=name..": "..tostring(row.current).."/"..tostring(row.required)
-        else
-          row.text=name
-        end
+    if id and kind=="creature" then name=QuestieOcto.DatabaseAPI:GetCreatureName(id)
+    elseif id and kind=="gameObject" then name=QuestieOcto.DatabaseAPI:GetObjectName(id)
+    elseif id and kind=="item" then name=QuestieOcto.DatabaseAPI:GetItemName(id) end
+
+    -- Never localize by objective array position. Questie 5/6 only assumes
+    -- positional identity when both sides contain one objective; pfQuest uses
+    -- ClassicAPI's live leaderboard ID. If no trustworthy ID is available,
+    -- keep Turtle's native objective text intact for the fallback matcher.
+    if row and name and name~="" then
+      if row.current~=nil and row.required~=nil then
+        row.text=name..": "..tostring(row.current).."/"..tostring(row.required)
+      else
+        row.text=name
       end
     end
   end

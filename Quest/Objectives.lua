@@ -236,6 +236,7 @@ end
 
 local function MergeState(entry,row)
   entry.objectiveIndex=row.index
+  entry.objectiveID=row.objectiveID
   entry.objectiveText=row.text
   entry.rawObjectiveText=row.rawText or row.text
   entry.objectiveType=row.type
@@ -253,15 +254,31 @@ local function ObjectiveTypesMatch(logType,dbType)
   return false
 end
 
-local function EntryFromOrderedObjective(q,row)
-  local ordered=q.objectiveData
-  local index=tonumber(row.index)
-  if not ordered or not index then return nil end
-  local entry=ordered[index]
-  if not entry then return nil end
-  if ObjectiveTypesMatch(row.type,entry.type) then return entry end
-  O.stats.typeMismatch=O.stats.typeMismatch+1
-  return nil
+local function EntryFromLiveObjectiveID(q,row)
+  local id=tonumber(row and row.objectiveID)
+  if not q or not id then return nil end
+  local typ=string.lower(tostring(row.type or ""))
+  local creatureMatch=nil
+  local objectMatch=nil
+  local itemMatch=nil
+
+  for i=1,table.getn(q.objectiveData or {}) do
+    local entry=q.objectiveData[i]
+    if entry and tonumber(entry.id)==id then
+      if entry.kind=="creature" then creatureMatch=entry
+      elseif entry.kind=="gameObject" then objectMatch=entry
+      elseif entry.kind=="item" then itemMatch=entry end
+    end
+  end
+
+  if typ=="item" then return itemMatch end
+  if typ=="object" or typ=="gameobject" then return objectMatch end
+  if typ=="monster" or typ=="creature" or typ=="kill" then
+    -- pfQuest notes that Vanilla can return "monster" for some object-style
+    -- objectives; let the live ClassicAPI ID disambiguate the namespace.
+    return creatureMatch or objectMatch
+  end
+  return creatureMatch or objectMatch or itemMatch
 end
 
 local function CandidateName(kind,id)
@@ -319,15 +336,21 @@ function O:ResolveQuest(questID)
   local irTargets,skipCreature,skipObject=BuildIRTargets(q)
 
   for _,row in pairs(state and state.objectives or {}) do
-    local ordered=EntryFromOrderedObjective(q,row)
+    local direct=EntryFromLiveObjectiveID(q,row)
     local kind=nil
     local id=nil
 
-    if ordered then
-      kind=ordered.kind
-      id=ordered.id
+    if direct then
+      -- pfQuest-style primary path: use ClassicAPI's live leaderboard entity
+      -- ID so server objective ordering cannot attach one boss's progress to
+      -- another boss's map node.
+      kind=direct.kind
+      id=direct.id
       O.stats.direct=O.stats.direct+1
     else
+      -- Questie 5/6-style fallback: when no trustworthy live ID is available,
+      -- match the native objective text against same-type DB candidates rather
+      -- than assuming objective array positions are identical.
       kind=NormalizeLogType(row.type)
       id=BestSameTypeCandidate(q,kind,row,used)
       if id then O.stats.fallback=O.stats.fallback+1 end
