@@ -41,10 +41,35 @@ local ITEM_OBJECTIVE_FIRST={
   [5088]=true,
 }
 
--- Quests that are not normal static NPC offers. Questie 6 blacklists 7946
--- because Morja only exposes it after the Dark Iron Ale/Jubjub interaction.
+-- Quests that are not normal static NPC offers. Questie 6 blacklists these
+-- because the NPC only exposes the quest after a scripted world interaction.
+-- Keeping the real starter relation is useful for quest truth/tooltips, but it
+-- must not become a permanent map pickup marker.
 local CONDITIONAL_OFFERS={
+  [3861]="Use /chicken on a Chicken until it temporarily offers CLUCK!.",
   [7946]="Requires Jubjub to be lured back with Dark Iron Ale.",
+}
+
+-- Some situational quests benefit from one deliberately chosen discovery marker
+-- without pretending every scripted source is a permanent questgiver. CLUCK! can
+-- be triggered from many Chickens, but the Westfall Chicken at 55.6,30.9 is used
+-- as the single representative pickup/turn-in marker so new players can discover
+-- that the quest exists without covering every Chicken spawn with quest icons.
+-- The underlying starter/finisher relation remains NPC 620 and server truth is
+-- unchanged; this table is presentation only.
+local CONDITIONAL_MAP_MARKERS={
+  [3861]={
+    creatureID=620,
+    coords={{55.6,30.9,40,300}},
+  },
+}
+
+-- Server repeatability and map presentation are separate. CLUCK! is technically
+-- repeatable, but Questie-Octo already treats it as one-and-done after the first
+-- completion. Present any marker that is legitimately shown for it as an
+-- ordinary yellow quest rather than a blue repeatable quest.
+local NORMAL_REPEATABLE_PRESENTATION={
+  [3861]=true,
 }
 
 local function AddObjectiveData(list,kind,id)
@@ -108,7 +133,10 @@ function QM:MarkObservedRepeatable(questID)
   local db=ObservedRepeatables()
   if db[questID] then return false end
   db[questID]=true
-  if self.cache[questID] then self.cache[questID].repeatable=true end
+  if self.cache[questID] then
+    self.cache[questID].repeatable=true
+    self.cache[questID].presentationRepeatable=not NORMAL_REPEATABLE_PRESENTATION[questID]
+  end
   if QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.Schedule then
     QuestieOcto.AvailableQuests:Schedule(true,0.02)
   end
@@ -166,6 +194,7 @@ function QM:Get(questID)
     timed=raw["timed"] and true or false,
     disabled=raw["disabled"] and true or false,
     conditionalOffer=CONDITIONAL_OFFERS[tonumber(questID)],
+    conditionalMapMarker=CONDITIONAL_MAP_MARKERS[tonumber(questID)],
     exclusive=raw["exclusive"] and true or false,
     nextChain=tonumber(raw["nextChain"]),
 
@@ -202,6 +231,14 @@ function QM:Get(questID)
       areaTrigger=raw["obj"] and CopyArray(raw["obj"]["A"]) or nil,
     },
   }
+
+  -- Keep server repeatability authoritative for completion/filtering while
+  -- allowing a narrow presentation exception such as CLUCK!.
+  q.presentationRepeatable=q.repeatable and not NORMAL_REPEATABLE_PRESENTATION[tonumber(questID)] and true or false
+  -- CLUCK! was explicitly chosen to stay an ordinary yellow discovery marker.
+  -- Keep that presentation exception independent from the Turtle low-level gray
+  -- marker rule so a high-level player does not turn its representative marker gray.
+  q.presentationAlwaysNormal=NORMAL_REPEATABLE_PRESENTATION[tonumber(questID)] and true or false
 
   -- IR items are intentionally NOT added to objectiveData. They are a
   -- pfQuest-special interaction relationship that becomes target guidance

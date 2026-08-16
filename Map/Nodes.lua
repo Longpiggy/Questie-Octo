@@ -136,15 +136,25 @@ local function ApplyObjectiveState(node,state)
   return node
 end
 
+local function ConditionalCreatureCoords(q,creatureID,role)
+  local marker=q and q.conditionalMapMarker or nil
+  if marker and tonumber(marker.creatureID)==tonumber(creatureID)
+     and (role=="available" or role=="turnin") then
+    return marker.coords
+  end
+  return nil
+end
+
 local function AddCreatureNode(questID,role,creatureID,itemID,chance,objectiveState,vendor)
   local q=QuestieOcto.QuestModel:Get(questID)
   local node={
-    questID=questID,role=role,event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.repeatable or false,sourceKind="creature",sourceID=creatureID,
+    questID=questID,role=role,event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.presentationRepeatable or false,sourceKind="creature",sourceID=creatureID,
     sourceName=QuestieOcto.DatabaseAPI:GetCreatureName(creatureID),
     sourceRank=QuestieOcto.DatabaseAPI:GetCreatureRank(creatureID),
     respawnSeconds=QuestieOcto.DatabaseAPI:GetCreatureRespawnSeconds(creatureID),
     itemID=itemID,itemName=itemID and QuestieOcto.DatabaseAPI:GetItemName(itemID) or nil,
-    chance=chance,vendor=vendor and true or false,coords=QuestieOcto.DatabaseAPI:GetCreatureCoords(creatureID)
+    chance=chance,vendor=vendor and true or false,coords=ConditionalCreatureCoords(q,creatureID,role) or QuestieOcto.DatabaseAPI:GetCreatureCoords(creatureID),
+    conditionalOffer=q and q.conditionalOffer or nil
   }
   AddNode(ApplyObjectiveState(node,objectiveState))
 end
@@ -152,7 +162,7 @@ end
 local function AddObjectNode(questID,role,objectID,itemID,chance,objectiveState)
   local q=QuestieOcto.QuestModel:Get(questID)
   local node={
-    questID=questID,role=role,event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.repeatable or false,sourceKind="gameObject",sourceID=objectID,
+    questID=questID,role=role,event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.presentationRepeatable or false,sourceKind="gameObject",sourceID=objectID,
     sourceName=QuestieOcto.DatabaseAPI:GetObjectName(objectID),
     itemID=itemID,itemName=itemID and QuestieOcto.DatabaseAPI:GetItemName(itemID) or nil,
     chance=chance,coords=QuestieOcto.DatabaseAPI:GetObjectCoords(objectID)
@@ -164,7 +174,7 @@ local function AddAreaTriggerNode(questID,source)
   if not source or not source.mapID or not source.x or not source.y then return end
   local q=QuestieOcto.QuestModel:Get(questID)
   AddNode(ApplyObjectiveState({
-    questID=questID,role="objectiveArea",event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.repeatable or false,
+    questID=questID,role="objectiveArea",event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.presentationRepeatable or false,
     sourceKind="areaTrigger",sourceID=source.id,sourceName="Exploration Mark",
     coords={{source.x,source.y,source.mapID}}
   },source))

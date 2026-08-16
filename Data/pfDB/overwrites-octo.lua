@@ -1326,6 +1326,15 @@ do -- units/npcs
 
   -- Barltok Kettleburn (Dun Agrath)
   pfDB["units"]["data-turtle"][52068]["coords"] = { [1] = { 21, 71.4, 11, 120 } }
+
+  -- Hurl Cinderfist (Restless, 41640): his live world spawn at Rugford's
+  -- Mountain Rest falls inside both Turtle's expanded Dun Morogh map and the
+  -- overlapping Grim Reaches map. Keep both map representations so the quest
+  -- objective is visible from either local map without changing server truth.
+  pfDB["units"]["data-turtle"][62200]["coords"] = {
+    [1] = { 83.2, 70.8, 1, 300 },
+    [2] = { 4.1, 92, 5602, 300 },
+  }
 end
 
 do -- quests

@@ -544,9 +544,9 @@ local function BindDescriptor(pin,desc,revision,allowItemStart)
     local q=QuestieOcto.QuestModel:Get(area.questID)
     pin.event=q and q.eventID and QuestieOcto.EventAvailability and QuestieOcto.EventAvailability:IsPresentationEvent(q.eventID) or false
     pin.pvp=q and q.pvp or false
-    pin.repeatable=q and q.repeatable or false
+    pin.repeatable=q and q.presentationRepeatable or false
     pin.visualPriority=40
-    pin.texture:SetTexture(QuestieOcto.Map:GetTextureForNode({role="itemStart",event=pin.event,pvp=pin.pvp,repeatable=pin.repeatable}))
+    pin.texture:SetTexture(QuestieOcto.Map:GetTextureForNode({role="itemStart",questID=area.questID,event=pin.event,pvp=pin.pvp,repeatable=pin.repeatable}))
     pin.texture:SetDrawLayer("OVERLAY",5)
     if QuestieOcto.Visuals then
       QuestieOcto.Visuals:ApplyPin(pin,{role="itemStart",questID=area.questID,pvp=pin.pvp,repeatable=pin.repeatable},true,pin.lastAlpha or 1)
@@ -882,9 +882,20 @@ function MM:Start()
   f:RegisterEvent("ZONE_CHANGED")
   f:RegisterEvent("ZONE_CHANGED_NEW_AREA")
   f:RegisterEvent("MINIMAP_ZONE_CHANGED")
+  f:RegisterEvent("PLAYER_LEVEL_UP")
 
   f:SetScript("OnEvent",function()
     local eventName=event
+    if eventName=="PLAYER_LEVEL_UP" then
+      -- Force descriptor rebinding so +25/+26 gray presentation changes as
+      -- soon as the player levels, without touching the prepared map geometry.
+      QuestieOcto.Scheduler:After(0.01,function()
+        MM.bindRevision=(MM.bindRevision or 0)+1
+        MM:RefreshPlan()
+      end,"minimap-gray-level-refresh")
+      return
+    end
+
     QuestieOcto.Scheduler:After(0.01,function()
       RestoreCurrentZoneMapContext(eventName)
       MM:RefreshPlan()

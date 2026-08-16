@@ -229,6 +229,9 @@ local function LiveObjectiveText(node)
 end
 
 local function Extra(node)
+  if node.role=="available" and node.conditionalOffer then
+    return tostring(node.conditionalOffer)
+  end
   if node.role=="itemStart" and node.itemName then
     local text
     if node.vendor then text="Sells ["..tostring(node.itemName).."]"
@@ -1124,27 +1127,38 @@ function T:Show(pin)
   if pin.itemStartArea then
     local area=pin.itemStartArea
 
-    -- Use AddDoubleLine with an empty right column for every source row.
-    -- This avoids the first source row inheriting the tooltip's title-sized
-    -- presentation while keeping every monster line visually identical.
-    for _,source in pairs(area.sourceList or {}) do
-      local sourceText=SourceDisplayName(source).." ("..tostring(source.count)..
-        (area.zoneWideRare and " zone spawns)" or " nearby spawns)")
-      if area.zoneWideRare and source.chance and Settings():Get("enableTooltipDroprates") then
-        sourceText=sourceText.." - "..(FormatDropRate(source.chance) or tostring(source.chance)).."%"
-      end
-      tooltip:AddDoubleLine(
-        sourceText,
-        "",
-        .2,1,.35,
-        .2,1,.35
+    if area.zoneWideRare then
+      -- A zone-wide representative exists specifically to make enormous
+      -- world-drop source sets readable. Do not undo that simplification by
+      -- dumping every represented creature into the tooltip (Pendant of
+      -- Myzrael can have dozens of source types in a single zone). Keep the
+      -- full source list in the data and present only a compact aggregate.
+      local sourceCount=table.getn(area.sourceList or {})
+      local spawnCount=tonumber(area.n) or 0
+      tooltip:SetText("Rare item-start sources",.2,1,.35)
+      tooltip:AddLine(
+        tostring(sourceCount).." creature types, "..tostring(spawnCount).." zone spawns",
+        .65,.65,.65
       )
+    else
+      -- Ordinary clustered item-start areas still list their nearby sources.
+      -- Use AddDoubleLine with an empty right column for every source row so
+      -- the first source does not inherit the tooltip's title-sized font.
+      for _,source in pairs(area.sourceList or {}) do
+        local sourceText=SourceDisplayName(source).." ("..tostring(source.count).." nearby spawns)"
+        tooltip:AddDoubleLine(
+          sourceText,
+          "",
+          .2,1,.35,
+          .2,1,.35
+        )
 
-      local rank=RareRankText(source.rank)
-      local respawn=rank and RespawnText(source.respawnSeconds) or nil
-      if respawn then
-        local rareTag=RareRankText(source.rank) or "Rare"
-        tooltip:AddLine("["..rareTag.."] Respawn: "..respawn,.75,.75,.75)
+        local rank=RareRankText(source.rank)
+        local respawn=rank and RespawnText(source.respawnSeconds) or nil
+        if respawn then
+          local rareTag=RareRankText(source.rank) or "Rare"
+          tooltip:AddLine("["..rareTag.."] Respawn: "..respawn,.75,.75,.75)
+        end
       end
     end
 
@@ -1165,21 +1179,13 @@ function T:Show(pin)
     if Settings():Get("enableTooltipsItemID") and area.itemID then
       itemLabel=itemLabel.." (Item "..tostring(area.itemID)..")"
     end
-    if area.zoneWideRare then
-      local threshold=tonumber(area.rareThreshold) or 0.5
-      tooltip:AddLine(
-        "One zone marker represents item-start sources below "..string.format("%.2f",threshold).."%.",
-        .65,.65,.65,true
-      )
-    end
-
     local line="Drops ["..itemLabel.."]"
     if dropRateText and Settings():Get("enableTooltipDroprates") then
       line=line.." ("..dropRateText..")"
     end
     tooltip:AddLine(line.." - item starts quest",.82,.82,.82,true)
 
-    NormalizeFirstRowFont(tooltip)
+    if not area.zoneWideRare then NormalizeFirstRowFont(tooltip) end
     tooltip:Show()
     return
   end
