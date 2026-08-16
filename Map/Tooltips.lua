@@ -124,6 +124,28 @@ local function FormatDropRate(rate)
   return string.format("%.3f",rate)
 end
 
+local function ItemStartAreaDropRateText(area)
+  local minimum=nil
+  local maximum=nil
+
+  for _,source in pairs((area and area.sourceList) or {}) do
+    local chance=tonumber(source.chance)
+    if chance and chance>0 then
+      if not minimum or chance<minimum then minimum=chance end
+      if not maximum or chance>maximum then maximum=chance end
+    end
+  end
+
+  if not minimum or not maximum then return nil end
+
+  local minText=FormatDropRate(minimum)
+  local maxText=FormatDropRate(maximum)
+  if not minText or not maxText then return nil end
+
+  if minText==maxText then return minText.."%" end
+  return minText.."%~"..maxText.."%"
+end
+
 local function DifficultyColor(level,questID)
   -- Use the same authority as the native Quest Log.  Octo/Turtle modifies the
   -- low-level/easy band, so reproducing stock Classic thresholds makes map
@@ -1136,13 +1158,7 @@ function T:Show(pin)
       )
     end
 
-    local chance=nil
-    for _,source in pairs(area.sourceList or {}) do
-      if source.chance then
-        chance=source.chance
-        break
-      end
-    end
+    local dropRateText=ItemStartAreaDropRateText(area)
 
     local itemLabel=tostring(area.itemName or ("Item "..tostring(area.itemID)))
     if Settings():Get("enableTooltipsItemID") and area.itemID then
@@ -1157,8 +1173,8 @@ function T:Show(pin)
     end
 
     local line="Drops ["..itemLabel.."]"
-    if chance and not area.zoneWideRare and Settings():Get("enableTooltipDroprates") then
-      line=line.." ("..(FormatDropRate(chance) or tostring(chance)).."%)"
+    if dropRateText and Settings():Get("enableTooltipDroprates") then
+      line=line.." ("..dropRateText..")"
     end
     tooltip:AddLine(line.." - item starts quest",.82,.82,.82,true)
 

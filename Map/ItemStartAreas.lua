@@ -184,10 +184,10 @@ function A:BuildForMap(nodes,mapID,includeNode)
 end
 
 
--- World-map-only presentation helper for extremely low-rate starter items.
+-- Shared zone-wide presentation helper for extremely low-rate starter items.
 -- These drops are often spread across many unrelated creatures throughout a
--- zone. Keep every source in the data/minimap, but let the World Map represent
--- all <0.10% sources for the same quest/item with one zone marker.
+-- zone. Keep every source in the underlying data, but represent all <0.10%
+-- sources for the same quest/item with one zone marker on Map and Minimap.
 function A:BuildZoneWideRareForMap(nodes,mapID)
   local groups={}
 
