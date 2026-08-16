@@ -94,6 +94,9 @@ S.defaults={
   trackerEnabled=true,
   trackerLocked=true,
   trackerAutoTrack=true,
+  -- Native Quest Log tracked checkmarks are optional. The custom tracker owns
+  -- tracking state; this toggle only controls the Blizzard/Turtle row check.
+  trackerQuestLogCheckmarks=false,
   trackerShowCompleted=true,
   trackerHideCompletedObjectives=false,
   trackerSort="zone",
@@ -234,7 +237,7 @@ function S:Set(key,value)
       key=="enableTooltipDroprates" or
       key=="questLogShowLevels" or key=="questLogDifficultyColors" or
       key=="trackerEnabled" or key=="trackerLocked" or key=="trackerAutoTrack" or
-      key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
+      key=="trackerQuestLogCheckmarks" or key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
       key=="trackerOutlineText" or key=="trackerThickOutlineText" then
     value=value and true or false
   elseif key=="lowLevelQuestRange" then

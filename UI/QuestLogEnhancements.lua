@@ -64,6 +64,8 @@ local function ApplyTrackerCheck(button,index,questID)
   -- native visual check after the Blizzard row has been updated instead of
   -- replacing the Quest Log skin or its artwork.
   check:Hide()
+  if not Settings():Get("trackerQuestLogCheckmarks") then return end
+
   local driver=QuestieOcto.TrackerDriver
   if not driver or not driver.IsTracked or not questID or not driver:IsTracked(questID) then return end
 
@@ -310,6 +312,7 @@ function Q:Start()
   -- when toggled from Questie-Octo settings). Keep the native row checkmarks
   -- synchronized with the addon tracker state in those cases too.
   QuestieOcto:RegisterMessage("TRACKER_STATE_CHANGED",self,"ScheduleRefresh")
+  QuestieOcto:RegisterMessage("TRACKER_SETTING_CHANGED",self,"ScheduleRefresh")
   self:ScheduleRefresh()
 end
 

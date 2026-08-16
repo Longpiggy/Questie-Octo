@@ -1347,3 +1347,13 @@ Compatibility correction:
     unrelated addons can load their own copy without load-order interference.
 
 No Spy files are modified or bundled by Questie-Octo.
+
+
+1.0.82 - OPTIONAL QUEST LOG TRACKED CHECKMARKS
+------------------------------------------------
+The native Turtle/Vanilla Quest Log checkmark restored in 1.0.80 is now an
+opt-in presentation setting. `Show Quest Log Checkmarks` appears in Tracker
+options between `Auto Track Quests` and `Show Completed Quests` and defaults
+to OFF. The option controls only the native Quest Log row check artwork;
+tracking state and tracker behavior are unchanged.
+

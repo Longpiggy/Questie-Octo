@@ -336,6 +336,7 @@ local function CreateTrackerTab()
       end},
       trackerLocked={type="toggle",order=3,name="Lock Tracker",desc="Prevent the tracker from being moved.",width="full",get=GetValue,set=SetValue},
       trackerAutoTrack={type="toggle",order=4,name="Auto Track Quests",desc="Automatically track accepted quests.",width="full",get=GetValue,set=SetValue},
+      trackerQuestLogCheckmarks={type="toggle",order=4.5,name="Show Quest Log Checkmarks",desc="Show the native checkmark beside quests tracked by Questie-Octo.",width="full",get=GetValue,set=SetValue},
       trackerShowCompleted={type="toggle",order=5,name="Show Completed Quests",desc="Keep completed quests visible until turned in.",width="full",get=GetValue,set=SetValue},
       trackerHideCompletedObjectives={type="toggle",order=6,name="Hide Completed Objectives",desc="Hide completed objective lines.",width="full",get=GetValue,set=SetValue},
       sorting_header={type="header",order=10,name="Sorting"},

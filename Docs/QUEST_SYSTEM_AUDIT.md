@@ -475,3 +475,17 @@ same-minor copies. AceConfigRegistry is the same Ace3v implementation except
 for its deliberate private CallbackHandler dependency above. Spy carries a
 newer AceConfigDialog and therefore upgrades that library normally through
 LibStub.
+
+## 1.0.82 optional native Quest Log tracked checkmarks
+
+The 1.0.80 restoration of Turtle/Vanilla's native `UI-CheckBox-Check` beside
+Questie-Octo-tracked Quest Log rows is now opt-in. The Tracker options expose
+`Show Quest Log Checkmarks` directly between `Auto Track Quests` and
+`Show Completed Quests`, and the new setting defaults OFF.
+
+Disabling the option hides only the Quest Log row check artwork; it does not
+untrack quests, alter auto-tracking, or change the custom tracker. Enabling it
+reuses the same native Blizzard/Turtle check region and the existing
+Questie-Octo tracking state. Changing the option refreshes an open Quest Log
+immediately through the tracker-setting message path.
+
