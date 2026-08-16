@@ -17,6 +17,7 @@ N.stats={
   objectiveCreature=0,
   objectiveObject=0,
   objectiveItemSource=0,
+  objectiveArea=0,
   turnin=0,
   flightMaster=0,
   auctioneer=0,
@@ -41,6 +42,7 @@ local function NewStats()
     objectiveCreature=0,
     objectiveObject=0,
     objectiveItemSource=0,
+    objectiveArea=0,
     turnin=0,
     flightMaster=0,
     auctioneer=0,
@@ -156,6 +158,16 @@ local function AddObjectNode(questID,role,objectID,itemID,chance,objectiveState)
     chance=chance,coords=QuestieOcto.DatabaseAPI:GetObjectCoords(objectID)
   }
   AddNode(ApplyObjectiveState(node,objectiveState))
+end
+
+local function AddAreaTriggerNode(questID,source)
+  if not source or not source.mapID or not source.x or not source.y then return end
+  local q=QuestieOcto.QuestModel:Get(questID)
+  AddNode(ApplyObjectiveState({
+    questID=questID,role="objectiveArea",event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.repeatable or false,
+    sourceKind="areaTrigger",sourceID=source.id,sourceName="Exploration Mark",
+    coords={{source.x,source.y,source.mapID}}
+  },source))
 end
 
 local function BuildAvailableQuestNodes(questID)
@@ -479,6 +491,12 @@ local function BuildActiveQuestNodes(questID)
       end
     end
   end
+  for _,src in pairs(resolved.areaTrigger or {}) do
+    if not src.complete then
+      AddAreaTriggerNode(questID,src)
+      CurrentStats().objectiveArea=(CurrentStats().objectiveArea or 0)+1
+    end
+  end
 end
 
 local function BuildActiveNodes()
@@ -496,6 +514,7 @@ local function StatKeyForNode(node)
   if node.role=="objectiveCreature" then return "objectiveCreature" end
   if node.role=="objectiveObject" then return "objectiveObject" end
   if node.role=="objectiveItemSource" then return "objectiveItemSource" end
+  if node.role=="objectiveArea" then return "objectiveArea" end
   if node.role=="turnin" then return "turnin" end
   if node.role=="flightMaster" then return "flightMaster" end
   if node.role=="auctioneer" then return "auctioneer" end

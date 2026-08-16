@@ -238,7 +238,8 @@ local function Extra(node)
   end
   if node.role=="objectiveCreature"
      or node.role=="objectiveObject"
-     or node.role=="objectiveItemSource" then
+     or node.role=="objectiveItemSource"
+     or node.role=="objectiveArea" then
     local liveText=LiveObjectiveText(node)
     if liveText and liveText~="" then
       local text=liveText

@@ -196,6 +196,10 @@ function QM:Get(questID)
       gameObject=raw["obj"] and CopyArray(raw["obj"]["O"]) or nil,
       item=raw["obj"] and CopyArray(raw["obj"]["I"]) or nil,
       irItems=raw["obj"] and CopyArray(raw["obj"]["IR"]) or nil,
+      -- A = quest-bound AreaTrigger objective. This is deliberately distinct
+      -- from generic map exploration/fog data: only triggers referenced by an
+      -- actual quest are retained here.
+      areaTrigger=raw["obj"] and CopyArray(raw["obj"]["A"]) or nil,
     },
   }
 

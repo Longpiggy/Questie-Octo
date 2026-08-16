@@ -44,6 +44,7 @@ function A:Validate()
     mapWorldSize = Has(C_Map,"GetMapWorldSize"),
     instanceInfo = type(GetInstanceInfo)=="function",
     leaderboardObjectiveID = type(GetQuestLogLeaderBoardID)=="function",
+    areaTriggerInfo = Has(C_Map,"GetAreaTriggerInfo"),
   }
 
   return self.valid
@@ -126,6 +127,28 @@ function A:IsInDungeonOrRaid()
   return instanceType=="party" or instanceType=="raid"
 end
 
+-- pfQuest-classicAPI resolves quest-bound exploration objectives directly from
+-- ClassicAPI's AreaTrigger.dbc bridge. Keep this behind the API contract so
+-- generic map code never needs to know whether the DLL/global exists.
+function A:GetAreaTriggerInfo(areaTriggerID)
+  areaTriggerID=tonumber(areaTriggerID)
+  if not areaTriggerID or not C_Map or type(C_Map.GetAreaTriggerInfo)~="function" then return nil end
+
+  local ok,info=pcall(C_Map.GetAreaTriggerInfo,areaTriggerID)
+  if not ok or type(info)~="table" then return nil end
+
+  local mapID=tonumber(info.areaID)
+  local x=tonumber(info.mapX)
+  local y=tonumber(info.mapY)
+  if not mapID or not x or not y then return nil end
+
+  return {
+    id=areaTriggerID,
+    areaID=mapID,
+    mapX=x,
+    mapY=y
+  }
+end
 
 
 function A:GetQuestLogLeaderBoardID(objectiveIndex,questLogIndex)

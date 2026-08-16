@@ -146,6 +146,7 @@ local function TextureForNode(node)
   end
   if node.role=="objectiveObject" then return TEX_OBJECT end
   if node.role=="objectiveCreature" then return TEX_SLAY end
+  if node.role=="objectiveArea" then return TEX_EVENT end
   return TEX_INCOMPLETE
 end
 local function RolePriority(role)
@@ -157,7 +158,7 @@ local function RolePriority(role)
   -- At a shared Full Nodes coordinate, a direct objective should own the
   -- displayed quest color over an indirect item-drop source. The merged pin
   -- still retains every quest/objective entry for its tooltip.
-  if role=="objectiveObject" or role=="objectiveCreature" then return 20 end
+  if role=="objectiveObject" or role=="objectiveCreature" or role=="objectiveArea" then return 20 end
   if role=="objectiveItemSource" then return 15 end
   return 10
 end
