@@ -399,6 +399,24 @@ local function WrapTextToWidth(fs,text,maxWidth)
   return table.concat(lines,"\n"),count
 end
 
+local function ZoneSpacerHeight(fontSize)
+  -- Keep zone groups visually separated without consuming a full text row.
+  -- The spacer scales with the configured tracker font and adds a small amount
+  -- for OUTLINE/THICKOUTLINE so heavier glyph edges do not feel crowded.
+  local height=(tonumber(fontSize) or 10)-4
+  if height<4 then height=4 end
+  if height>13 then height=13 end
+
+  if Settings():Get("trackerThickOutlineText") then
+    height=height+2
+  elseif Settings():Get("trackerOutlineText") then
+    height=height+1
+  end
+
+  if height>15 then height=15 end
+  return height
+end
+
 local function ApplyRowStyle(row, contentWidth, constrainWidth)
   local size=tonumber(Settings():Get("trackerFontSize")) or 10
   local left=0
@@ -407,7 +425,7 @@ local function ApplyRowStyle(row, contentWidth, constrainWidth)
 
   if kind=="zone" then
     size=size+1
-    r,g,b=1,0.82,0
+    r,g,b=0.88,0.69,0.24
     left=0
   elseif kind=="quest" then
     -- Match the classic Questie/Quest Log presentation: completion is shown
@@ -464,7 +482,12 @@ local function ApplyRowStyle(row, contentWidth, constrainWidth)
   row.textIndent=left
 
   local baseHeight=size+4
-  local height=baseHeight*math.max(1,lineCount)
+  local height
+  if kind=="spacer" then
+    height=ZoneSpacerHeight(size)
+  else
+    height=baseHeight*math.max(1,lineCount)
+  end
   row:SetHeight(height)
 end
 
