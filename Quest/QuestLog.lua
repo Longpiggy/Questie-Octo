@@ -358,6 +358,7 @@ function QL:Refresh(fastRefresh)
       local info=QuestieOcto.API:GetQuestLogInfo(index)
       local title=info and info.title
       local level=info and info.level
+      local tag=info and info.tag
       local isHeader=info and info.isHeader
       local isComplete=info and info.isComplete
       if title and isHeader then
@@ -442,6 +443,7 @@ function QL:Refresh(fastRefresh)
         table.insert(snapshotParts,tostring(questID or 0))
         table.insert(snapshotParts,title)
         table.insert(snapshotParts,tostring(level or 0))
+        table.insert(snapshotParts,tostring(tag or ""))
         table.insert(snapshotParts,tostring(status))
         table.insert(snapshotParts,objectiveSnapshot)
 
@@ -451,6 +453,10 @@ function QL:Refresh(fastRefresh)
             logIndex=index,
             title=title,
             level=level,
+            -- Vanilla/pfQuest uses GetQuestLogTitle().tag as the live elite
+            -- marker. Preserve it with the quest instead of reclassifying
+            -- quests from database metadata.
+            tag=tag,
             zoneGroup=currentHeader,
             status=status,
             complete=complete,
