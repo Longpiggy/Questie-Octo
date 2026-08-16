@@ -1324,3 +1324,26 @@ BETA 1.2 - STABLE ADDON IDENTITY / QUEST BROWSER CORRECTIONS
 - Unknown or unverified event IDs are on standby: they do not publish available
   quest markers even if an NPC is observed. Active quests already in the Quest
   Log remain visible.
+
+
+1.0.81 - SHARED CALLBACKHANDLER ISOLATION / SPY COMPATIBILITY
+-------------------------------------------------------------
+A supplied Spy 4.5.0 archive exposed that Questie-Octo's Lua-5.0
+CallbackHandler translation was registered globally as `CallbackHandler-1.0`
+minor 6.  When Questie-Octo loaded first, LibStub caused Spy's same-minor
+CallbackHandler to be skipped.  Spy then inherited Questie-Octo's callback
+runtime even though Spy's Ace3v libraries use the Vanilla explicit-argc ABI
+`Fire(eventName, argc, ...)`.
+
+The old development note stating that CallbackHandler behavior was retained was
+therefore too broad: the Lua syntax conversion worked for Questie-Octo's option
+path, but its `Fire` entry point did not preserve Ace3v's explicit argc slot.
+
+Compatibility correction:
+  * Questie-Octo's handler is now private: `QuestieOcto-CallbackHandler-1.0`.
+  * Questie-Octo AceConfigRegistry explicitly uses the private handler.
+  * The private handler uses the Ace3v explicit-argc `Fire` contract.
+  * Questie-Octo no longer claims the global `CallbackHandler-1.0` library, so
+    unrelated addons can load their own copy without load-order interference.
+
+No Spy files are modified or bundled by Questie-Octo.

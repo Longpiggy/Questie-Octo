@@ -2,7 +2,7 @@
 -- Original Questie foundation: CallbackHandler-1.0 r1131 / MINOR 6.
 -- Turtle 1.12 Lua 5.0 supports vararg declarations but consumes them through
 -- the implicit 'arg' table rather than Lua 5.1's '...' expression.
-local MAJOR, MINOR = "CallbackHandler-1.0", 6
+local MAJOR, MINOR = "QuestieOcto-CallbackHandler-1.0", 6
 local CallbackHandler = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not CallbackHandler then return end
@@ -108,17 +108,18 @@ function CallbackHandler:New(target, RegisterName, UnregisterName, UnregisterAll
   local events=setmetatable({},meta)
   local registry={recurse=0,events=events}
 
-  function registry:Fire(eventname, ...)
+  -- Ace3v's Vanilla callback ABI uses an explicit argc slot:
+  --   Fire(eventName, argc, a1, a2, ...)
+  -- Keep that contract here.  Questie-Octo namespaces this compatibility
+  -- handler so it cannot replace another addon's global CallbackHandler-1.0.
+  function registry:Fire(eventname, argc, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
     if not rawget(events,eventname) or not next(events[eventname]) then return end
 
     local oldrecurse=registry.recurse
     registry.recurse=oldrecurse+1
 
-    local count=arg.n or table.getn(arg)
-    local callargs={eventname}
-    callargs.n=count+1
-    for i=1,count do callargs[i+1]=arg[i] end
-    Dispatchers[count+1](events[eventname],unpack(callargs,1,callargs.n))
+    argc=tonumber(argc) or 0
+    Dispatchers[argc+1](events[eventname],eventname,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
 
     registry.recurse=oldrecurse
 

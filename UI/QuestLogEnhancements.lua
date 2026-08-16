@@ -47,6 +47,53 @@ local function GetButtonFontString(button)
   return nil
 end
 
+local function GetButtonRegion(button,suffix)
+  if not button or not button.GetName or not getglobal then return nil end
+  local name=button:GetName()
+  if not name then return nil end
+  return getglobal(name..suffix)
+end
+
+local function ApplyTrackerCheck(button,index,questID)
+  local check=GetButtonRegion(button,"Check")
+  if not check then return end
+
+  -- Turtle's native QuestLog_Update owns this exact UI-CheckBox-Check region
+  -- and normally shows it through IsQuestWatched(). Questie-Octo keeps its
+  -- own tracker state to avoid Blizzard's native watch limit, so restore the
+  -- native visual check after the Blizzard row has been updated instead of
+  -- replacing the Quest Log skin or its artwork.
+  check:Hide()
+  local driver=QuestieOcto.TrackerDriver
+  if not driver or not driver.IsTracked or not questID or not driver:IsTracked(questID) then return end
+
+  local fs=GetButtonFontString(button)
+  if not fs then return end
+
+  local textWidth=nil
+  if fs.GetStringWidth then
+    local ok,w=pcall(fs.GetStringWidth,fs)
+    if ok then textWidth=tonumber(w) end
+  end
+  if not textWidth and fs.GetWidth then
+    local ok,w=pcall(fs.GetWidth,fs)
+    if ok then textWidth=tonumber(w) end
+  end
+  textWidth=textWidth or 0
+
+  -- QuestLogTitleButtonTemplate anchors its text 20 px from the row's left
+  -- edge. The native code places the check roughly four pixels after a short
+  -- title and caps it near the right edge for long/tagged titles. Recompute
+  -- that position after Questie-Octo adds the [level] prefix so the restored
+  -- check does not sit inside the modified title.
+  local x=textWidth+24
+  if x>270 then x=270 end
+  if x<24 then x=24 end
+  if check.ClearAllPoints then check:ClearAllPoints() end
+  check:SetPoint("LEFT",button,"LEFT",x,0)
+  check:Show()
+end
+
 
 local function CacheNativeQuestColor(button,index)
   if not button or not index or index<1 then return end
@@ -131,6 +178,8 @@ local function StyleButton(button,index)
     ApplyHeaderFont(button)
     local fs=GetButtonFontString(button)
     if fs then fs.questieOctoHeaderStyled=true end
+    local check=GetButtonRegion(button,"Check")
+    if check then check:Hide() end
     return
   end
 
@@ -164,6 +213,8 @@ local function StyleButton(button,index)
   if QuestLogTitleButton_Resize then
     pcall(QuestLogTitleButton_Resize,button)
   end
+
+  ApplyTrackerCheck(button,index,questID)
 end
 
 function Q:Refresh()
@@ -255,6 +306,10 @@ function Q:Start()
   self.started=true
   self:InstallHook()
   self:InstallVisibilityWatcher()
+  -- Tracker state can change without a native QUEST_LOG_UPDATE (for example
+  -- when toggled from Questie-Octo settings). Keep the native row checkmarks
+  -- synchronized with the addon tracker state in those cases too.
+  QuestieOcto:RegisterMessage("TRACKER_STATE_CHANGED",self,"ScheduleRefresh")
   self:ScheduleRefresh()
 end
 

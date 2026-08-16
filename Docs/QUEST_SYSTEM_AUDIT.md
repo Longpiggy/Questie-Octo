@@ -427,3 +427,51 @@ still list their nearby source creatures normally.
 Removed the redundant `One zone marker represents item-start sources below 0.50%.`
 line from zone-wide rare item-start tooltips. The representative threshold and all
 source/drop data remain unchanged; this is tooltip presentation only.
+
+## 1.0.80 native Quest Log tracked check + empty tracker hiding
+
+The newest direct in-game Turtle/Octo `QuestLogFrame.xml` and
+`QuestLogFrame.lua` confirm that the small `UI-CheckBox-Check` beside a quest
+title is native Quest Log presentation. Native `QuestLog_Update()` shows the
+`QuestLogTitleNCheck` region when `IsQuestWatched(questIndex)` is true.
+
+Questie-Octo intentionally keeps its own tracker state instead of relying on
+Blizzard's limited native watch list. The Quest Log enhancement layer therefore
+post-processes the existing native check region after Blizzard updates the row:
+tracked Questie-Octo quests show the native check artwork, untracked quests do
+not. The check position is recomputed after the `[level]` title prefix so it
+does not overlap the modified title. This is presentation synchronization only;
+Questie-Octo does not replace the Quest Log skin or invent a new tracked icon.
+
+The custom tracker now hides its entire frame when its ordered tracked-quest
+list is empty. The previous `No tracked quests.` placeholder row is removed.
+When a quest becomes tracked again, the normal `TRACKER_STATE_CHANGED` render
+path shows the tracker automatically.
+
+
+## 1.0.81 shared CallbackHandler isolation / Spy compatibility
+
+A supplied Spy 4.5.0 test exposed an inter-addon Ace3 collision when Spy and
+Questie-Octo were loaded together.  Both addons shipped a LibStub library named
+`CallbackHandler-1.0` at minor 6.  Because Questie-Octo normally loads first,
+Spy's own CallbackHandler file was skipped by LibStub and Spy inherited
+Questie-Octo's private Lua-5.0 translation instead.
+
+That translation did not preserve the Ace3v/Turtle explicit-argc callback ABI
+used by the surrounding Vanilla Ace libraries (`Fire(eventName, argc, ...)`).
+Spy's later `Spy.MainWindow` nil error was therefore a downstream initialization
+symptom, not a `MainWindow` global-name collision with Questie-Octo.
+
+Questie-Octo now registers its compatibility handler as the private
+`QuestieOcto-CallbackHandler-1.0` library and AceConfigRegistry consumes that
+private name.  The private handler also restores the explicit-argc Ace3v ABI.
+Questie-Octo therefore no longer publishes/replaces the shared global
+`CallbackHandler-1.0`; addons such as Spy are free to load their own compatible
+copy regardless of addon load order.
+
+The other overlapping Ace components were checked against the supplied Spy
+snapshot: Questie-Octo's AceCore and AceGUI files are byte-identical to Spy's
+same-minor copies. AceConfigRegistry is the same Ace3v implementation except
+for its deliberate private CallbackHandler dependency above. Spy carries a
+newer AceConfigDialog and therefore upgrades that library normally through
+LibStub.

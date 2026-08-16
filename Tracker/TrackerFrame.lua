@@ -615,6 +615,15 @@ function T:Render()
     return
   end
 
+  local ordered=(QuestieOcto.TrackerDriver and QuestieOcto.TrackerDriver.ordered) or {}
+  if table.getn(ordered)==0 then
+    -- An empty tracker has no actionable content. Hide the whole frame instead
+    -- of leaving a permanent "No tracked quests." panel on the player's UI.
+    self:ClearRows()
+    self.frame:Hide()
+    return
+  end
+
   self.frame:Show()
   self:ApplyLockState()
 
@@ -634,7 +643,6 @@ function T:Render()
   self.scroll:Show()
 
   self:ClearRows()
-  local ordered=(QuestieOcto.TrackerDriver and QuestieOcto.TrackerDriver.ordered) or {}
   local sortMode=Settings():Get("trackerSort")
   local lastZone=nil
 
@@ -673,10 +681,6 @@ function T:Render()
         self:AddRow(ObjectiveDisplayText(objective),"objective",nil,objective.complete)
       end
     end
-  end
-
-  if self.rowCount==0 then
-    self:AddRow("No tracked quests.","objective",nil,false)
   end
 
   -- First pass has already created the visible FontStrings at natural width.

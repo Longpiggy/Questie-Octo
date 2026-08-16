@@ -16,7 +16,7 @@ if not AceConfigRegistry then return end
 
 AceConfigRegistry.tables = AceConfigRegistry.tables or {}
 
-local CallbackHandler = LibStub:GetLibrary("CallbackHandler-1.0")
+local CallbackHandler = LibStub:GetLibrary("QuestieOcto-CallbackHandler-1.0")
 
 if not AceConfigRegistry.callbacks then
 	AceConfigRegistry.callbacks = CallbackHandler:New(AceConfigRegistry)
