@@ -42,6 +42,7 @@ function A:Validate()
     queryQuestsCompleted = type(QueryQuestsCompleted)=="function",
     questFlaggedCompleted = type(IsQuestFlaggedCompleted)=="function" or Has(C_QuestLog,"IsQuestFlaggedCompleted"),
     mapWorldSize = Has(C_Map,"GetMapWorldSize"),
+    instanceInfo = type(GetInstanceInfo)=="function",
   }
 
   return self.valid
@@ -107,6 +108,21 @@ end
 function A:GetBestMapForPlayer()
   if not self.valid then return nil end
   return C_Map.GetBestMapForUnit("player")
+end
+
+-- ClassicAPI backports the modern GetInstanceInfo() tuple to Vanilla 1.12.
+-- Keep instance classification behind the API contract instead of teaching
+-- presentation modules about DLL/global availability details.
+function A:GetInstanceType()
+  if type(GetInstanceInfo)~="function" then return "none" end
+  local ok,name,instanceType=pcall(GetInstanceInfo)
+  if not ok or type(instanceType)~="string" then return "none" end
+  return instanceType
+end
+
+function A:IsInDungeonOrRaid()
+  local instanceType=self:GetInstanceType()
+  return instanceType=="party" or instanceType=="raid"
 end
 
 

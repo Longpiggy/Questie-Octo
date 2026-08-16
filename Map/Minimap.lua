@@ -462,8 +462,40 @@ local function PvPNodeVisible(node)
   return Settings():Get("showPvPRelatedQuests") and true or false
 end
 
+-- Ultra-rare starter items are useful as broad world-map information, but
+-- inside a dungeon/raid they create misleading minimap targets for incidental
+-- world-drop relationships (for example a 0.04% drop). Keep the underlying
+-- source data and all >=0.10% dungeon starters; filter only minimap display.
+local function UltraRareInstanceItemStartHidden(node)
+  if not MM.inDungeonOrRaid or not node or node.role~="itemStart" then return false end
+  return QuestieOcto.ItemStartAreas
+     and QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance)
+     and true or false
+end
+
+local function ItemAreaHasMeaningfulInstanceSource(area)
+  if not MM.inDungeonOrRaid then return true end
+  if not area then return false end
+
+  for _,source in pairs(area.sourceList or {}) do
+    if not QuestieOcto.ItemStartAreas
+       or not QuestieOcto.ItemStartAreas:IsZoneWideRareChance(source.chance) then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function MinimapNodeVisible(node)
+  return node and IsRoleEnabled(node.role) and PvPNodeVisible(node)
+     and not UltraRareInstanceItemStartHidden(node)
+     and true or false
+end
+
 local function ItemAreaVisible(area)
   if not area or not IsRoleEnabled("itemStart") then return false end
+  if not ItemAreaHasMeaningfulInstanceSource(area) then return false end
   local q=QuestieOcto.QuestModel:Get(area.questID)
   if q and q.pvp and not Settings():Get("showPvPRelatedQuests") then return false end
   return true
@@ -489,10 +521,10 @@ local function DescriptorHasVisibleEntry(desc,revision)
   elseif desc.type=="nodeSlot" then
     for _,entry in pairs(desc.entries or {}) do
       local node=entry.node
-      if node and IsRoleEnabled(node.role) and PvPNodeVisible(node) then visible=true; break end
+      if MinimapNodeVisible(node) then visible=true; break end
     end
   elseif desc.type=="node" and desc.node then
-    visible=IsRoleEnabled(desc.node.role) and PvPNodeVisible(desc.node)
+    visible=MinimapNodeVisible(desc.node)
   end
 
   desc.minimapVisibilityRevision=revision
@@ -544,7 +576,7 @@ local function BindDescriptor(pin,desc,revision)
   local fullNode=nil
   for _,entry in pairs(entries or {}) do
     local node=entry.node
-    if node and IsRoleEnabled(node.role) and PvPNodeVisible(node) then
+    if MinimapNodeVisible(node) then
       visible=true
       pin.clusterCount=math.max(pin.clusterCount or 1,entry.clusterCount or 1)
       AddEntry(pin,node)
@@ -626,6 +658,15 @@ function MM:RefreshPlan()
     self.lastPlayerX=nil
     self.lastPlayerY=nil
     self.lastZoom=nil
+  end
+
+  -- Instance type changes at the same lifecycle boundaries that refresh the
+  -- minimap plan (entering world / zone changes). Evaluate it here rather
+  -- than polling GetInstanceInfo every 0.05 seconds.
+  local inDungeonOrRaid=QuestieOcto.API and QuestieOcto.API:IsInDungeonOrRaid() or false
+  if self.inDungeonOrRaid~=inDungeonOrRaid then
+    self.inDungeonOrRaid=inDungeonOrRaid
+    self.bindRevision=(self.bindRevision or 0)+1
   end
 
   local plan=QuestieOcto.PreparedMap:Get(mapID)
