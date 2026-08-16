@@ -29,6 +29,16 @@ local function ObjectiveProgressFallback(text)
   return tonumber(current),tonumber(required)
 end
 
+local function SortedNumericKeys(src)
+  local keys={}
+  if type(src)~="table" then return keys end
+  for k in pairs(src) do
+    if type(k)=="number" then table.insert(keys,k) end
+  end
+  table.sort(keys)
+  return keys
+end
+
 local function ReadObjectives(index,questID)
   local objectives={}
   local snapshot={}
@@ -42,7 +52,15 @@ local function ReadObjectives(index,questID)
     allDone=false
     local nonLogCount=0
 
-    for i,row in pairs(apiObjectives) do
+    -- ClassicAPI returns objectives indexed by their quest-log objective
+    -- number. Keep that numeric identity/order instead of relying on pairs(),
+    -- whose iteration order can differ between Lua tables/clients. The row's
+    -- text, progress and completion therefore stay attached to the same
+    -- objective while LocalizeObjectiveRows applies the compact DB ordinal.
+    local objectiveKeys=SortedNumericKeys(apiObjectives)
+    for keyIndex=1,table.getn(objectiveKeys) do
+      local i=objectiveKeys[keyIndex]
+      local row=apiObjectives[i]
       local typ=row.type
       local text=row.text
       local current=tonumber(row.numFulfilled)

@@ -9,7 +9,19 @@ QM.cache = {}
 local function CopyArray(src)
   if not src then return nil end
   local out={}
-  for _,v in pairs(src) do table.insert(out,v) end
+  local keys={}
+
+  -- These sources are arrays, but pairs() does not guarantee their numeric
+  -- order on Lua 5.0. Preserve the database/compiler order explicitly so
+  -- objective #1/#2 cannot be swapped before BuildObjectiveData consumes it.
+  for k in pairs(src) do
+    if type(k)=="number" then table.insert(keys,k) end
+  end
+  table.sort(keys)
+
+  for i=1,table.getn(keys) do
+    table.insert(out,src[keys[i]])
+  end
   return out
 end
 
