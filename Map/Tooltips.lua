@@ -1166,7 +1166,7 @@ function T:Show(pin)
       itemLabel=itemLabel.." (Item "..tostring(area.itemID)..")"
     end
     if area.zoneWideRare then
-      local threshold=tonumber(area.rareThreshold) or 0.1
+      local threshold=tonumber(area.rareThreshold) or 0.5
       tooltip:AddLine(
         "One zone marker represents item-start sources below "..string.format("%.2f",threshold).."%.",
         .65,.65,.65,true

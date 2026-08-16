@@ -8,7 +8,7 @@ QuestieOcto.ItemStartAreas = QuestieOcto.ItemStartAreas or {}
 local A = QuestieOcto.ItemStartAreas
 
 A.radius=14.0
-A.zoneWideRareThreshold=0.1
+A.zoneWideRareThreshold=0.5
 
 function A:IsZoneWideRareChance(chance)
   chance=tonumber(chance) or 0
@@ -186,7 +186,7 @@ end
 
 -- Shared zone-wide presentation helper for extremely low-rate starter items.
 -- These drops are often spread across many unrelated creatures throughout a
--- zone. Keep every source in the underlying data, but represent all <0.10%
+-- zone. Keep every source in the underlying data, but represent all <0.50%
 -- sources for the same quest/item with one zone marker on Map and Minimap.
 function A:BuildZoneWideRareForMap(nodes,mapID)
   local groups={}

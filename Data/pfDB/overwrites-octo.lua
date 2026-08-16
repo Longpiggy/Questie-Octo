@@ -1523,6 +1523,13 @@ do -- items
 end
 
 do -- quests
+  -- Onu is meditating (960): stale legacy pfDB quest-giver relation.
+  -- The supplied Turtle server data retains the quest template but has no live
+  -- creature/object/item quest-start relation for 960. Quest 961 is the actual
+  -- repeatable Onu helper quest and keeps its active-944 prerequisite. Remove
+  -- 960 from the merged runtime quest database without altering 961.
+  pfDB["quests"]["data-turtle"][960] = "_"
+
   -- Add "Dark Iron Gunpowder Keg" to objectives of "Vile Dwarven Pigs"
   -- The extractor scripts did not catch those, as the objetive is filled via a Gossip on use.
   pfDB["quests"]["data-turtle"][41682]["obj"]["O"] = { 2020173 }
