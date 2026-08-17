@@ -1357,3 +1357,61 @@ options between `Auto Track Quests` and `Show Completed Quests` and defaults
 to OFF. The option controls only the native Quest Log row check artwork;
 tracking state and tracker behavior are unchanged.
 
+1.0.83 - UPDATED PFQUEST REFERENCES / SAFE SERVER-TRUTH DATA PASS
+-----------------------------------------------------------------
+Updated the project's current pfQuest references to the user-supplied
+pfQuest-classicAPI-octo(5) and pfQuest-octo-master(4) snapshots. The latter is
+Octo DB 1.1.0 and is now the primary Octo database reference.
+
+Safe changes only:
+  * cleared 35 stale class/race restrictions whose current Turtle
+    quest_template field is explicitly unrestricted;
+  * appended 9 server-required objective items without replacing any existing
+    objective data;
+  * added presentation-only Blighted Surge (8519) source guidance for Poisoned
+    Water (6804) / Discordant Bracers (17309), keeping the live item objective
+    authoritative.
+
+The new master's 38 non-additive 1.0.12 objective replacements are deliberately
+deferred for a dedicated full server/data audit. Several upstream merge/order
+edge cases were found, so those replacements must be applied as final semantic
+truth rather than copied literally. Future broad/full-audit work must explicitly
+remember and revisit that deferred batch.
+
+The updated classicAPI `/db checkdb` also reinforces an audit rule: a quest with
+no explicit objective table can still be a correct delivery/talk-to quest when
+its end relation provides the needed turn-in guidance.
+
+
+1.0.84 - SPY ACECONFIG ISOLATION / QUEST-GIVER FACTION ELIGIBILITY
+------------------------------------------------------------------
+A second Spy 4.5.0 test showed that 1.0.81 isolated CallbackHandler but left a
+same-minor shared AceConfigRegistry collision. Questie-Octo's modified registry
+was still published as `AceConfigRegistry-3.0` minor 16, so Spy's own minor 16
+registry could be skipped when Questie-Octo loaded first. Spy's newer
+AceConfigDialog then inherited Questie-Octo's private-registry state; the
+reported `Spy.MainWindow` nil, `Colors.lua` nil-frame, and missing
+`InterfaceOptionsFrame_OpenToCategory` errors are consistent downstream
+initialization/config symptoms.
+
+Compatibility correction:
+  * Questie-Octo's modified config registry is private as
+    `QuestieOcto-AceConfigRegistry-3.0`.
+  * Questie-Octo's modified config dialog is private as
+    `QuestieOcto-AceConfigDialog-3.0`.
+  * Questie-Octo Options references only those private config libraries.
+  * the shared LibStub and same-version AceGUI Slider are restored to the
+    supplied Spy-compatible implementations, so Questie-Octo no longer wins an
+    equal-version shared component with project-specific changes.
+  * Spy remains unmodified and unbundled.
+
+Quest availability also now respects the faction metadata already carried by
+pfQuest creature/object starters (`A`, `H`, `AH`). Turtle can leave a quest's
+RequiredRaces unrestricted while effectively faction-locking the pickup through
+a hostile quest giver. Questie-Octo now treats the starter faction as an
+effective availability gate and filters individual starter pins accordingly.
+This fixes Horde players being shown Alliance Sunsworn Camp quests on
+Moonwhisper Coast (for example Andanil Sunsworn 63119 and Rhys Dawnbreeze
+63122, both recorded as Alliance-only starter NPCs) even though the live NPCs
+will not offer those quests. Unknown faction metadata remains fail-open, and
+item-start quests remain unaffected by a separate NPC starter's faction.

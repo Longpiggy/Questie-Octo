@@ -186,15 +186,19 @@ local function BuildAvailableQuestNodes(questID)
 
   if q.starts.creature then
     for _,id in pairs(q.starts.creature) do
-      AddCreatureNode(questID,"available",id,nil,nil)
-      CurrentStats().availableCreature=CurrentStats().availableCreature+1
+      if not QuestieOcto.DatabaseAPI.CreatureAllowsPlayerFaction or QuestieOcto.DatabaseAPI:CreatureAllowsPlayerFaction(id) then
+        AddCreatureNode(questID,"available",id,nil,nil)
+        CurrentStats().availableCreature=CurrentStats().availableCreature+1
+      end
     end
   end
 
   if q.starts.gameObject then
     for _,id in pairs(q.starts.gameObject) do
-      AddObjectNode(questID,"available",id,nil,nil)
-      CurrentStats().availableObject=CurrentStats().availableObject+1
+      if not QuestieOcto.DatabaseAPI.ObjectAllowsPlayerFaction or QuestieOcto.DatabaseAPI:ObjectAllowsPlayerFaction(id) then
+        AddObjectNode(questID,"available",id,nil,nil)
+        CurrentStats().availableObject=CurrentStats().availableObject+1
+      end
     end
   end
 end

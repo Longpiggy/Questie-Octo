@@ -46,6 +46,25 @@ Questie-Octo and this record does not change their licensing or ownership.
 | pfUI-classicAPI-octo | `5b4ed17b4ca94712ea7cc35cd86f31dfdc7b5d94a83bb51abb3cfca2e8e4911b` | Tooltip lifecycle, minimap shape, and Vanilla/ClassicAPI UI compatibility reference. |
 | DragonflightUI-Reforged | `2c08e1ae203f54d7969262b65056d58d5e9e8c26f3b61f2c935ff0825525ac68` | Replacement ESC/GameMenu behavior and square-minimap compatibility reference. |
 
+## Current authoritative pfQuest reference snapshots (2026-08-17)
+
+The user supplied newer pfQuest reference archives after the original licensing
+audit. These newer snapshots supersede the older pfQuest rows above for current
+behavior/database comparison; the older hashes remain preserved above as
+historical provenance and must not be treated as current truth.
+
+| Current reference | SHA-256 | Authority / note |
+| --- | --- | --- |
+| `pfQuest-classicAPI-octo(5).zip` | `6f516c3d899bade909de1e79ddd55bd6f3eade9017541fdf3e5bb5c58c723d34` | Current pfQuest-family ClassicAPI/runtime reference. Compared with the previously used snapshot, only `slashcmd.lua` and `CHANGES-octo.md` changed; no quest/unit/item/object database payload changed. |
+| `pfQuest-octo-master(4).zip` | `91a663eaed749a5a2bbe8404381d4a897fe5583b9f05a765a8d42c2bcdcdec19` | **Primary current Octo database reference.** Octo DB version 1.1.0. Generated Turtle DB payload remains byte-identical to the prior supplied Octo master; new semantic corrections live in `overwrites.lua` (1.0.11-1.0.13). |
+
+Maintenance rule: do **not** wholesale-copy the 1.1.0 generated database over
+Questie-Octo. Questie-Octo intentionally carries later/project-specific map and
+data corrections. Treat the new master as a semantic correction/reference
+source, verify non-additive changes against current Turtle server truth, and
+apply only the final intended state through Questie-Octo's overwrite/enrichment
+layers.
+
 ## Historical sources no longer available as exact archives
 
 Existing Questie-Octo comments and README history establish that Questie 3.3.5,

@@ -259,6 +259,33 @@ function DB:GetCreatureFaction(id)
   return raw and (raw["fac"] or raw["faction"]) or nil
 end
 
+function DB:GetObjectFaction(id)
+  local raw=self:GetObjectRaw(id)
+  return raw and (raw["fac"] or raw["faction"]) or nil
+end
+
+function DB:GetPlayerFactionCode()
+  local group=UnitFactionGroup and UnitFactionGroup("player") or nil
+  if group=="Alliance" then return "A" end
+  if group=="Horde" then return "H" end
+  return nil
+end
+
+function DB:FactionAllowsPlayer(allowed)
+  if type(allowed)~="string" or allowed=="" then return true end
+  local code=self:GetPlayerFactionCode()
+  if not code then return true end
+  return string.find(allowed,code,1,true) and true or false
+end
+
+function DB:CreatureAllowsPlayerFaction(id)
+  return self:FactionAllowsPlayer(self:GetCreatureFaction(id))
+end
+
+function DB:ObjectAllowsPlayerFaction(id)
+  return self:FactionAllowsPlayer(self:GetObjectFaction(id))
+end
+
 
 function DB:GetMapIDByName(name)
   if not self.ready or not name then return nil end

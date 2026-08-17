@@ -8,7 +8,7 @@ if not AceGUI or (AceGUI:GetWidgetVersion(Type) or 0) >= Version then return end
 
 -- Lua APIs
 local min, max, floor = math.min, math.max, math.floor
-local tonumber, pairs = tonumber, pairs
+local tonumber, pairs, format = tonumber, pairs, string.format
 
 -- WoW APIs
 local PlaySound = PlaySound
@@ -21,19 +21,10 @@ local CreateFrame, UIParent = CreateFrame, UIParent
 --[[-----------------------------------------------------------------------------
 Support functions
 -------------------------------------------------------------------------------]]
-local function DisplayValue(self, value)
-	if self.valueLabels and self.valueLabels[value] then
-		return self.valueLabels[value]
-	end
-	return value
-end
-
 local function UpdateText(self)
 	local value = self.value or 0
-	if self.valueLabels and self.valueLabels[value] then
-		self.editbox:SetText(self.valueLabels[value])
-	elseif self.ispercent then
-		self.editbox:SetText(("%s%%"):format(floor(value * 1000 + 0.5) / 10))
+	if self.ispercent then
+		self.editbox:SetText(format(("%s%%"),floor(value * 1000 + 0.5) / 10))
 	else
 		self.editbox:SetText(floor(value * 100 + 0.5) / 100)
 	end
@@ -41,12 +32,9 @@ end
 
 local function UpdateLabels(self)
 	local min, max = (self.min or 0), (self.max or 100)
-	if self.valueLabels then
-		self.lowtext:SetText(DisplayValue(self, min))
-		self.hightext:SetText(DisplayValue(self, max))
-	elseif self.ispercent then
-		self.lowtext:SetFormattedText("%s%%", (min * 100))
-		self.hightext:SetFormattedText("%s%%", (max * 100))
+	if self.ispercent then
+		self.lowtext:SetText(format("%s%%", (min * 100)))
+		self.hightext:SetText(format("%s%%", (max * 100)))
 	else
 		self.lowtext:SetText(min)
 		self.hightext:SetText(max)
@@ -112,15 +100,7 @@ end
 local function EditBox_OnEnterPressed()
 	local self = this.obj
 	local value = this:GetText()
-	if self.valueLabels then
-		local typed=value
-		value=tonumber(value)
-		if not value then
-			for sliderValue,label in pairs(self.valueLabels) do
-				if tostring(label)==typed then value=sliderValue break end
-			end
-		end
-	elseif self.ispercent then
+	if self.ispercent then
 		value = value:gsub('%%', '')
 		value = tonumber(value) / 100
 	else
@@ -150,7 +130,6 @@ local methods = {
 		self:SetWidth(200)
 		self:SetHeight(44)
 		self:SetDisabled(false)
-		self:SetValueLabels(nil)
 		self:SetIsPercent(nil)
 		self:SetSliderValues(0,100,1)
 		self:SetValue(0)
@@ -210,12 +189,6 @@ local methods = {
 			frame:SetValue(self.value)
 		end
 		frame.setup = nil
-	end,
-
-	["SetValueLabels"] = function(self, labels)
-		self.valueLabels = labels
-		UpdateLabels(self)
-		UpdateText(self)
 	end,
 
 	["SetIsPercent"] = function(self, value)

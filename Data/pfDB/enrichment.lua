@@ -1695,6 +1695,49 @@ function E:Apply()
     [8595] = true,
   }
 
+  -- Current Turtle server quest_template has these fields unrestricted (0).
+  -- The updated pfQuest-octo 1.1.0 reference identifies the same stale
+  -- vanilla-era restrictions, but its pre-merge `field = nil` implementation
+  -- cannot actually delete a base field. Apply the verified removals here,
+  -- after the final quest merge, so eligibility matches current server truth.
+  local fieldClearExtra = {
+    [792] = { ["class"] = true }, -- Vile Familiars
+    [1386] = { ["race"] = true }, -- Assault on the Kolkar
+    [6963] = { ["race"] = true }, -- Stolen Winter Veil Treats
+    [8302] = { ["race"] = true }, -- The Hand of the Righteous
+    [8314] = { ["race"] = true }, -- Unraveling the Mystery
+    [8732] = { ["race"] = true }, -- Field Duty Papers
+    [8915] = { ["race"] = true }, -- An Earnest Proposition
+    [8931] = { ["race"] = true }, -- Just Compensation
+    [8932] = { ["race"] = true }, -- Just Compensation
+    [8933] = { ["race"] = true }, -- Just Compensation
+    [8934] = { ["race"] = true }, -- Just Compensation
+    [8935] = { ["race"] = true }, -- Just Compensation
+    [8937] = { ["race"] = true }, -- Just Compensation
+    [8938] = { ["race"] = true }, -- Just Compensation
+    [8940] = { ["race"] = true }, -- Just Compensation
+    [8941] = { ["race"] = true }, -- Just Compensation
+    [8942] = { ["race"] = true }, -- Just Compensation
+    [8944] = { ["race"] = true }, -- Just Compensation
+    [8948] = { ["race"] = true }, -- Anthion's Old Friend
+    [8949] = { ["race"] = true }, -- Falrin's Vendetta
+    [8962] = { ["race"] = true }, -- Components of Importance
+    [8964] = { ["race"] = true }, -- Components of Importance
+    [8965] = { ["race"] = true }, -- Components of Importance
+    [8966] = { ["race"] = true }, -- The Left Piece of Lord Valthalak's Amulet
+    [8967] = { ["race"] = true }, -- The Left Piece of Lord Valthalak's Amulet
+    [8968] = { ["race"] = true }, -- The Left Piece of Lord Valthalak's Amulet
+    [8969] = { ["race"] = true }, -- The Left Piece of Lord Valthalak's Amulet
+    [8985] = { ["race"] = true }, -- More Components of Importance
+    [8988] = { ["race"] = true }, -- More Components of Importance
+    [8989] = { ["race"] = true }, -- The Right Piece of Lord Valthalak's Amulet
+    [8990] = { ["race"] = true }, -- The Right Piece of Lord Valthalak's Amulet
+    [8991] = { ["race"] = true }, -- The Right Piece of Lord Valthalak's Amulet
+    [8992] = { ["race"] = true }, -- The Right Piece of Lord Valthalak's Amulet
+    [9014] = { ["race"] = true }, -- Saving the Best for Last
+    [9378] = { ["race"] = true }, -- DND FLAG The Dread Citadel - Naxxramas
+  }
+
   local relationExtra = {
     [9320] = { ["start"] = { ["U"] = { 16786 } }, ["end"] = { ["U"] = { 16786 } } },
     [40542] = { ["end"] = { ["U"] = { 5635 } } },
@@ -1714,6 +1757,18 @@ function E:Apply()
   }
 
   local objectiveExtra = {
+    -- Verified directly against the current Turtle quest_template. These are
+    -- additive objectives only: existing objective truth is preserved.
+    [3962] = { ["I"] = { 11522 } }, -- It's Dangerous to Go Alone
+    [8966] = { ["I"] = { 22049 } }, -- The Left Piece of Lord Valthalak's Amulet
+    [8967] = { ["I"] = { 22050 } },
+    [8968] = { ["I"] = { 22051 } },
+    [8969] = { ["I"] = { 22052 } },
+    [8989] = { ["I"] = { 22049 } }, -- The Right Piece of Lord Valthalak's Amulet
+    [8990] = { ["I"] = { 22050 } },
+    [8991] = { ["I"] = { 22051 } },
+    [8992] = { ["I"] = { 22052 } },
+
     [41900] = { ["I"] = { 7069 } },
     [41901] = { ["I"] = { 13467 } },
     [41902] = { ["I"] = { 10286 } },
@@ -1764,6 +1819,13 @@ function E:Apply()
   for id, fields in pairs(extra) do
     if q[id] then
       for k, v in pairs(fields) do q[id][k] = v end
+    end
+  end
+
+  for id, fields in pairs(fieldClearExtra) do
+    local quest = q[id]
+    if quest then
+      for field in pairs(fields) do quest[field] = nil end
     end
   end
 

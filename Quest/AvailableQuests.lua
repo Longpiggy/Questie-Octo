@@ -17,7 +17,7 @@ A.hardcoreCache=nil
 local function NewStats()
   return {
     scanned=0,available=0,completed=0,active=0,disabled=0,
-    level=0,prerequisite=0,exclusive=0,race=0,class=0,
+    level=0,prerequisite=0,exclusive=0,race=0,class=0,starterFaction=0,
     hardcore=0,skill=0,reputation=0,timed=0,event=0,repeatable=0,pvp=0,noStarter=0
   }
 end
@@ -148,6 +148,29 @@ local function HasStarter(q)
     (q.starts.item and next(q.starts.item))
 end
 
+local function StarterFactionAllowsPlayer(q)
+  local db=QuestieOcto.DatabaseAPI
+  if not db then return true end
+
+  -- An item starter is not tied to an NPC/object faction, so it remains a valid
+  -- alternate pickup path even when another listed starter is faction-specific.
+  if q.starts.item and next(q.starts.item) then return true end
+
+  local sawDirectStarter=false
+  for _,id in pairs(q.starts.creature or {}) do
+    sawDirectStarter=true
+    if not db.CreatureAllowsPlayerFaction or db:CreatureAllowsPlayerFaction(id) then return true end
+  end
+  for _,id in pairs(q.starts.gameObject or {}) do
+    sawDirectStarter=true
+    if not db.ObjectAllowsPlayerFaction or db:ObjectAllowsPlayerFaction(id) then return true end
+  end
+
+  -- Missing faction metadata is deliberately treated as usable by the DB helper.
+  -- Only reject when direct starters are known and every one excludes the player.
+  return not sawDirectStarter
+end
+
 local function PrerequisitesSatisfied(q)
   if not q.preQuestSingle and not q.preQuestActive and not q.preQuestAll then return true end
 
@@ -265,6 +288,16 @@ function A:EvaluateQuest(questID,trackStats)
   if q.classMask and not MaskContains(q.classMask,PlayerClassBit()) then
     Track(self,"class",trackStats)
     return false,"class"
+  end
+
+  -- pfQuest's source data also carries the effective faction of quest-giver
+  -- creatures/objects (A/H/AH). Turtle quests can have RequiredRaces=0 while
+  -- being practically faction-locked because the only quest giver is hostile.
+  -- Respect that source-level truth so hostile Sunsworn-style NPCs are not
+  -- advertised as available to the opposite faction.
+  if not StarterFactionAllowsPlayer(q) then
+    Track(self,"starterFaction",trackStats)
+    return false,"starterFaction"
   end
 
   if q.hardcore then
@@ -545,6 +578,7 @@ function A:GetUnavailableReason(questID)
   if code=="repeatable" then return "Repeatable quests are hidden." end
   if code=="pvpHidden" then return "PVP related quests are hidden." end
   if code=="timed" then return "Another timed quest is active." end
+  if code=="starterFaction" then return "The known quest starter is not friendly to your faction." end
   if code=="noStarter" then return "No quest starter is known." end
   if code=="noModel" then return "Not present in the current quest database." end
   return "Unavailable — exact server-side requirement unknown ("..tostring(code or "unknown")..")."

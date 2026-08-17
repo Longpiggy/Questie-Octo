@@ -45,7 +45,7 @@ end
 -- configured threshold, reference-loot owners, and vendors. The original
 -- pfQuest default threshold is 1%, which we preserve here without adding a
 -- new player-facing option.
-local function ResolveItemSources(itemID)
+local function ResolveItemSources(questID,itemID)
   local result={}
   local seen={}
   local sources=QuestieOcto.DatabaseAPI:GetItemSources(itemID)
@@ -91,6 +91,16 @@ local function ResolveItemSources(itemID)
     for creatureID in pairs(sources.Vendor) do
       AddUniqueSource(result,seen,"creature",creatureID,itemID,nil,true)
     end
+  end
+
+  -- Poisoned Water (6804): Discordant Bracers (17309) belong to the temporary
+  -- Discordant Surge (13279), which has no natural world spawn. The quest text
+  -- sends the player to use Aspect of Neptulon on poisoned elementals, and the
+  -- updated pfQuest-octo 1.1.0 audit identifies Blighted Surge (8519) as the
+  -- actionable source. Keep 17309 as the real live item objective and add only
+  -- 8519's physical positions as presentation guidance.
+  if tonumber(questID)==6804 and tonumber(itemID)==17309 then
+    AddUniqueSource(result,seen,"creature",8519,itemID,nil,false)
   end
 
   return result
@@ -393,7 +403,7 @@ function O:ResolveQuest(questID)
           O.stats.object=O.stats.object+1
         elseif kind=="item" then
           table.insert(result.item,MergeState({
-            itemID=id,name=QuestieOcto.DatabaseAPI:GetItemName(id),sources=ResolveItemSources(id)
+            itemID=id,name=QuestieOcto.DatabaseAPI:GetItemName(id),sources=ResolveItemSources(questID,id)
           },row))
           O.stats.item=O.stats.item+1
         end
@@ -418,7 +428,7 @@ function O:ResolveQuest(questID)
         O.stats.object=O.stats.object+1
       elseif entry.kind=="item" then
         table.insert(result.item,{
-          itemID=entry.id,name=QuestieOcto.DatabaseAPI:GetItemName(entry.id),sources=ResolveItemSources(entry.id)
+          itemID=entry.id,name=QuestieOcto.DatabaseAPI:GetItemName(entry.id),sources=ResolveItemSources(questID,entry.id)
         })
         O.stats.item=O.stats.item+1
       end

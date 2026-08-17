@@ -186,7 +186,7 @@ local function Settings()
 end
 
 local function ClearSavedConfigPosition()
-  local Dialog=LibStub and LibStub("AceConfigDialog-3.0",true)
+  local Dialog=LibStub and LibStub("QuestieOcto-AceConfigDialog-3.0",true)
   if not Dialog or not Dialog.GetStatusTable then return end
 
   local status=Dialog:GetStatusTable(APP_NAME)
@@ -264,7 +264,7 @@ local function CreateGeneralTab()
       resetOptions={type="execute",order=92,name="Reset Options",desc="Restore option defaults.",func=function()
         Settings():Reset()
         ClearSavedConfigPosition()
-        local Registry=LibStub and LibStub("AceConfigRegistry-3.0",true)
+        local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
         if Registry and Registry.NotifyChange then Registry:NotifyChange(APP_NAME) end
       end},
     },
@@ -391,8 +391,8 @@ function O:Initialize()
   if self.initialized then return true end
 
   local AceGUI=LibStub and LibStub("AceGUI-3.0",true)
-  local Registry=LibStub and LibStub("AceConfigRegistry-3.0",true)
-  local Dialog=LibStub and LibStub("AceConfigDialog-3.0",true)
+  local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
+  local Dialog=LibStub and LibStub("QuestieOcto-AceConfigDialog-3.0",true)
 
   self.stats.aceGUI=AceGUI and true or false
   self.stats.aceRegistry=Registry and true or false
@@ -499,7 +499,7 @@ end
 function O:Show()
   if not self:Initialize() then return end
 
-  local Dialog=LibStub("AceConfigDialog-3.0")
+  local Dialog=LibStub("QuestieOcto-AceConfigDialog-3.0")
   -- Questie 3.3.5 refreshes the existing standalone frame through Open().
   Dialog:Open(APP_NAME,self.configFrame)
   RecenterConfigFrame(self.configFrame)

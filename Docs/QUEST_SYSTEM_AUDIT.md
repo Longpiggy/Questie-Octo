@@ -489,3 +489,191 @@ reuses the same native Blizzard/Turtle check region and the existing
 Questie-Octo tracking state. Changing the option refreshes an open Quest Log
 immediately through the tracker-setting message path.
 
+## 1.0.83 updated pfQuest reference audit — safe server-truth integration
+
+The current pfQuest references were replaced by newer user-supplied snapshots:
+
+- `pfQuest-classicAPI-octo(5).zip`
+  SHA-256 `6f516c3d899bade909de1e79ddd55bd6f3eade9017541fdf3e5bb5c58c723d34`
+- `pfQuest-octo-master(4).zip`
+  SHA-256 `91a663eaed749a5a2bbe8404381d4a897fe5583b9f05a765a8d42c2bcdcdec19`
+
+`pfQuest-octo-master(4)` is now the primary Octo database reference. Its
+generated Turtle DB files are byte-identical to the previous supplied master;
+the meaningful new database knowledge is in `overwrites.lua`, covering
+1.0.11-1.0.13.
+
+### Safe corrections integrated now
+
+The following changes are additive or direct eligibility truth and were
+cross-checked against the current supplied Turtle `quest_template` rather than
+copied blindly from pfQuest.
+
+**35 stale class/race restrictions removed after the final merge**
+
+The server reports the corresponding field as unrestricted (`0`). The updated
+pfQuest master tries to remove these fields before its base/Turtle merge using
+`entry[field] = nil`; that does not delete the inherited base field. Questie-Octo
+therefore clears them explicitly in the post-merge enrichment layer.
+
+- class clear: `792`
+- race clear:
+  `1386, 6963, 8302, 8314, 8732, 8915, 8931, 8932, 8933, 8934, 8935,
+  8937, 8938, 8940, 8941, 8942, 8944, 8948, 8949, 8962, 8964, 8965,
+  8966, 8967, 8968, 8969, 8985, 8988, 8989, 8990, 8991, 8992, 9014,
+  9378`
+
+This is a server-eligibility correction only; no objectives, prerequisites, or
+presentation priority are changed by the field clear itself.
+
+**9 missing objective items appended**
+
+Current Turtle `quest_template` directly contains these required items. They are
+added through `objectiveExtra` with append-unique semantics so existing
+objective data is retained:
+
+- `3962` -> item `11522`
+- `8966` -> `22049`
+- `8967` -> `22050`
+- `8968` -> `22051`
+- `8969` -> `22052`
+- `8989` -> `22049`
+- `8990` -> `22050`
+- `8991` -> `22051`
+- `8992` -> `22052`
+
+This also avoids the updated pfQuest master's edge case where quest 3962 has no
+Turtle-side `obj` table at the point its append loop runs.
+
+**Poisoned Water (6804) actionable-source guidance**
+
+The authoritative live item objective remains `Discordant Bracers` (17309).
+Those bracers belong to temporary `Discordant Surge` (13279), whose database
+entry has no natural world spawn. The quest text instructs the player to use
+Aspect of Neptulon on poisoned elementals; the updated Octo audit identifies
+`Blighted Surge` (8519), which has the real Eastern Plaguelands spawns.
+
+Questie-Octo does not invent a second live kill objective. Instead,
+`ResolveItemSources(questID,itemID)` adds creature 8519 as **presentation-only
+source guidance** for quest 6804 / item 17309 while preserving the actual item
+objective and progress mapping.
+
+### Deliberately deferred — FULL CHECK REQUIRED
+
+The updated Octo master contains a non-additive 1.0.12 replacement table for 38
+quests. Those entries can remove existing targets as well as add/replace them,
+so they are **not** imported as part of this safe pass.
+
+Deferred IDs:
+
+`974, 1435, 3520, 5163, 5206, 5441, 5561, 5581, 6661, 6681, 7029, 7041,
+7629, 8249, 8746, 8762, 9015, 9165, 9257, 9269, 9270, 9271, 40056, 40099,
+40124, 40141, 40174, 40179, 40713, 41243, 41312, 41383, 41659, 41684,
+41694, 80207, 80703, 80722`
+
+Known reasons this batch must be handled semantically rather than copied:
+
+- the replacements are destructive/non-additive and can remove useful pins;
+- `5163` and `8762` are absent from the updated master's Turtle patch table at
+  the point its replacement loop executes, so those advertised replacements do
+  not actually apply there;
+- later blocks supersede some 1.0.12 rows (notably `40124`, `40713`, and
+  `80207` needs final-state review);
+- current server/base evidence for some custom quests is split across base dumps
+  and later database updates;
+- every replacement should be checked for final quest objective IDs, required
+  item/source semantics, actual spawn/source availability, and later
+  Questie-Octo-specific corrections before removing an existing target.
+
+**Mandatory reminder rule:** whenever Sandrea next asks for a **full check**,
+**full database check**, **full audit**, or similar broad data verification,
+surface this deferred 38-quest replacement batch first and explicitly ask/confirm
+that it is included in that audit. Do not let a future general audit forget this
+pending work.
+
+### Updated classicAPI diagnostic lesson
+
+The updated `pfQuest-classicAPI-octo(5)` changes `/db checkdb` so a quest with no
+`obj` table but a valid end relation is recognized as a delivery/talk-to quest
+whose turn-in pin is legitimate guidance. Questie-Octo audit rule: **no `obj`
+does not by itself prove a quest is broken**. Check quest text, start/end
+relations, and live/server objective truth before inventing an objective.
+
+
+## 1.0.84 Spy config-library isolation and source-faction availability
+
+### Spy follow-up: CallbackHandler isolation alone was not sufficient
+
+The supplied Spy 4.5.0 retest still produced downstream errors when
+Questie-Octo was loaded, including:
+
+- `Spy.lua:2228` — `Spy.MainWindow` nil;
+- `Colors.lua:224` — nil frame;
+- `Spy.lua:1862` — `InterfaceOptionsFrame_OpenToCategory` nil.
+
+The second source audit found another equal-version LibStub collision left by
+1.0.81: both addons publish `AceConfigRegistry-3.0` minor 16, but
+Questie-Octo's copy had been deliberately modified to consume the private
+`QuestieOcto-CallbackHandler-1.0`. When Questie-Octo loads first, Spy's own
+minor-16 registry is skipped. Spy's newer AceConfigDialog (minor 65) then runs
+against Questie-Octo's project-specific shared registry rather than the registry
+shipped with Spy. This can abort Spy's option/initialization path before
+`Spy:CreateMainWindow()` completes; the later MainWindow/Colors errors are
+therefore downstream symptoms rather than proof of a global `MainWindow` name
+collision.
+
+Questie-Octo now keeps all project-modified AceConfig state private:
+
+- `QuestieOcto-AceConfigRegistry-3.0` minor 16;
+- `QuestieOcto-AceConfigDialog-3.0` minor 63;
+- `QuestieOcto-CallbackHandler-1.0` minor 6.
+
+`UI/Options.lua` uses only those private registry/dialog majors. Questie-Octo no
+longer registers either standard `AceConfigRegistry-3.0` or standard
+`AceConfigDialog-3.0`, so Spy can load both of its own copies independently of
+addon load order. As an additional shared-library hygiene check, Questie-Octo's
+LibStub and equal-version AceGUI Slider are now byte-identical to the supplied
+Spy copies. AceCore and the AceGUI core were already byte-identical; every other
+shared AceGUI widget for which Questie-Octo could prevent Spy's version from
+loading is also byte-identical after this pass. Spy itself is not modified.
+
+The remaining verification is an in-client Spy + Questie-Octo login test; the
+WoW runtime cannot be executed in the build environment.
+
+### Quest-giver faction is effective quest availability
+
+A Horde tester on Moonwhisper Coast reported Alliance Sunsworn Camp quests as
+`(Available)` on both map and world-hover tooltips even though the NPCs were
+hostile and would not offer them. The raw Turtle quest rows for examples such as
+42064/42065/42068 have `RequiredRaces=0`, so quest-level race filtering alone
+cannot solve this.
+
+The pfQuest unit data already contains the missing effective restriction:
+
+- Andanil Sunsworn (63119) — `fac = "A"`;
+- Rhys Dawnbreeze (63122) — `fac = "A"`;
+- the surrounding Sunsworn quest givers in that camp likewise carry Alliance
+  source-faction metadata.
+
+The updated `pfQuest-classicAPI-octo(5)` reference explicitly uses starter
+creature/object `fac` (`A`, `H`, `AH`) as an inferred quest race/faction mask
+when the quest itself has no race mask, and filters starter nodes against the
+player faction. Questie-Octo had the faction data and already used it for town
+service markers, but did not apply it to ordinary available quest starters.
+
+1.0.84 therefore adds a general source-faction eligibility layer:
+
+1. explicit quest race/class masks remain authoritative and are checked first;
+2. an item starter remains a valid faction-neutral alternate pickup path;
+3. creature/object starters with missing faction metadata fail open;
+4. when direct starter faction metadata is known, the quest is unavailable if
+   every direct starter excludes the player's faction;
+5. individual available creature/object nodes are also filtered, so a quest
+   with mixed-faction alternate starters shows only the usable starter(s);
+6. the same individual filtering is applied to the immediate zone-bootstrap
+   path, preventing a stale wrong-faction pin before the full node rebuild;
+7. active quest objectives/turn-ins are not rewritten by this availability
+   correction.
+
+This is a presentation/eligibility correction using existing pfQuest source
+truth; it does not invent race masks in the generated quest database.

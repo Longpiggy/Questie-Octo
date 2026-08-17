@@ -126,12 +126,15 @@ end
 
 local function StarterTouchesMap(q,mapID)
   for _,id in pairs(q.starts.creature or {}) do
-    local coords=ConditionalCreatureCoords(q,id,"available") or QuestieOcto.DatabaseAPI:GetCreatureCoords(id)
-    if CoordsContainMap(coords,mapID) then return true end
+    if not QuestieOcto.DatabaseAPI.CreatureAllowsPlayerFaction or QuestieOcto.DatabaseAPI:CreatureAllowsPlayerFaction(id) then
+      local coords=ConditionalCreatureCoords(q,id,"available") or QuestieOcto.DatabaseAPI:GetCreatureCoords(id)
+      if CoordsContainMap(coords,mapID) then return true end
+    end
   end
 
   for _,id in pairs(q.starts.gameObject or {}) do
-    if CoordsContainMap(QuestieOcto.DatabaseAPI:GetObjectCoords(id),mapID) then return true end
+    if (not QuestieOcto.DatabaseAPI.ObjectAllowsPlayerFaction or QuestieOcto.DatabaseAPI:ObjectAllowsPlayerFaction(id))
+       and CoordsContainMap(QuestieOcto.DatabaseAPI:GetObjectCoords(id),mapID) then return true end
   end
 
   for _,itemID in pairs(q.starts.item or {}) do
@@ -157,13 +160,17 @@ end
 
 local function AddAvailableQuestNodes(nodes,q,mapID)
   for _,id in pairs(q.starts.creature or {}) do
-    local node=CreatureNode(q.id,"available",id,nil,nil)
-    if CoordsContainMap(node.coords,mapID) then AddNode(nodes,node) end
+    if not QuestieOcto.DatabaseAPI.CreatureAllowsPlayerFaction or QuestieOcto.DatabaseAPI:CreatureAllowsPlayerFaction(id) then
+      local node=CreatureNode(q.id,"available",id,nil,nil)
+      if CoordsContainMap(node.coords,mapID) then AddNode(nodes,node) end
+    end
   end
 
   for _,id in pairs(q.starts.gameObject or {}) do
-    local node=ObjectNode(q.id,"available",id,nil,nil)
-    if CoordsContainMap(node.coords,mapID) then AddNode(nodes,node) end
+    if not QuestieOcto.DatabaseAPI.ObjectAllowsPlayerFaction or QuestieOcto.DatabaseAPI:ObjectAllowsPlayerFaction(id) then
+      local node=ObjectNode(q.id,"available",id,nil,nil)
+      if CoordsContainMap(node.coords,mapID) then AddNode(nodes,node) end
+    end
   end
 
   for _,itemID in pairs(q.starts.item or {}) do
