@@ -28,9 +28,11 @@ By default, Questie-Octo adds a yellow **!** settings button.
 - **Left Click:** Open settings
 - **Drag:** Move the button around the minimap when it is not managed by a button panel
 
+To disable it, open **Other → Interface** and uncheck **Show Minimap Button**.
+
 If your UI provides a minimap-button panel, such as pfUI's **Addon Buttons** panel, the enabled Questie-Octo button can appear there with your other addon buttons.
 
-On supported game menus, including pfUI and DragonflightUI-Reforged, you may also see a **Questie Options** button in the Escape menu.
+On supported game menus, including Blizzard, Shagu Tweaks, pfUI and DragonflightUI-Reforged, you may also see a **Questie Options** button in the Escape menu.
 
 You can also open the settings with either slash command:
 
@@ -54,13 +56,7 @@ If the tracker gets moved somewhere inconvenient, use **Tracker → Reset Tracke
 
 Questie-Octo uses its dark options theme by default.
 
-To change it, open the settings, scroll to the bottom of the **General** tab, and toggle **Enable Dark Theme** just above Reset Settings. The theme only changes the Questie-Octo settings window and does not reskin pfUI, DragonflightUI-Reforged, or other UI addons.
-
-### Minimap settings button
-
-The Questie-Octo settings button is enabled by default. It can sit beside the minimap or be collected by a compatible minimap-button panel such as pfUI's **Addon Buttons** panel.
-
-To disable it, open the settings, scroll to the bottom of the **General** tab, and uncheck **Show Minimap Button** just above Reset Settings.
+To change it, open **Other → Interface** and toggle **Enable Dark Theme**. The theme only changes the Questie-Octo settings window.
 
 **Changing this option requires `/reload`.** When disabled, Questie-Octo does not create the minimap-button frame at all; it is not merely hidden. This avoids compatibility problems with older Vanilla minimap-button collector addons.
 
@@ -71,6 +67,21 @@ The other settings access methods described above remain available when the mini
 Questie-Octo can automatically track accepted quests.
 
 To manually track or untrack a quest, use **Shift + Left Click** on the quest in the Quest Log.
+
+### Quest Browser
+
+The **Quest Browser** button is available in the bottom-left corner of the Questie-Octo settings window. You can also open it with `/qo quests`.
+
+### Quest Automation
+
+Quest automation is optional and disabled by default. Open **Other → Quest Automation** to configure:
+
+- **Auto Accept Quests**
+- **Auto Turn In Quests**
+- **Auto Accept Gray Quests**
+- **Include Repeatable Quests**
+
+Hold **Shift** while talking to an NPC to keep that conversation manual. Questie-Octo leaves multiple reward choices, money-cost turn-ins, and quest accept confirmations to the player.
 
 ## Useful Commands
 

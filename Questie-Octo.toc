@@ -2,7 +2,7 @@
 ## Title: Questie-Octo
 ## Notes: Quest helper.
 ## Author: Questie-Octo
-## Version: 1.0.15
+## Version: 1.0.40
 ## SavedVariables: QuestieOctoGlobalDB
 ## SavedVariablesPerCharacter: QuestieOctoDB
 
@@ -53,6 +53,7 @@ Map\Visuals.lua
 Map\ContinentProjection.lua
 Map\Map.lua
 Map\MinimapSettings.lua
+Quest\Automation.lua
 Map\Minimap.lua
 Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml

@@ -567,11 +567,7 @@ end
 function R:GetOptionsTab()
   return {
     name="Quests",type="group",order=14,
-    args={
-      heading={type="header",order=1,name="Quests"},
-      description={type="description",order=2,fontSize="medium",width="full",name="Browse the quest database in a dedicated lightweight window."},
-      open={type="execute",order=3,name="Open Quests",desc="Open the quest browser.",width="double",func=function() R:OpenWindow() end},
-    },
+    args={},
   }
 end
 

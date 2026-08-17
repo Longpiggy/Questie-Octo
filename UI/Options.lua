@@ -288,6 +288,9 @@ local function SetValue(info,value)
   if changed then
     O.stats.changes=O.stats.changes+1
   end
+  if O.configFrame and O.configFrame.SetStatusText then
+    O.configFrame:SetStatusText(nil)
+  end
 
   -- AceConfigDialog refreshes the custom frame immediately after setters.
   -- Clear AceGUI's persisted drag coordinates before that refresh happens.
@@ -307,66 +310,89 @@ local function EnabledMinimap()
   return Settings():Get("enableMiniMapIcons") and true or false
 end
 
+local function CreateQuestBrowserFooterButton(configFrame)
+  if not configFrame or not configFrame.frame or configFrame.questieOctoQuestBrowserButton then return end
+
+  local shell=configFrame.frame
+  local statusbg=configFrame.statustext and configFrame.statustext:GetParent()
+  -- UIPanelButtonTemplate stretches its complete artwork at wide widths, which
+  -- distorts the footer button. Template2 keeps fixed left/right caps and only
+  -- expands the middle section, matching AceGUI's normal wide button behavior.
+  -- Template2's XML scripts resolve $parentLeft/Middle/Right through the global
+  -- button name, so this frame must be named rather than anonymous.
+  local button=CreateFrame("Button","QuestieOctoQuestBrowserFooterButton",shell,"UIPanelButtonTemplate2")
+  button:SetPoint("BOTTOMLEFT",shell,"BOTTOMLEFT",15,17)
+  button:SetWidth(170)
+  button:SetHeight(20)
+  button:SetText("Quest Browser")
+  button:SetScript("OnClick",function()
+    QuestieOcto.QuestResearch:OpenWindow()
+  end)
+
+  configFrame.questieOctoQuestBrowserButton=button
+  configFrame.questieOctoStatusBackground=statusbg
+
+  -- AceGUI normally reserves this exact bottom-left strip as a validation
+  -- status area. Use it for Quest Browser during normal operation, but keep
+  -- SetStatusText functional: a real validation message temporarily replaces
+  -- the button instead of being hidden behind it.
+  local originalSetStatusText=configFrame.SetStatusText
+  if originalSetStatusText then
+    configFrame.questieOctoOriginalSetStatusText=originalSetStatusText
+    configFrame.SetStatusText=function(self,message)
+      originalSetStatusText(self,message)
+      if message and tostring(message)~="" then
+        button:Hide()
+        if statusbg then statusbg:Show() end
+      else
+        if statusbg then statusbg:Hide() end
+        button:Show()
+      end
+    end
+  else
+    if statusbg then statusbg:Hide() end
+    button:Show()
+  end
+
+  if configFrame.SetStatusText then
+    configFrame:SetStatusText(nil)
+  end
+end
+
 
 local function CreateGeneralTab()
   return {
     name="General", type="group", order=1,
     args={
-      icon_header={type="header",order=1,name="Icon Settings"},
-      enableMapIcons={type="toggle",order=2,name="Show Quests",desc="Show quest icons on the main map.",width="full",get=GetValue,set=SetValue},
-      world_map_visibility_header={type="header",order=3,name="World Map Visibility"},
-      showAllQuestsWorldMap={type="toggle",order=3.1,name="Show Quests on the World Map",desc="Show normal quest pickup and turn-in icons on continent maps.",width="full",get=GetValue,set=SetValue},
-      showSpecialQuestsWorldMap={type="toggle",order=3.2,name="Show Special Quests on the World Map",desc="Show repeatable, PvP, and active event quest icons on continent maps.",width="full",get=GetValue,set=SetValue},
-      showMapFlightMaster={type="toggle",order=3.3,name="Show Flight Master on the World Map",desc="Show Flight Master icons on the map.",width="full",get=GetValue,set=SetValue},
-      enableMiniMapIcons={type="toggle",order=4,name="Enable Minimap Icons",desc="Show quest icons on the minimap.",width="full",get=GetValue,set=SetValue},
-      type_header={type="header",order=5,name="Quest Icon Types"},
-      enableObjectives={type="toggle",order=5,name="Enable Objective Icons",desc="Show active quest objectives on the map and minimap.",width="full",get=GetValue,set=SetValue},
-      enableTurnins={type="toggle",order=6,name="Enable Completed Quest Icons",desc="Show completed quest turn-ins on the map and minimap.",width="full",get=GetValue,set=SetValue},
-      enableAvailable={type="toggle",order=7,name="Enable Available Quest Icons",desc="Show available quests on the map and minimap.",width="full",get=GetValue,set=SetValue},
+      world_map_visibility_header={type="header",order=2,name="World Map Visibility"},
+      enableMapIcons={type="toggle",order=2.1,name="Show Quests",desc="Show quest icons on the main map.",width="full",get=GetValue,set=SetValue},
+      showAllQuestsWorldMap={type="toggle",order=2.2,name="Show Quests on the World Map",desc="Show normal quest pickup and turn-in icons on continent maps.",width="full",get=GetValue,set=SetValue},
+      showSpecialQuestsWorldMap={type="toggle",order=2.3,name="Show Special Quests on the World Map",desc="Show repeatable, PvP, and active event quest icons on continent maps.",width="full",get=GetValue,set=SetValue},
+      showMapFlightMaster={type="toggle",order=2.4,name="Show Flight Master on the World Map",desc="Show Flight Master icons on the map.",width="full",get=GetValue,set=SetValue},
+      enableMiniMapIcons={type="toggle",order=3,name="Enable Minimap Icons",desc="Show quest icons on the minimap.",width="full",get=GetValue,set=SetValue},
+      enableObjectives={type="toggle",order=4,name="Enable Objective Icons",desc="Show active quest objectives on the map and minimap.",width="full",get=GetValue,set=SetValue},
+      enableTurnins={type="toggle",order=5,name="Enable Completed Quest Icons",desc="Show completed quest turn-ins on the map and minimap.",width="full",get=GetValue,set=SetValue},
+      enableAvailable={type="toggle",order=6,name="Enable Available Quest Icons",desc="Show available quests on the map and minimap.",width="full",get=GetValue,set=SetValue},
 
-      objective_nodes={type="group",order=8,name="Objective Nodes",inline=true,args={
-        objectiveNodeDensity={type="select",order=1,name="Objective Node Density",desc="Clustered groups nearby spawns. Full Nodes shows every known spawn.",width="double",values={clustered="Clustered",full="Full Nodes"},get=GetValue,set=SetValue},
-      }},
+      objective_density_label={type="description",order=8,name="Objective",fontSize="medium",width="normal"},
+      objectiveNodeDensity={type="select",order=8.1,name="",desc="Clustered groups nearby spawns. Full Nodes shows every known spawn.",width="normal",values={clustered="Clustered",full="Full Nodes"},get=GetValue,set=SetValue},
 
-      item_start_options={type="group",order=9,name="Item-Start Quests",inline=true,args={
-        showItemStartQuests={type="toggle",order=1,name="Show Item-Start Quests",desc="Show quests started by dropped or looted items.",width="full",get=GetValue,set=SetValue},
-        showItemStartMap={type="toggle",order=2,name="Show on World Map",desc="Show item-start quest sources on the World Map.",width="full",disabled=function() return not Settings():Get("showItemStartQuests") end,get=GetValue,set=SetValue},
-        showItemStartMinimap={type="toggle",order=3,name="Show on Minimap",desc="Show item-start quest sources on the minimap.",width="full",disabled=function() return not Settings():Get("showItemStartQuests") end,get=GetValue,set=SetValue},
-        itemStartDensity={type="select",order=4,name="Node Density",desc="Clustered groups nearby sources. Full Nodes shows every known source.",width="double",values={clustered="Clustered",full="Full Nodes"},disabled=function() return not Settings():Get("showItemStartQuests") end,get=GetValue,set=SetValue},
-      }},
+      item_start_header={type="header",order=9,name="Item-Start Quests"},
+      showItemStartQuests={type="toggle",order=9.1,name="Show Item-Start Quests",desc="Show quests started by dropped or looted items.",width="full",get=GetValue,set=SetValue},
+      showItemStartMap={type="toggle",order=9.2,name="Show on World Map",desc="Show item-start quest sources on the World Map.",width="full",disabled=function() return not Settings():Get("showItemStartQuests") end,get=GetValue,set=SetValue},
+      showItemStartMinimap={type="toggle",order=9.3,name="Show on Minimap",desc="Show item-start quest sources on the minimap.",width="normal",disabled=function() return not Settings():Get("showItemStartQuests") end,get=GetValue,set=SetValue},
+      itemStartDensity={type="select",order=9.4,name="",desc="Clustered groups nearby sources. Full Nodes shows every known source.",width="normal",values={clustered="Clustered",full="Full Nodes"},disabled=function() return not Settings():Get("showItemStartQuests") end,get=GetValue,set=SetValue},
 
-      quest_options={type="group",order=10,name="Quest Options",inline=true,args={
-        questLogShowLevels={type="toggle",order=1,name="Show Quest Levels",desc="Show quest levels in the Quest Log.",width="full",get=GetValue,set=SetValue},
-        showLowLevelQuests={type="toggle",order=2,name="Show Low-Level Quests",desc="Show quests below the normal green quest range.",get=GetValue,set=SetValue},
-        lowLevelQuestRange={type="range",order=2.1,name=function()
-          local value=tonumber(Settings():Get("lowLevelQuestRange")) or 35
-          if value>=35 then return "Levels Below: All" end
-          return "Levels Below: "..tostring(value)
-        end,desc="Limit how many levels below you are shown. All removes the limit.",width="normal",min=5,max=35,step=5,arg={questieHideEditBox=true,questieMaxLabel="All",questieCommitOnMouseUp=true,questieLiveLabelPrefix="Levels Below: "},disabled=function() return not Settings():Get("showLowLevelQuests") end,get=GetValue,set=SetValue},
-        showRepeatableQuests={type="toggle",order=3,name="Show Repeatable Quests",desc="Show available repeatable quests.",width="full",get=GetValue,set=SetValue},
-        showEventQuests={type="toggle",order=4,name="Show Event Quests",desc="Show available event quests.",width="full",get=GetValue,set=SetValue},
-        showPvPRelatedQuests={type="toggle",order=5,name="Show PVP Related Quests",desc="Show PvP quest icons on the map and minimap.",width="full",get=GetValue,set=SetValue},
-      }},
-      useDarkTheme={type="toggle",order=88,name="Enable Dark Theme",desc="Use Questie-Octo's dark Shagu-style options appearance. This only skins the Questie-Octo settings window.",width="full",get=GetValue,set=SetValue},
-      showMinimapButton={type="toggle",order=89,name="Show Minimap Button",desc="Show the Questie-Octo settings button. Minimap-button panels can manage it like a normal addon button. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue},
-      reset_header={type="header",order=90,name="Reset Questie Options"},
-      reset_text={type="description",order=91,name="Restore Questie-Octo options to their defaults. Quest data and completed-quest history are not deleted.",fontSize="medium"},
-      resetOptions={type="execute",order=92,name="Reset Options",desc="Restore option defaults.",func=function()
-        local beforeMinimapButton=Settings():Get("showMinimapButton") and true or false
-        Settings():Reset()
-        if beforeMinimapButton~=(Settings():Get("showMinimapButton") and true or false) then
-          QuestieOcto:Print("Minimap Button reset will apply after /reload.")
-        end
-        ClearSavedConfigPosition()
-        local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
-        if Registry and Registry.NotifyChange then Registry:NotifyChange(APP_NAME) end
-      end},
-      -- AceGUI 3's Vanilla ScrollFrame reports the exact layout height with no
-      -- dependable trailing viewport margin. The two General footer toggles can
-      -- otherwise leave the reset controls clipped behind the outer frame on
-      -- replacement UIs. A local blank footer keeps the whole General tab
-      -- reachable without modifying the shared AceGUI widget used by Spy/others.
-      general_bottom_padding={type="description",order=99,name=" \n \n \n ",width="full"},
+      quest_options_header={type="header",order=10,name="Quest Options"},
+      showLowLevelQuests={type="toggle",order=10.2,name="Show Low-Level Quests",desc="Show quests below the normal green quest range.",get=GetValue,set=SetValue},
+      lowLevelQuestRange={type="range",order=10.21,name=function()
+        local value=tonumber(Settings():Get("lowLevelQuestRange")) or 35
+        if value>=35 then return "Levels Below: All" end
+        return "Levels Below: "..tostring(value)
+      end,desc="Limit how many levels below you are shown. All removes the limit.",width="normal",min=5,max=35,step=5,arg={questieHideEditBox=true,questieMaxLabel="All",questieCommitOnMouseUp=true,questieLiveLabelPrefix="Levels Below: "},disabled=function() return not Settings():Get("showLowLevelQuests") end,get=GetValue,set=SetValue},
+      showRepeatableQuests={type="toggle",order=10.3,name="Show Repeatable Quests",desc="Show available repeatable quests.",width="full",get=GetValue,set=SetValue},
+      showEventQuests={type="toggle",order=10.4,name="Show Event Quests",desc="Show available event quests.",width="full",get=GetValue,set=SetValue},
+      showPvPRelatedQuests={type="toggle",order=10.5,name="Show PVP Related Quests",desc="Show PvP quest icons on the map and minimap.",width="full",get=GetValue,set=SetValue},
     },
   }
 end
@@ -378,7 +404,6 @@ local function CreateMapTab()
       map_options={type="header",order=1,name="Map Options"},
       alwaysGlowMap={type="toggle",order=1.1,name="Enable Map Icon Glow",desc="Add a colored glow behind objective icons.",width="full",get=GetValue,set=SetValue},
       questObjectiveColors={type="toggle",order=1.2,name="Enable Different Map Icon Color for Each Quest",desc="Use a different color for each quest's objective icons.",width="full",get=GetValue,set=SetValue},
-      notes_header={type="header",order=2,name="Map Note Options"},
       globalScale={type="range",order=2.2,name="Global Scale for Map Icons",desc="Adjust map icon size.",width="double",min=0.01,max=4,step=0.01,disabled=function() return not Settings():Get("enableMapIcons") end,get=GetValue,set=SetValue},
 
       miscellaneous_icons={type="header",order=20,name="Miscellaneous icons"},
@@ -405,7 +430,6 @@ local function CreateMinimapTab()
       options_header={type="header",order=1,name="Minimap Options"},
       alwaysGlowMinimap={type="toggle",order=1.1,name="Enable Minimap Icon Glow",desc="Add a colored glow behind objective icons.",width="full",disabled=function() return not EnabledMinimap() end,get=GetValue,set=SetValue},
       questMinimapObjectiveColors={type="toggle",order=1.2,name="Enable Different Minimap Icon Color for Each Quest",desc="Use a different color for each quest's objective icons.",width="full",disabled=function() return not EnabledMinimap() end,get=GetValue,set=SetValue},
-      notes_header={type="header",order=2,name="Minimap Note Options"},
       globalMiniMapScale={type="range",order=2.2,name="Global Scale for Minimap Icons",desc="Adjust minimap icon size.",width="double",min=0.01,max=4,step=0.01,disabled=function() return not EnabledMinimap() end,get=GetValue,set=SetValue},
 
       miscellaneous_icons={type="header",order=20,name="Miscellaneous icons"},
@@ -431,18 +455,19 @@ local function CreateTrackerTab()
     args={
       tracker_header={type="header",order=1,name="Tracker Options"},
       trackerEnabled={type="toggle",order=2,name="Enable Quest Tracker",desc="Show or hide the quest tracker.",width="full",get=GetValue,set=SetValue},
-      resetTracker={type="execute",order=2.5,name="Reset Tracker Position",desc="Return the tracker to its default position.",func=function()
+      resetTracker={type="execute",order=30.1,name="Reset Tracker Position",desc="Return the tracker to its default position.",func=function()
         if QuestieOcto.TrackerFrame and QuestieOcto.TrackerFrame.ResetLocation then QuestieOcto.TrackerFrame:ResetLocation() end
       end},
       trackerLocked={type="toggle",order=3,name="Lock Tracker",desc="Prevent the tracker from being moved.",width="full",get=GetValue,set=SetValue},
       trackerAutoTrack={type="toggle",order=4,name="Auto Track Quests",desc="Automatically track accepted quests.",width="full",get=GetValue,set=SetValue},
+      questLogShowLevels={type="toggle",order=4.4,name="Show Quest Levels in the Quest Log",desc="Show quest levels in the Quest Log.",width="full",get=GetValue,set=SetValue},
       trackerQuestLogCheckmarks={type="toggle",order=4.5,name="Show Quest Log Checkmarks",desc="Show the native checkmark beside quests tracked by Questie-Octo.",width="full",get=GetValue,set=SetValue},
       trackerShowCompleted={type="toggle",order=5,name="Show Completed Quests",desc="Keep completed quests visible until turned in.",width="full",get=GetValue,set=SetValue},
       trackerHideCompletedObjectives={type="toggle",order=6,name="Hide Completed Objectives",desc="Hide completed objective lines.",width="full",get=GetValue,set=SetValue},
-      sorting_header={type="header",order=10,name="Sorting"},
-      trackerSort={type="select",order=11,name="Sort Quests",desc="Choose how quests are sorted.",width="double",values={zone="Zone",proximity="Proximity",level="Level"},get=GetValue,set=SetValue},
+      trackerHideInCombat={type="toggle",order=7,name="Hide Tracker in Combat",desc="Hide the tracker while in combat.",width="full",get=GetValue,set=SetValue},
       appearance_header={type="header",order=20,name="Appearance"},
-      trackerHideInCombat={type="toggle",order=12,name="Hide Tracker in Combat",desc="Hide the tracker while in combat.",width="full",get=GetValue,set=SetValue},
+      trackerSortLabel={type="description",order=20.05,name="Sort Quests",fontSize="medium",width="normal"},
+      trackerSort={type="select",order=20.06,name="",desc="Choose how quests are sorted.",width="normal",values={zone="Zone",proximity="Proximity",level="Level"},get=GetValue,set=SetValue},
       trackerOutlineText={type="toggle",order=20.1,name="Outline",desc="Add an outline to tracker text.",width="full",get=GetValue,set=SetValue},
       trackerThickOutlineText={type="toggle",order=20.2,name="Thick Outline",desc="Add a thicker outline to tracker text.",width="full",get=GetValue,set=SetValue},
       trackerFontSize={type="range",order=21,name="Font Size",desc="Adjust tracker text size.",width="double",min=8,max=18,step=1,get=GetValue,set=SetValue},
@@ -471,6 +496,36 @@ local function CreateTooltipTab()
 end
 
 
+local function CreateQuestTab()
+  local tab=QuestieOcto.QuestResearch:GetOptionsTab()
+  tab.name="Other"
+  tab.args=tab.args or {}
+
+  tab.args.automation_header={type="header",order=1,name="Quest Automation"}
+  tab.args.autoAcceptQuests={type="toggle",order=2,name="Auto Accept Quests",desc="Automatically accept eligible quests from NPCs. Hold Shift while talking to an NPC to keep that conversation manual.",width="full",get=GetValue,set=SetValue}
+  tab.args.autoTurnInQuests={type="toggle",order=3,name="Auto Turn In Quests",desc="Automatically advance and turn in completed quests when no manual reward choice or money confirmation is required. Hold Shift to keep that NPC conversation manual.",width="full",get=GetValue,set=SetValue}
+  tab.args.autoAcceptGrayQuests={type="toggle",order=4,name="Auto Accept Gray Quests",desc="Allow Auto Accept Quests to accept gray/trivial quests.",width="full",disabled=function() return not Settings():Get("autoAcceptQuests") end,get=GetValue,set=SetValue}
+  tab.args.autoIncludeRepeatableQuests={type="toggle",order=5,name="Include Repeatable Quests",desc="Allow quest automation to accept and turn in repeatable quests. The same repeatable quest is processed at most once per NPC conversation.",width="full",disabled=function() return not Settings():Get("autoAcceptQuests") and not Settings():Get("autoTurnInQuests") end,get=GetValue,set=SetValue}
+
+  tab.args.interface_header={type="header",order=9,name="Interface"}
+  tab.args.useDarkTheme={type="toggle",order=10,name="Enable Dark Theme",desc="Use Questie-Octo's dark Shagu-style options appearance. This only skins the Questie-Octo settings window.",width="full",get=GetValue,set=SetValue}
+  tab.args.showMinimapButton={type="toggle",order=11,name="Show Minimap Button",desc="Show the Questie-Octo settings button. Minimap-button panels can manage it like a normal addon button. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue}
+  tab.args.reset_header={type="header",order=20,name="Reset Questie Options"}
+  tab.args.reset_text={type="description",order=21,name="Quest data and completed-quest history are not deleted.",fontSize="medium"}
+  tab.args.resetOptions={type="execute",order=22,name="Reset Options",desc="Restore option defaults.",func=function()
+    local beforeMinimapButton=Settings():Get("showMinimapButton") and true or false
+    Settings():Reset()
+    if beforeMinimapButton~=(Settings():Get("showMinimapButton") and true or false) then
+      QuestieOcto:Print("Minimap Button reset will apply after /reload.")
+    end
+    ClearSavedConfigPosition()
+    local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
+    if Registry and Registry.NotifyChange then Registry:NotifyChange(APP_NAME) end
+  end}
+
+  return tab
+end
+
 local function CreateOptionsTable()
   return {
     name="Questie Options",
@@ -482,7 +537,7 @@ local function CreateOptionsTable()
       minimap_tab=CreateMinimapTab(),
       tracker_tab=CreateTrackerTab(),
       tooltip_tab=CreateTooltipTab(),
-      quests_tab=QuestieOcto.QuestResearch:GetOptionsTab(),
+      quests_tab=CreateQuestTab(),
     },
   }
 end
@@ -544,6 +599,7 @@ function O:Initialize()
 
   configFrame:Hide()
   self.configFrame=configFrame
+  CreateQuestBrowserFooterButton(configFrame)
 
   -- Questie 5.2.3/6.0.0/3.3.5/7/8 register the actual standalone
   -- AceGUI config object in UISpecialFrames through a global name. The widget
@@ -603,6 +659,7 @@ function O:Show()
   -- Questie 3.3.5 refreshes the existing standalone frame through Open().
   Dialog:Open(APP_NAME,self.configFrame)
   RecenterConfigFrame(self.configFrame)
+  if self.configFrame.SetStatusText then self.configFrame:SetStatusText(nil) end
   self:ApplyDarkTheme()
   self.stats.opens=self.stats.opens+1
 end

@@ -1,3 +1,132 @@
+1.0.40 - README BASELINE UPDATE
+- Replaced README.md with the current user-approved README baseline.
+- No addon behavior changed in this version.
+
+1.0.39 - README REFRESH
+- Updated README instructions to match the current Other > Interface location for Dark Theme and Show Minimap Button.
+- Added simple Quest Browser and Quest Automation guidance, including the four automation toggles and Shift manual bypass.
+- Documented that multiple reward choices, money-cost turn-ins, and quest accept confirmations remain manual.
+
+1.0.38 - QUEST AUTOMATION QUEST-GREETING FIX
+- Fixed quest automation on quest-only NPCs that use QUEST_GREETING instead of the GossipFrame.
+- Native QuestFrame rows now use SelectAvailableQuest(index) / SelectActiveQuest(index) instead of being incorrectly routed through C_GossipInfo's gossip selectors.
+- Added a safe exact-title/NPC-starter fallback to resolve quest IDs for legacy quest-greeting offers while preserving gray/repeatable automation gates.
+- Added the matching native gossip fallback when ClassicAPI's modern gossip table yields no selectable quest.
+- Kept Shift bypass, one-action-at-a-time behavior, manual multi-reward selection, money-cost protection, and manual QUEST_ACCEPT_CONFIRM unchanged.
+
+1.0.37 - QUEST AUTOMATION
+- Added a Quest Automation section to the Other tab with four opt-in, character-local toggles: Auto Accept Quests, Auto Turn In Quests, Auto Accept Gray Quests, and Include Repeatable Quests. All four default OFF.
+- Added an event-driven automation flow modeled on the Questie 6 interaction pattern but implemented independently for Octo/ClassicAPI quest-ID gossip selection.
+- Completed turn-ins are prioritized before new accepts and only one quest action is started at a time.
+- Holding Shift makes the current NPC conversation manual. QUEST_ACCEPT_CONFIRM remains manual.
+- Multiple selectable rewards and money-cost turn-ins remain manual. Repeatable quests are excluded unless explicitly enabled and the same repeatable quest is processed at most once per NPC conversation.
+
+1.0.36 - COMPACT QUEST BROWSER FOOTER BUTTON
+- Kept Quest Browser in the accepted bottom-left footer position beside Close.
+- Changed it from a footer-filling button to a compact 170-pixel button, matching the bottom-left action-button layout shown by ShaguTweaks' Defaults button.
+- Preserved the existing validation/status-text fallback behavior.
+
+1.0.35 - OTHER INTERFACE HEADER / LEVELS-BELOW LABEL
+- Added an Interface section header above Enable Dark Theme and Show Minimap Button in the Other tab.
+- Restored the low-level quest slider label and live drag label to "Levels Below: X" / "Levels Below: All".
+
+1.0.34 - COMPACT LOW-LEVEL LABEL / NOTE HEADER CLEANUP
+- Shortened the low-level quest range label from "Levels Below: X" to "Below: X" while keeping the current value visible.
+- Removed the Map Note Options header from the Map tab.
+- Removed the Minimap Note Options header from the Minimap tab.
+
+1.0.33 - QUEST BROWSER FOOTER BUTTON ARTWORK
+- Kept the accepted Quest Browser footer placement and width beside Close.
+- Switched the footer button from UIPanelButtonTemplate to UIPanelButtonTemplate2 so its left/right caps stay correctly proportioned at full footer width instead of stretching the complete button texture.
+- Preserved the existing validation/status-message fallback behavior.
+
+1.0.32 - QUEST BROWSER OPTIONS FOOTER
+- Removed Quest Browser from the General tab content.
+- Added a dedicated Quest Browser button in the bottom-left options footer, using the area beside Close that AceGUI normally reserves for status text.
+- Preserved AceGUI validation status behavior: a real status/error message can temporarily replace the footer button, and normal option interaction restores it.
+
+1.0.31 - QUEST BROWSER BOTTOM / OTHER TAB
+- Moved the full-width Quest Browser button to the bottom of General -> Quest Options, directly below Show PVP Related Quests.
+- Renamed the far-right Quests options tab to Other.
+
+1.0.30 - QUEST LOG OPTIONS PLACEMENT / RESET TEXT
+- Renamed "Show Quest Levels" to "Show Quest Levels in the Quest Log" and moved it from General > Quest Options to the Tracker tab directly above Show Quest Log Checkmarks.
+- Shortened the Reset Questie Options explanatory text to "Quest data and completed-quest history are not deleted."
+
+1.0.29 - TRACKER RESET BUTTON REORDER
+- Moved Reset Tracker Position below the manual tracker hint in the Tracker tab.
+- Kept the tracker controls otherwise unchanged.
+
+1.0.28 - QUEST BROWSER FULL-WIDTH ROW
+- Changed the General-tab Quest Browser button to use the full available row width.
+- Kept the button left-aligned in the row while letting the button span the full row width.
+
+1.0.27 - GENERAL TAB QUEST LAYOUT CLEANUP
+- Removed the "Quest Icon Types" section title.
+- Moved "Show Quests" into the World Map Visibility section as its first toggle.
+- Restored Quest Browser to a normal left-aligned standalone button above the World Map Visibility section.
+- Removed the temporary Quest Browser spacer used by 1.0.24-1.0.26.
+
+1.0.26 - QUEST BROWSER TOP-ROW SPACER TUNING
+- Reduced the General-tab spacer between Show Quests and Quest Browser from normal width to half width.
+- This keeps the button on the same top row while pushing it right, instead of wrapping it onto the line below on narrower option-window widths.
+
+1.0.25 - PACKAGE ROOT CORRECTION
+- Corrected the release ZIP so the addon directory is exactly "Questie-Octo".
+- Corrected the GitHub patch ZIP so changed files preserve their repository paths (UI/Options.lua and Docs/DEVELOPMENT HISTORY.txt).
+- No Quest Browser layout behavior changed from 1.0.24.
+
+1.0.24 - QUEST BROWSER RIGHT-SIDE PLACEMENT
+- Added a spacer in the General tab top row so the Quest Browser button sits on the right side rather than beside Show Quests.
+- Kept Show Quests on the left and left the rest of the General tab layout unchanged.
+
+1.0.23 - QUEST BROWSER GENERAL-TAB MOVE
+- Renamed the Quest Browser options button to "Quest Browser".
+- Moved Quest Browser to the right side of Show Quests at the top of the General tab.
+- Removed the Quests-tab "Quests" section header and the browser description text; the Quests tab now contains only the Dark Theme, Minimap Button, and reset controls added there previously.
+
+1.0.22 - QUEST TAB SETTINGS FOOTER CLEANUP
+- Removed the redundant Icon Settings header so Show Quests is the first General option.
+- Moved Enable Dark Theme and Show Minimap Button from General to the Quests tab beneath the quest browser controls.
+- Moved the full Reset Questie Options section to the Quests tab.
+- Removed the General-only bottom padding that was only needed for the old footer controls.
+- No option defaults or behaviors changed.
+
+1.0.21 - QUEST OPTIONS / TRACKER SORT LAYOUT CLEANUP
+- Removed the inline Quest Options box on the General tab and restored Quest Options as a real section header.
+- Kept the Show Low-Level Quests slider row layout while presenting the Quest Options entries directly under the header.
+- Simplified the Tracker tab Sort Quests row presentation while keeping it above Outline in the Appearance section.
+
+1.0.20 - ITEM-START HEADER AND NODE DENSITY ALIGNMENT
+- Removed the Item-Start Quests inline subgroup so its controls use the same full options-page width as Objective.
+- Item-Start Quests is now a normal section header like Quest Icon Types.
+- Restored the normal-width Clustered/Full Nodes selectors for Objective and Item-Start sources.
+- Objective and Show on Minimap now place their selectors in the same right-side column.
+
+1.0.19 - TRACKER SORTING LAYOUT CLEANUP
+- Tracker Options now places Hide Tracker in Combat directly below Hide Completed Objectives.
+- Removed the separate Sorting header from the Tracker tab.
+- Moved Sort Quests into the Appearance section and placed its selector on the right side of the row above Outline.
+- Objective and Item-Start Clustered/Full Nodes selectors now share aligned half-width right-side columns for a cleaner layout.
+
+1.0.18 - COMPACT NODE DENSITY OPTIONS LAYOUT
+- General options layout only: removed the separate Objective Nodes box and placed the Clustered/Full Nodes selector to the right of a simple Objective label.
+- Item-Start Quests now places its Clustered/Full Nodes selector on the same row as Show on Minimap; the separate Node Density row was removed.
+- No Clustered/Full Nodes behavior, defaults, map preparation, quest data, or gameplay semantics changed.
+
+1.0.17 - CLEAN RELEASE AFTER DATABASE LOAD DIAGNOSTIC
+- Removed the temporary 1.0.16 DBDIAG stage markers, automatic startup diagnostic line, and /qo dbdiag command after the affected player confirmed a truly clean reinstall loads correctly.
+- Keeps the private compiled/pruned runtime database, lazy availability eligibility, O(1) scheduler queue, standard minimap-button lifecycle, tracker fixes, and all other confirmed 1.0.15 behavior unchanged.
+- The 1.0.16 diagnostic history remains documented below for maintenance context.
+
+1.0.16 - COMPILED DATABASE LOAD DIAGNOSTIC
+- Diagnostic-only hardening for the player-specific compiled runtime database load failure.
+- Adds fixed one-shot stage markers for QuestieOcto.lua, Data/runtime/init.lua, Data/runtime/finalize.lua, and Database/LegacyPFDB.lua.
+- Prints one compact DBDIAG line automatically at PLAYER_ENTERING_WORLD.
+- If the compiled root is unavailable, prints two additional DBDIAG lines showing whether init/finalize ran, whether a root was created, and whether LegacyPFDB captured the same root.
+- Adds /qo dbdiag for the same fixed diagnostic on demand.
+- No polling, frame-tree traversal, database mutation, quest-data changes, or gameplay behavior changes.
+
 1.0.15 - QUEST BROWSER WORDING
 
 - Simplified the Quest Options browser description to: "Browse the quest database in a dedicated lightweight window."

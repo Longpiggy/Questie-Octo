@@ -116,7 +116,15 @@ S.defaults={
   -- button is created only when enabled at login; disabling it therefore
   -- removes the frame entirely after /reload instead of merely hiding it.
   useDarkTheme=true,
-  showMinimapButton=true
+  showMinimapButton=true,
+
+  -- Quest automation is character-local and opt-in. These conservative
+  -- defaults mirror Questie 6's disabled-by-default automation posture while
+  -- keeping repeatable quests and gray/trivial acceptance independently gated.
+  autoAcceptQuests=false,
+  autoTurnInQuests=false,
+  autoAcceptGrayQuests=false,
+  autoIncludeRepeatableQuests=false
 }
 
 local function Clamp(value,minValue,maxValue)
@@ -128,7 +136,8 @@ local function Clamp(value,minValue,maxValue)
 end
 
 local function IsCharacterOption(key)
-  return key=="showLowLevelQuests" or key=="lowLevelQuestRange" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests"
+  return key=="showLowLevelQuests" or key=="lowLevelQuestRange" or key=="showEventQuests" or key=="showRepeatableQuests" or key=="showPvPRelatedQuests" or
+    key=="autoAcceptQuests" or key=="autoTurnInQuests" or key=="autoAcceptGrayQuests" or key=="autoIncludeRepeatableQuests"
 end
 
 -- Vanilla/Turtle can restore SavedVariables after addon files have executed.
@@ -246,7 +255,8 @@ function S:Set(key,value)
       key=="trackerEnabled" or key=="trackerLocked" or key=="trackerAutoTrack" or
       key=="trackerQuestLogCheckmarks" or key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
       key=="trackerOutlineText" or key=="trackerThickOutlineText" or
-      key=="useDarkTheme" or key=="showMinimapButton" then
+      key=="useDarkTheme" or key=="showMinimapButton" or
+      key=="autoAcceptQuests" or key=="autoTurnInQuests" or key=="autoAcceptGrayQuests" or key=="autoIncludeRepeatableQuests" then
     value=value and true or false
   elseif key=="lowLevelQuestRange" then
     value=tonumber(value)
@@ -299,6 +309,8 @@ function S:Set(key,value)
     end
     return true
   elseif key=="showMinimapButton" then
+    return true
+  elseif key=="autoAcceptQuests" or key=="autoTurnInQuests" or key=="autoAcceptGrayQuests" or key=="autoIncludeRepeatableQuests" then
     return true
   end
 
