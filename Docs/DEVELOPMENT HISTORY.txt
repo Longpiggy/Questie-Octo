@@ -1452,3 +1452,7 @@ static timer rather than displaying "0s". The supplied current Tortoise server
 source retains the creature templates but has no ordinary static creature rows
 for those three IDs, so no replacement respawn value is invented.
 
+1.0.87 - Centered tooltip tilde markers
+- Rare respawn text now uses the centered mathematical tilde (∼) instead of the raised ASCII tilde (~).
+- Item-start drop-rate ranges use the same centered marker (for example, 0.02%∼0.08%).
+- Formatting, respawn values, and drop-rate values are unchanged; this is presentation-only.

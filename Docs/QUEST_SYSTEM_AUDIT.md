@@ -724,3 +724,6 @@ pfQuest Turtle data records `0` for the nearby Silithus rare-elites Xil'xix
 server source contains their creature templates but no ordinary static creature
 spawn rows for those IDs, so Questie-Octo must not fabricate a respawn timer.
 
+### 1.0.87 — centered tooltip tilde markers
+
+User-facing tooltip tildes use the centered `∼` glyph rather than the raised ASCII `~`. This applies to rare/static respawn approximation text and item-start drop-rate ranges such as `0.02%∼0.08%`. No respawn data, timing thresholds, drop-rate data, or item-start rules changed. Seconds remain visible only below five minutes.
