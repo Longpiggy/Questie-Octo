@@ -45,6 +45,7 @@ local function CharacterDB()
   local db=QuestieOctoDB.tracker
   db.window=db.window or {}
   if db.expanded==nil then db.expanded=true end
+  if db.topRow==nil then db.topRow=1 end
   return db
 end
 
@@ -111,6 +112,24 @@ function T:RestoreGeometry()
   if x==nil then x=-30 end
   if y==nil then y=-180 end
   self.frame:SetPoint("TOPRIGHT",UIParent,"TOPRIGHT",x,y)
+end
+
+-- Tracker scrolling is row-based rather than pixel-based on Vanilla. Persist the
+-- first visible row per character so /reload and login restore the same page.
+-- Keeping this state beside the existing tracker geometry/expanded state also
+-- avoids a second SavedVariables path that could disagree with the renderer.
+function T:SaveScrollPosition()
+  local db=CharacterDB()
+  local top=tonumber(self.topRow) or 1
+  if top<1 then top=1 end
+  db.topRow=math.floor(top+0.5)
+end
+
+function T:RestoreScrollPosition()
+  local db=CharacterDB()
+  local top=tonumber(db.topRow) or 1
+  if top<1 then top=1 end
+  self.topRow=math.floor(top+0.5)
 end
 
 local function SetFont(fs,size,r,g,b)
@@ -234,10 +253,10 @@ function T:GetVisibleRowRange()
 end
 
 function T:ClampTopRow()
-  if self.rowCount<=0 then
-    self.topRow=1
-    return
-  end
+  -- Do not destroy a restored scroll position during the brief startup window
+  -- where the tracker can render before the quest cache has populated. Once
+  -- rows exist, clamp the saved row normally against the current content.
+  if self.rowCount<=0 then return end
 
   local top=tonumber(self.topRow) or 1
   if top<1 then top=1 end
@@ -285,6 +304,7 @@ function T:LayoutVisibleRows()
   self.content:SetWidth(contentWidth)
   self.content:SetHeight(math.max(1,y))
   if self.scroll.SetVerticalScroll then self.scroll:SetVerticalScroll(0) end
+  self:SaveScrollPosition()
 end
 
 function T:ScrollBy(delta)
@@ -359,7 +379,9 @@ function T:ClearRows()
     row.textIndent=nil
   end
   self.rowCount=0
-  self.topRow=1
+  -- Preserve topRow across presentation rebuilds. LayoutVisibleRows clamps it
+  -- once the refreshed rows exist, so ordinary quest updates and /reload do
+  -- not bounce a player back to the top of the tracker.
   self.timerRows={}
 end
 
@@ -977,6 +999,7 @@ function T:CreateFrame()
   end
 
   self:RestoreGeometry()
+  self:RestoreScrollPosition()
   self:ApplyLockState()
   self:ApplyBackgroundOpacity()
   self:ApplyNativeTrackerVisibility()

@@ -1625,3 +1625,35 @@ wording, respawn values, drop rates, or thresholds changed.
   round minimap handling, pfUI/DragonflightUI collector avoidance, and `/qo`
   fallback are unchanged.
 - No quest/map/drop-rate/gameplay data changed.
+
+
+1.0.99 - QUEST LOG COLLAPSE STATE
+-----------------------------------
+- Fixed a Vanilla/Turtle quest-log presentation edge case where collapsing a
+  zone header removes its child rows from GetQuestLogTitle(). Questie-Octo now
+  preserves a previously cached quest only when that quest belonged to the
+  currently collapsed header and ClassicAPI C_QuestLog.IsOnQuest still confirms
+  it is active. Collapsing a zone therefore no longer makes available `!`
+  markers/tooltips reappear for already accepted quests.
+- Collapsed Quest Log header choices are now remembered per character and
+  restored after reload. Questie-Octo observes the native header state rather
+  than replacing Blizzard's Quest Log UI; explicit expansions remove the saved
+  collapse preference, Collapse All/Expand All are naturally observed, and one
+  saved header is restored per refresh because collapsing changes later log
+  indices.
+- The restore occurs only after Questie-Octo publishes its active quest cache,
+  preserving the current Octo 25-slot polling and native abandon-selection
+  behavior. No quest database, objective, map-node, tracker presentation, or
+  availability rules changed.
+
+1.0.2 - TRACKER SCROLL POSITION PERSISTENCE (renumbered public release from development 1.0.100)
+-------------------------------------------------
+- The custom tracker now remembers its row-based scroll position per character
+  and restores the same tracker page after login or `/reload`.
+- Tracker presentation rebuilds no longer reset the visible page to row 1. The
+  saved row is clamped safely when tracked content becomes shorter or changes.
+- A transient empty tracker during startup does not erase the saved position;
+  the position is validated only after actual tracker rows are available.
+- This extends the 1.0.99 per-character Quest Log collapse persistence without
+  changing quest truth, sorting, visible-row limits, or tracker geometry.
+

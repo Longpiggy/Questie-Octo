@@ -13,7 +13,62 @@ QL.active={}
 QL.snapshot=nil
 QL.mapSnapshot=nil
 QL.mapState=nil
+QL.lastHeaderStates={}
 QL.stats={ entries=0, quests=0, resolved=0, refreshes=0, acceptedFastRefreshes=0, acceptedEvents=0, acceptedResolved=0, acceptedFromIndex=0, acceptedHintsUsed=0, acceptedPrimes=0, acceptedPolls=0, lastAcceptedQuestID=0, removedEvents=0, removedResolved=0, removedFromIndex=0, lastRemovedQuestID=0, completeRaw=0, completeObjectives=0, completeNoObjectives=0, failed=0, mapChanges=0, progressOnlyChanges=0 }
+
+-- Native Vanilla/Turtle quest-log headers are presentation state. Collapsing a
+-- header removes its child quest rows from GetQuestLogTitle(), even though those
+-- quests are still active. Keep the user's collapsed-header preference per
+-- character and restore it without expanding/collapsing every header just to
+-- scan the log. Header titles are the only stable identity exposed by 1.12.
+local function CollapsedHeaderDB()
+  QuestieOctoDB=QuestieOctoDB or {}
+  QuestieOctoDB.questLogCollapsedHeaders=QuestieOctoDB.questLogCollapsedHeaders or {}
+  return QuestieOctoDB.questLogCollapsedHeaders
+end
+
+local function SyncCollapsedHeaders(headerStates)
+  local saved=CollapsedHeaderDB()
+  local previous=QL.lastHeaderStates or {}
+  local collapseIndex=nil
+
+  for title,state in pairs(headerStates or {}) do
+    local collapsed=state and state.collapsed and true or false
+    local wasCollapsed=previous[title]
+
+    if collapsed then
+      -- A newly observed collapsed header is a player/native UI choice.
+      saved[title]=true
+    elseif saved[title] then
+      if wasCollapsed==true then
+        -- The header was collapsed on the previous pass and is expanded now:
+        -- remember the player's explicit expansion instead of fighting it.
+        saved[title]=nil
+      elseif not collapseIndex and state and tonumber(state.index) then
+        -- Saved from an earlier session (or from a header that disappeared and
+        -- returned). Restore one header per pass because collapsing it changes
+        -- all later visible quest-log indices.
+        collapseIndex=tonumber(state.index)
+      end
+    end
+  end
+
+  -- Forget only the in-memory observation for headers that are not currently
+  -- present. Their saved preference remains so a later reappearing zone can be
+  -- restored safely.
+  local nextStates={}
+  for title,state in pairs(headerStates or {}) do
+    nextStates[title]=state and state.collapsed and true or false
+  end
+  QL.lastHeaderStates=nextStates
+
+  if collapseIndex and type(CollapseQuestHeader)=="function" then
+    CollapseQuestHeader(collapseIndex)
+    -- Native clients normally emit QUEST_LOG_UPDATE here. Schedule our own
+    -- keyed pass as a safety net for compatibility layers that do not.
+    QL:Schedule(0.01,true)
+  end
+end
 
 local function ParseObjectiveProgress(text)
   if not text then return nil,nil end
@@ -381,9 +436,13 @@ function QL:Refresh(fastRefresh)
   self.stats.completeNoObjectives=0
   self.stats.failed=0
 
+  local previousActive=QL.active or {}
+  local previousMapState=QL.mapState or {}
   local nextActive={}
   local snapshotParts={}
   local nextMapState={}
+  local headerStates={}
+  local collapsedHeaders={}
   local pos=1
   local currentHeader="Other"
   local nativeResolved={}
@@ -401,9 +460,12 @@ function QL:Refresh(fastRefresh)
       local level=info and info.level
       local tag=info and info.tag
       local isHeader=info and info.isHeader
+      local isCollapsed=info and info.isCollapsed
       local isComplete=info and info.isComplete
       if title and isHeader then
         currentHeader=title
+        headerStates[title]={ index=index, collapsed=isCollapsed and true or false }
+        if isCollapsed then collapsedHeaders[title]=true end
       elseif title then
         local nativeTitle=title
         local nativeQuestID=(info and info.questID) or QuestieOcto.API:GetQuestIDForLogIndex(index)
@@ -503,7 +565,13 @@ function QL:Refresh(fastRefresh)
             complete=complete,
             failed=failed,
             objectives=objectives,
-            objectiveSource=objectiveSource
+            objectiveSource=objectiveSource,
+            -- Keep the last native snapshots with the cached state. When a
+            -- header is collapsed its child rows are no longer readable, so
+            -- these let a hidden-but-still-active quest retain identical map
+            -- semantics until the header is expanded again.
+            _objectiveSnapshot=objectiveSnapshot,
+            _objectiveMapSnapshot=objectiveMapSnapshot
           }
           -- Separate map semantics from live progress text. A simple 3/10 ->
           -- 4/10 update must refresh the Tracker, but it must not reconstruct
@@ -521,10 +589,42 @@ function QL:Refresh(fastRefresh)
       return
     end
 
+    -- Collapsed native headers remove their child quest rows from the visible
+    -- quest-log enumeration. Do not interpret that presentation change as an
+    -- abandon. Preserve only quests that were previously cached under a header
+    -- that is currently collapsed AND that ClassicAPI still confirms active.
+    -- Real abandon/turn-in paths therefore continue to disappear immediately.
+    local previousKeys=SortedNumericKeys(previousActive)
+    for keyIndex=1,table.getn(previousKeys) do
+      local questID=previousKeys[keyIndex]
+      local state=previousActive[questID]
+      if state and not nextActive[questID] and collapsedHeaders[state.zoneGroup]
+        and QuestieOcto.API and QuestieOcto.API.IsOnQuest and QuestieOcto.API:IsOnQuest(questID) then
+        nextActive[questID]=state
+        if previousMapState[questID]~=nil then
+          nextMapState[questID]=previousMapState[questID]
+        else
+          nextMapState[questID]=tostring(state.status or 0).."\031"..tostring(state._objectiveMapSnapshot or "")
+        end
+        nativeResolved[questID]=true
+        QL.stats.resolved=QL.stats.resolved+1
+
+        -- Keep the cached quest represented in the general snapshot as well so
+        -- repeated refreshes while the header stays collapsed are stable. A
+        -- one-time QUEST_LOG_CHANGED when the presentation is toggled is fine;
+        -- active/eligibility/map membership remains unchanged.
+        table.insert(snapshotParts,tostring(questID))
+        table.insert(snapshotParts,tostring(state.title or ""))
+        table.insert(snapshotParts,tostring(state.level or 0))
+        table.insert(snapshotParts,tostring(state.tag or ""))
+        table.insert(snapshotParts,tostring(state.status or 0))
+        table.insert(snapshotParts,tostring(state._objectiveSnapshot or ""))
+      end
+    end
+
     local nextSnapshot=table.concat(snapshotParts,"\031")
     local changed=(nextSnapshot~=QL.snapshot)
 
-    local previousActive=QL.active or {}
     local activeSetChangedQuests={}
     local activeSetChanged=false
     for questID in pairs(nextActive) do
@@ -556,7 +656,6 @@ function QL:Refresh(fastRefresh)
     end
 
     local firstMapPublication=(QL.mapState==nil)
-    local previousMapState=QL.mapState or {}
     local mapChangedQuests={}
     local mapChanged=firstMapPublication and true or false
     for questID,state in pairs(nextMapState) do
@@ -605,6 +704,11 @@ function QL:Refresh(fastRefresh)
         QL.acceptedQuestID=nil
       end
     end
+
+    -- Persist explicit native collapse/expand choices and restore saved ones.
+    -- This runs only after the authoritative active cache has been published,
+    -- so restoring a collapse can never make its quests vanish from Questie.
+    SyncCollapsedHeaders(headerStates)
 
     if QL.pending then
       local fast=QL.fastPending and true or false
