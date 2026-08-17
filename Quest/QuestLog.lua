@@ -14,17 +14,172 @@ QL.snapshot=nil
 QL.mapSnapshot=nil
 QL.mapState=nil
 QL.lastHeaderStates={}
+QL.collapsedQuestIDs={}
+QL.headerHooksInstalled=false
 QL.stats={ entries=0, quests=0, resolved=0, refreshes=0, acceptedFastRefreshes=0, acceptedEvents=0, acceptedResolved=0, acceptedFromIndex=0, acceptedHintsUsed=0, acceptedPrimes=0, acceptedPolls=0, lastAcceptedQuestID=0, removedEvents=0, removedResolved=0, removedFromIndex=0, lastRemovedQuestID=0, completeRaw=0, completeObjectives=0, completeNoObjectives=0, failed=0, mapChanges=0, progressOnlyChanges=0 }
 
 -- Native Vanilla/Turtle quest-log headers are presentation state. Collapsing a
 -- header removes its child quest rows from GetQuestLogTitle(), even though those
--- quests are still active. Keep the user's collapsed-header preference per
--- character and restore it without expanding/collapsing every header just to
--- scan the log. Header titles are the only stable identity exposed by 1.12.
+-- quests are still active. Keep two deliberately separate states:
+--   * questLogCollapsedHeaders = saved per-character restore preference.
+--   * collapsedQuestIDs = what is actually hidden by a collapsed header NOW.
+-- The saved preference must never by itself hide a tracker quest; it is only
+-- consumed by SyncCollapsedHeaders() when restoring the native Quest Log.
 local function CollapsedHeaderDB()
   QuestieOctoDB=QuestieOctoDB or {}
   QuestieOctoDB.questLogCollapsedHeaders=QuestieOctoDB.questLogCollapsedHeaders or {}
   return QuestieOctoDB.questLogCollapsedHeaders
+end
+
+local function HeaderTitleAt(index)
+  index=tonumber(index)
+  if not index or index<=0 or not QuestieOcto.API or not QuestieOcto.API.GetQuestLogInfo then return nil end
+  local info=QuestieOcto.API:GetQuestLogInfo(index)
+  if info and info.isHeader and info.title then return info.title end
+  return nil
+end
+
+local function QuestIDAt(index,info)
+  local questID=info and tonumber(info.questID) or nil
+  if not questID and QuestieOcto.API and QuestieOcto.API.GetQuestIDForLogIndex then
+    questID=tonumber(QuestieOcto.API:GetQuestIDForLogIndex(index))
+  end
+  if questID and questID>0 then return questID end
+
+  -- First-accept ClassicAPI data can lag briefly. Reuse an already cached ID at
+  -- this visible index rather than losing the collapse membership transition.
+  local title=info and info.title or nil
+  for cachedID,state in pairs(QL.active or {}) do
+    if state and tonumber(state.logIndex)==tonumber(index)
+      and (not title or not state.title or state.title==title) then
+      return tonumber(cachedID)
+    end
+  end
+  return nil
+end
+
+local function SetQuestCollapsed(questID,headerTitle,collapsed)
+  questID=tonumber(questID)
+  if not questID then return false end
+  local changed=false
+
+  if collapsed then
+    if QL.collapsedQuestIDs[questID]~=headerTitle then
+      QL.collapsedQuestIDs[questID]=headerTitle or true
+      changed=true
+    end
+  elseif QL.collapsedQuestIDs[questID]~=nil then
+    QL.collapsedQuestIDs[questID]=nil
+    changed=true
+  end
+
+  local state=QL.active and QL.active[questID]
+  if state and (state.collapsed and true or false)~=(collapsed and true or false) then
+    state.collapsed=collapsed and true or false
+    changed=true
+  end
+  return changed
+end
+
+local function PublishCollapseStateChanged(changed)
+  if changed then QuestieOcto:SendMessage("QUEST_LOG_COLLAPSE_STATE_CHANGED") end
+end
+
+function QL:IsQuestCollapsed(questID)
+  return self.collapsedQuestIDs[tonumber(questID)] and true or false
+end
+
+local function CaptureCollapsedHeader(index)
+  index=tonumber(index) or 0
+  local entries=GetNumQuestLogEntries() or 0
+  local changed=false
+
+  if index==0 then
+    local currentHeader=nil
+    for i=1,entries do
+      local info=QuestieOcto.API:GetQuestLogInfo(i)
+      if info and info.title and info.isHeader then
+        currentHeader=info.title
+      elseif info and info.title and currentHeader then
+        local questID=QuestIDAt(i,info)
+        if questID and SetQuestCollapsed(questID,currentHeader,true) then changed=true end
+      end
+    end
+  else
+    local title=HeaderTitleAt(index)
+    if not title then return end
+    -- Capture membership BEFORE native CollapseQuestHeader removes the rows.
+    for i=index+1,entries do
+      local info=QuestieOcto.API:GetQuestLogInfo(i)
+      if not info or not info.title or info.isHeader then break end
+      local questID=QuestIDAt(i,info)
+      if questID and SetQuestCollapsed(questID,title,true) then changed=true end
+    end
+  end
+
+  PublishCollapseStateChanged(changed)
+end
+
+local function ClearExpandedHeader(index,knownTitle)
+  index=tonumber(index) or 0
+  local changed=false
+
+  if index==0 then
+    local ids={}
+    for questID in pairs(QL.collapsedQuestIDs or {}) do table.insert(ids,questID) end
+    for i=1,table.getn(ids) do
+      if SetQuestCollapsed(ids[i],nil,false) then changed=true end
+    end
+  else
+    local title=knownTitle or HeaderTitleAt(index)
+    if not title then return end
+    local ids={}
+    for questID,headerTitle in pairs(QL.collapsedQuestIDs or {}) do
+      if headerTitle==title then table.insert(ids,questID) end
+    end
+    for i=1,table.getn(ids) do
+      if SetQuestCollapsed(ids[i],nil,false) then changed=true end
+    end
+    -- Safety for a cached quest whose runtime table drifted from the ID set.
+    for questID,state in pairs(QL.active or {}) do
+      if state and state.zoneGroup==title and state.collapsed then
+        if SetQuestCollapsed(questID,nil,false) then changed=true end
+      end
+    end
+  end
+
+  PublishCollapseStateChanged(changed)
+end
+
+function QL:InstallHeaderHooks()
+  if self.headerHooksInstalled then return end
+  if type(CollapseQuestHeader)~="function" or type(ExpandQuestHeader)~="function" then return end
+
+  local originalCollapse=CollapseQuestHeader
+  local originalExpand=ExpandQuestHeader
+  self.originalCollapseQuestHeader=originalCollapse
+  self.originalExpandQuestHeader=originalExpand
+
+  CollapseQuestHeader=function(index)
+    CaptureCollapsedHeader(index)
+    local result=originalCollapse(index)
+    -- Compatibility layers normally emit QUEST_LOG_UPDATE, but do not rely on
+    -- that for the tracker/cache refresh. The scheduler key deduplicates it.
+    QL:Schedule(0.01,true)
+    return result
+  end
+
+  ExpandQuestHeader=function(index)
+    local knownTitle=(tonumber(index) or 0)~=0 and HeaderTitleAt(index) or nil
+    local result=originalExpand(index)
+    -- Runtime visibility follows the native header immediately. Saved restore
+    -- preference is handled separately by SyncCollapsedHeaders().
+    ClearExpandedHeader(index,knownTitle)
+    QL:Schedule(0.01,true)
+    return result
+  end
+
+  self.headerHooksInstalled=true
 end
 
 local function SyncCollapsedHeaders(headerStates)
@@ -542,11 +697,25 @@ function QL:Refresh(fastRefresh)
 
         local complete=status==1 and true or false
         local failed=status==-1 and true or false
+        local zoneGroup=currentHeader
+        if questID and QuestieOcto.API and QuestieOcto.API.GetHeaderIndexForQuest then
+          local headerIndex=QuestieOcto.API:GetHeaderIndexForQuest(questID)
+          local headerTitle=headerIndex and HeaderTitleAt(headerIndex) or nil
+          if headerTitle then zoneGroup=headerTitle end
+        end
+
+        -- If the quest row is visible in the native log, its header is expanded
+        -- right now. Clear runtime collapsed membership unconditionally. The
+        -- saved reload preference must never suppress an actually visible row.
+        if questID then QL.collapsedQuestIDs[questID]=nil end
+        local collapsed=false
 
         table.insert(snapshotParts,tostring(questID or 0))
         table.insert(snapshotParts,title)
         table.insert(snapshotParts,tostring(level or 0))
         table.insert(snapshotParts,tostring(tag or ""))
+        table.insert(snapshotParts,tostring(zoneGroup or "Other"))
+        table.insert(snapshotParts,collapsed and "1" or "0")
         table.insert(snapshotParts,tostring(status))
         table.insert(snapshotParts,objectiveSnapshot)
 
@@ -560,7 +729,8 @@ function QL:Refresh(fastRefresh)
             -- marker. Preserve it with the quest instead of reclassifying
             -- quests from database metadata.
             tag=tag,
-            zoneGroup=currentHeader,
+            zoneGroup=zoneGroup,
+            collapsed=false,
             status=status,
             complete=complete,
             failed=failed,
@@ -598,27 +768,48 @@ function QL:Refresh(fastRefresh)
     for keyIndex=1,table.getn(previousKeys) do
       local questID=previousKeys[keyIndex]
       local state=previousActive[questID]
-      if state and not nextActive[questID] and collapsedHeaders[state.zoneGroup]
+      local collapsedHeader=state and (QL.collapsedQuestIDs[questID] or (collapsedHeaders[state.zoneGroup] and state.zoneGroup)) or nil
+      if state and not nextActive[questID] and collapsedHeader
         and QuestieOcto.API and QuestieOcto.API.IsOnQuest and QuestieOcto.API:IsOnQuest(questID) then
-        nextActive[questID]=state
+        local zoneGroup=(type(collapsedHeader)=="string" and collapsedHeader) or state.zoneGroup or "Other"
+        if QuestieOcto.API.GetHeaderIndexForQuest then
+          local headerIndex=QuestieOcto.API:GetHeaderIndexForQuest(questID)
+          local headerTitle=headerIndex and HeaderTitleAt(headerIndex) or nil
+          if headerTitle then zoneGroup=headerTitle end
+        end
+        QL.collapsedQuestIDs[questID]=zoneGroup
+
+        local preserved={}
+        for key,value in pairs(state) do preserved[key]=value end
+        preserved.zoneGroup=zoneGroup
+        preserved.collapsed=true
+        nextActive[questID]=preserved
         if previousMapState[questID]~=nil then
           nextMapState[questID]=previousMapState[questID]
         else
-          nextMapState[questID]=tostring(state.status or 0).."\031"..tostring(state._objectiveMapSnapshot or "")
+          nextMapState[questID]=tostring(preserved.status or 0).."\031"..tostring(preserved._objectiveMapSnapshot or "")
         end
         nativeResolved[questID]=true
         QL.stats.resolved=QL.stats.resolved+1
 
         -- Keep the cached quest represented in the general snapshot as well so
-        -- repeated refreshes while the header stays collapsed are stable. A
-        -- one-time QUEST_LOG_CHANGED when the presentation is toggled is fine;
-        -- active/eligibility/map membership remains unchanged.
+        -- repeated refreshes while the header stays collapsed are stable.
         table.insert(snapshotParts,tostring(questID))
-        table.insert(snapshotParts,tostring(state.title or ""))
-        table.insert(snapshotParts,tostring(state.level or 0))
-        table.insert(snapshotParts,tostring(state.tag or ""))
-        table.insert(snapshotParts,tostring(state.status or 0))
-        table.insert(snapshotParts,tostring(state._objectiveSnapshot or ""))
+        table.insert(snapshotParts,tostring(preserved.title or ""))
+        table.insert(snapshotParts,tostring(preserved.level or 0))
+        table.insert(snapshotParts,tostring(preserved.tag or ""))
+        table.insert(snapshotParts,tostring(preserved.zoneGroup or "Other"))
+        table.insert(snapshotParts,"1")
+        table.insert(snapshotParts,tostring(preserved.status or 0))
+        table.insert(snapshotParts,tostring(preserved._objectiveSnapshot or ""))
+      end
+    end
+
+    -- A real abandon/turn-in must not leave stale runtime collapse membership.
+    for questID in pairs(QL.collapsedQuestIDs or {}) do
+      if not nextActive[questID]
+        and (not QuestieOcto.API or not QuestieOcto.API.IsOnQuest or not QuestieOcto.API:IsOnQuest(questID)) then
+        QL.collapsedQuestIDs[questID]=nil
       end
     end
 
@@ -784,6 +975,7 @@ end
 function QL:Start()
   if self.started then return end
   self.started=true
+  self:InstallHeaderHooks()
 
   local f=CreateFrame("Frame","QuestieOctoQuestLogEvents",UIParent)
   self.frame=f

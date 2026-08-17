@@ -1657,3 +1657,20 @@ wording, respawn values, drop rates, or thresholds changed.
 - This extends the 1.0.99 per-character Quest Log collapse persistence without
   changing quest truth, sorting, visible-row limits, or tracker geometry.
 
+
+
+1.0.8 - TRACKER COLLAPSE STATE SEPARATION
+-------------------------------------------------
+- Reworked the failed 1.0.6/1.0.7 collapse-tracker attempt from the accepted
+  1.0.2 baseline. Saved header preferences and live tracker visibility are now
+  separate states: a saved reload preference never hides a quest whose native
+  Quest Log row is currently visible.
+- CollapseQuestHeader captures quest IDs before Vanilla removes the child rows;
+  ExpandQuestHeader clears only the live collapsed membership immediately. The
+  original 1.0.2 header-state observation remains responsible for persistence.
+- Collapsed quests stay active for availability/map truth but disappear from the
+  tracker, then return immediately when the native header is expanded.
+- Added tracker invalidation for quest title/level/zone-group changes, immediate
+  difficulty-color repaint on PLAYER_LEVEL_UP, and safe timed-quest log-index
+  validation after header reindexing.
+- No fullscreen-map experiment code is included.

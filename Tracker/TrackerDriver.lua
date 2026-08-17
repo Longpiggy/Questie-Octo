@@ -123,7 +123,9 @@ function D:Rebuild()
     if auto then tracked=not db.AutoUntrackedQuests[questID]
     else tracked=db.TrackedQuests[questID] and true or false end
 
-    if tracked and (showCompleted or not state.complete) then
+    -- Collapsing a native Quest Log header changes only tracker presentation.
+    -- Active quest truth remains in QuestLog.active for map/availability.
+    if tracked and not state.collapsed and (showCompleted or not state.complete) then
       local objectives={}
       for i=1,table.getn(state.objectives or {}) do
         local objective=state.objectives[i]
@@ -156,6 +158,8 @@ function D:Rebuild()
   for i=1,table.getn(ordered) do
     local row=ordered[i]
     table.insert(snapshot,tostring(row.id))
+    table.insert(snapshot,row.title or "")
+    table.insert(snapshot,tostring(row.level or 0))
     table.insert(snapshot,row.zoneGroup or "")
     table.insert(snapshot,tostring(row.tag or ""))
     table.insert(snapshot,row.complete and "1" or "0")
@@ -263,6 +267,7 @@ function D:Start()
   EnsureCharacterDB()
   self:InstallQuestLogShiftClick()
   QuestieOcto:RegisterMessage("QUEST_LOG_CHANGED",self,"Rebuild")
+  QuestieOcto:RegisterMessage("QUEST_LOG_COLLAPSE_STATE_CHANGED",self,"Rebuild")
   self:Rebuild()
 end
 

@@ -555,6 +555,21 @@ function T:GetQuestTimerSeconds(quest)
   local index=tonumber(quest.logIndex)
   if not index or type(GetQuestLogTimeLeft)~="function" then return nil end
 
+  -- Collapse/expand changes native quest-log indices. Validate the cached slot
+  -- before selecting it so a hidden timed quest can never interrogate another
+  -- quest after the log has been reindexed.
+  local questID=tonumber(quest.id)
+  if questID and QuestieOcto.API then
+    local indexedID=QuestieOcto.API.GetQuestIDForLogIndex and tonumber(QuestieOcto.API:GetQuestIDForLogIndex(index)) or nil
+    if indexedID~=questID then
+      local freshIndex=QuestieOcto.API.GetLogIndexForQuestID and tonumber(QuestieOcto.API:GetLogIndexForQuestID(questID)) or nil
+      local freshID=freshIndex and QuestieOcto.API.GetQuestIDForLogIndex and tonumber(QuestieOcto.API:GetQuestIDForLogIndex(freshIndex)) or nil
+      if not freshIndex or freshID~=questID then return nil end
+      index=freshIndex
+      quest.logIndex=freshIndex
+    end
+  end
+
   -- Questie 3.3.5 compatibility path: GetQuestLogTimeLeft is tied to the
   -- selected quest on old clients. Temporarily select this quest, read the
   -- timer, then restore the player's previous selection immediately.
@@ -1039,10 +1054,17 @@ function T:Start()
   if self.frame and self.frame.RegisterEvent then
     self.frame:RegisterEvent("PLAYER_REGEN_DISABLED")
     self.frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    self.frame:RegisterEvent("PLAYER_LEVEL_UP")
     local previous=self.frame:GetScript("OnEvent")
     self.frame:SetScript("OnEvent",function()
       if previous then previous() end
-      if event=="PLAYER_REGEN_DISABLED" or event=="PLAYER_REGEN_ENABLED" then T:OnCombatEvent(event) end
+      if event=="PLAYER_REGEN_DISABLED" or event=="PLAYER_REGEN_ENABLED" then
+        T:OnCombatEvent(event)
+      elseif event=="PLAYER_LEVEL_UP" then
+        -- Tracker difficulty colors depend on player level even when no quest
+        -- field changes, so repaint immediately at the level boundary.
+        T:Render()
+      end
     end)
   end
   QuestieOcto:RegisterMessage("TRACKER_STATE_CHANGED",self,"OnTrackerStateChanged")

@@ -38,6 +38,7 @@ function A:Validate()
     gossipActive = Has(C_GossipInfo,"GetActiveQuests"),
     questDetails = Has(C_QuestLog,"GetQuestDetails"),
     questObjectives = Has(C_QuestLog,"GetQuestObjectives"),
+    questHeaderIndex = Has(C_QuestLog,"GetHeaderIndexForQuest"),
     questsCompleted = type(GetQuestsCompleted)=="function" or Has(C_QuestLog,"GetQuestsCompleted"),
     queryQuestsCompleted = type(QueryQuestsCompleted)=="function",
     questFlaggedCompleted = type(IsQuestFlaggedCompleted)=="function" or Has(C_QuestLog,"IsQuestFlaggedCompleted"),
@@ -100,6 +101,18 @@ end
 function A:GetLogIndexForQuestID(questID)
   if not self.valid then return nil end
   return C_QuestLog.GetLogIndexForQuestID(questID)
+end
+
+-- ClassicAPI exposes the quest's native zone-header index even when that
+-- header is collapsed. This avoids assigning a hidden quest to a neighbouring
+-- visible header after Vanilla removes the collapsed child rows.
+function A:GetHeaderIndexForQuest(questID)
+  questID=tonumber(questID)
+  if not questID or not C_QuestLog or type(C_QuestLog.GetHeaderIndexForQuest)~="function" then return nil end
+  local ok,index=pcall(C_QuestLog.GetHeaderIndexForQuest,questID)
+  index=ok and tonumber(index) or nil
+  if not index or index<=0 then return nil end
+  return index
 end
 
 function A:IsOnQuest(questID)
