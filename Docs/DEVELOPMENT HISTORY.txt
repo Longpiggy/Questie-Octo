@@ -1482,3 +1482,58 @@ glyph or punctuation:
 Single drop rates remain unchanged. This is presentation-only: recorded
 respawn values, the below-five-minute seconds rule, hour conversion, drop
 rates, and the <0.50% representative item-start threshold are unchanged.
+
+
+1.0.90 - TRUE MIDDLE ASCII TILDE OVERLAY
+-----------------------------------------
+The explicit `approx.`/`to` wording from 1.0.89 was rejected because the
+preferred presentation is still the compact tilde notation. The stock FRIZQT
+tooltip font renders the supported ASCII `~` too high, while the mathematical
+Unicode tilde is absent from the current game font.
+
+Questie-Octo now keeps the ordinary ASCII `~` glyph but renders it in a small
+independent tooltip FontString shifted down by two pixels. The underlying line
+reserves two ordinary spaces at that position, so the glyph remains inline
+without relying on unsupported Unicode.
+
+Examples as presented to the player:
+  Respawn: ~15h
+  [Rare] Respawn: ~15h
+  0.007%~0.20%
+
+This is presentation-only. Respawn values, the below-five-minute seconds rule,
+hour conversion, drop-rate values, and the <0.50% item-start threshold remain
+unchanged. The overlay is reset whenever Questie-Octo rebuilds a map/minimap
+tooltip so stale markers cannot survive tooltip reuse.
+
+
+1.0.91 - Centered tilde texture
+- Replaced the raised-font tilde overlay with a small texture marker centered vertically on tooltip text.
+- Applies to rare respawn approximations and item-start drop-rate ranges.
+- No respawn/drop-rate data or thresholds changed.
+
+1.0.92 - ROLLBACK FAILED MIDDLE-TILDE EXPERIMENTS
+--------------------------------------------------
+Versions 1.0.87 through 1.0.91 experimented with alternative ways to make the
+approximation/range tilde appear vertically centered in the stock Turtle/Vanilla
+tooltip font. The mathematical Unicode glyph was not rendered, the wording
+replacements were rejected, the independent FontString did not produce the
+requested visual result, and the texture-slot approach produced a blank gap in
+actual client testing.
+
+A fresh source check also confirmed the current Turtle 1.12 UI itself documents
+that FontStrings do not paint inline |T textures; a current OctoCalendar comment
+also records that bare Texture regions did not solve a similar inline-display
+problem there. No reliable native inline-glyph mechanism was found that would
+justify further tooltip experiments without another client-side test harness.
+
+Per the maintainer's explicit fallback decision, 1.0.92 restores the exact
+1.0.86 runtime presentation for this feature:
+  * supported ASCII `~` is used again for rare respawn approximations;
+  * item-start drop-rate ranges use the same ASCII `~`;
+  * seconds remain visible only for respawns strictly below five minutes;
+  * timers above sixty minutes remain compact hour/minute values.
+
+The failed 1.0.87-1.0.91 presentation approaches are retained in history but
+must not be reintroduced as accepted behavior. The temporary `tilde_mid.tga`
+asset from 1.0.91 is removed.

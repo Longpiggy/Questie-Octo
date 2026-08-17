@@ -14,20 +14,20 @@ local function RespawnText(seconds)
   seconds=tonumber(seconds)
   if not seconds or seconds<=0 then return "unknown" end
   if seconds<300 then
-    if seconds<60 then return tostring(seconds).."s" end
+    if seconds<60 then return "~"..tostring(seconds).."s" end
     local minutes=math.floor(seconds/60)
     local secs=math.mod(seconds,60)
-    if secs==0 then return tostring(minutes).." min" end
-    return tostring(minutes).."m"..tostring(secs).."s"
+    if secs==0 then return "~"..tostring(minutes).." min" end
+    return "~"..tostring(minutes).."m"..tostring(secs).."s"
   end
   if seconds>3600 then
     local hours=math.floor(seconds/3600)
     local minutes=math.floor(math.mod(seconds,3600)/60)
-    local text=tostring(hours).."h"
+    local text="~"..tostring(hours).."h"
     if minutes>0 then text=text..tostring(minutes).."m" end
     return text
   end
-  return tostring(math.floor(seconds/60)).." min"
+  return "~"..tostring(math.floor(seconds/60)).." min"
 end
 
 local function ArrayContains(t,value)

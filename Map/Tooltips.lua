@@ -143,7 +143,7 @@ local function ItemStartAreaDropRateText(area)
   if not minText or not maxText then return nil end
 
   if minText==maxText then return minText.."%" end
-  return minText.."% to "..maxText.."%"
+  return minText.."%~"..maxText.."%"
 end
 
 local function DifficultyColor(level,questID)
@@ -176,22 +176,22 @@ local function RespawnText(seconds)
   -- Seconds are only useful for very short rare respawns. At five minutes and
   -- above, keep the tooltip compact and show whole minutes/hours only.
   if seconds<300 then
-    if seconds<60 then return tostring(seconds).."s" end
+    if seconds<60 then return "~"..tostring(seconds).."s" end
     local minutes=math.floor(seconds/60)
     local secs=math.mod(seconds,60)
-    if secs==0 then return tostring(minutes).." min" end
-    return tostring(minutes).."m"..tostring(secs).."s"
+    if secs==0 then return "~"..tostring(minutes).." min" end
+    return "~"..tostring(minutes).."m"..tostring(secs).."s"
   end
 
   if seconds>3600 then
     local hours=math.floor(seconds/3600)
     local minutes=math.floor(math.mod(seconds,3600)/60)
-    local text=tostring(hours).."h"
+    local text="~"..tostring(hours).."h"
     if minutes>0 then text=text..tostring(minutes).."m" end
     return text
   end
 
-  return tostring(math.floor(seconds/60)).." min"
+  return "~"..tostring(math.floor(seconds/60)).." min"
 end
 
 local function SourceDisplayName(source)
@@ -359,7 +359,7 @@ local function AddRareSourceRespawn(pin,tooltip)
   local rank,respawnSeconds=RareSourceInfo(pin)
   if not rank then return end
   local respawn=RespawnText(respawnSeconds)
-  if respawn then tooltip:AddLine("Respawn: approx. "..respawn,.75,.75,.75) end
+  if respawn then tooltip:AddLine("Respawn: "..respawn,.75,.75,.75) end
 end
 
 local function TooltipRelationshipSignature(pin)
@@ -1107,7 +1107,7 @@ function T:Show(pin)
       end
       local respawn=RespawnText(respawnSeconds)
       if respawn then
-        tooltip:AddLine("Respawn: approx. "..respawn,.75,.75,.75)
+        tooltip:AddLine("Respawn: "..respawn,.75,.75,.75)
       end
     else
       tooltip:SetText(tostring(title),.2,1,.35)
@@ -1171,7 +1171,7 @@ function T:Show(pin)
         local respawn=rank and RespawnText(source.respawnSeconds) or nil
         if respawn then
           local rareTag=RareRankText(source.rank) or "Rare"
-          tooltip:AddLine("["..rareTag.."] Respawn: approx. "..respawn,.75,.75,.75)
+          tooltip:AddLine("["..rareTag.."] Respawn: "..respawn,.75,.75,.75)
         end
       end
     end

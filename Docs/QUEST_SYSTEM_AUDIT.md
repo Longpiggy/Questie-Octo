@@ -744,3 +744,47 @@ therefore use the explicit ASCII-only wording `Respawn: approx. <time>` (and
 drop-rate ranges use `<minimum>% to <maximum>%`. Single-value drop rates remain
 unchanged. This rule is presentation-only and must not alter respawn/drop data
 or threshold semantics.
+
+
+### 1.0.90 — true middle ASCII tilde overlay
+
+User-facing rare respawn approximation and item-start drop-rate ranges return
+to compact `~` notation. Do **not** use the unsupported Unicode mathematical
+tilde and do not use the 1.0.89 `approx.`/`to` wording. Instead, the runtime
+line reserves two normal spaces and Questie-Octo overlays the guaranteed ASCII
+`~` at that character position using the same tooltip font, shifted downward
+by two pixels. This gives the requested visually centered/middle tilde without
+changing the font globally or depending on an unavailable glyph.
+
+The overlay pool must be hidden/reset whenever Questie-Octo clears and rebuilds
+a tooltip. This rule is presentation-only; timing/drop-rate data and all rare
+or item-start eligibility rules remain unchanged.
+
+
+## 1.0.91 tooltip tilde presentation
+The stock FRIZQT ASCII `~` sits visibly high and the mathematical tilde glyph is unavailable in the current client font. Questie-Octo therefore renders a tiny addon-owned tilde texture in the marker slot, vertically centered on the tooltip line. The surrounding text reserves only the marker width; this is presentation-only and applies to rare respawn approximation markers and item-start drop-rate ranges.
+
+### 1.0.92 — tooltip tilde rollback to accepted 1.0.86 behavior
+
+The attempted centered-tilde implementations from 1.0.87 through 1.0.91 are
+**rejected experiments**, not current design rules. In-game testing showed the
+Unicode mathematical tilde missing, the separate-font overlay still visually
+unsatisfactory, and the texture-marker approach leaving a blank reserved slot.
+
+The current Turtle 1.12 UI source also documents that FontStrings do not render
+inline `|T...|t` textures, so do not substitute that modern-client technique.
+The project therefore falls back to the last accepted and reliable 1.0.86
+presentation: use the ordinary supported ASCII `~` directly in the tooltip.
+Its stock-font vertical position is accepted as the compatibility fallback.
+
+Current timing presentation remains:
+
+- `< 5 minutes`: seconds may be shown;
+- `>= 5 minutes`: seconds are omitted;
+- `> 60 minutes`: compact hours/minutes are used;
+- positive approximate timers are prefixed with the ASCII `~`;
+- item-start min/max drop-rate ranges use the ASCII `~` separator.
+
+Do not re-add `tilde_mid.tga` or the 1.0.90/1.0.91 overlay/texture machinery
+unless a future client-side method is first demonstrated to render correctly in
+Octo/Turtle 1.12.

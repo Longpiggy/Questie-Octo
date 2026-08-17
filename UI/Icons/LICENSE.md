@@ -30,3 +30,4 @@ available-quest marker image supplied directly by the Questie-Octo project
 maintainer on 2026-08-17. The conversion preserves the supplied pixels and
 alpha; it is not copied from Questie's `available_gray.blp`.
 
+
