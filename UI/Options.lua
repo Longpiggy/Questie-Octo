@@ -21,6 +21,71 @@ local INNER_R,INNER_G,INNER_B,INNER_A=0.035,0.035,0.035,0.84
 local INNER_BORDER_R,INNER_BORDER_G,INNER_BORDER_B,INNER_BORDER_A=0.20,0.20,0.20,0.95
 local TAB_R,TAB_G,TAB_B,TAB_A=0.28,0.28,0.28,1.0
 
+-- Capture colors before Questie-Octo changes them so Dark Theme can be toggled
+-- without guessing what AceGUI, pfUI, DragonflightUI, or another UI skin used.
+-- Frames/regions are Lua objects on this client, so the small per-object cache
+-- stays local to the Questie-Octo options tree and does not touch global UI.
+local function CaptureBackdropColors(frame)
+  if not frame or frame.questieOctoThemeCaptured then return end
+  frame.questieOctoThemeCaptured=true
+
+  if frame.GetBackdropColor then
+    local r,g,b,a=frame:GetBackdropColor()
+    frame.questieOctoBgR,frame.questieOctoBgG,frame.questieOctoBgB,frame.questieOctoBgA=r or 1,g or 1,b or 1,a or 1
+  end
+  if frame.GetBackdropBorderColor then
+    local r,g,b,a=frame:GetBackdropBorderColor()
+    frame.questieOctoBdR,frame.questieOctoBdG,frame.questieOctoBdB,frame.questieOctoBdA=r or 1,g or 1,b or 1,a or 1
+  end
+end
+
+local function CaptureVertexColor(region)
+  if not region or region.questieOctoVertexCaptured then return end
+  region.questieOctoVertexCaptured=true
+  if region.GetVertexColor then
+    local r,g,b,a=region:GetVertexColor()
+    region.questieOctoVR,region.questieOctoVG,region.questieOctoVB,region.questieOctoVA=r or 1,g or 1,b or 1,a or 1
+  end
+end
+
+local function RestoreBackdropColors(frame)
+  if not frame or not frame.questieOctoThemeCaptured then return end
+  if frame.SetBackdropColor and frame.questieOctoBgR then
+    frame:SetBackdropColor(frame.questieOctoBgR,frame.questieOctoBgG,frame.questieOctoBgB,frame.questieOctoBgA or 1)
+  end
+  if frame.SetBackdropBorderColor and frame.questieOctoBdR then
+    frame:SetBackdropBorderColor(frame.questieOctoBdR,frame.questieOctoBdG,frame.questieOctoBdB,frame.questieOctoBdA or 1)
+  end
+end
+
+local function RestoreVertexColor(region)
+  if not region or not region.questieOctoVertexCaptured then return end
+  if region.SetVertexColor and region.questieOctoVR then
+    region:SetVertexColor(region.questieOctoVR,region.questieOctoVG,region.questieOctoVB,region.questieOctoVA or 1)
+  end
+end
+
+local function RestoreDefaultTheme(frame)
+  if not frame then return end
+  RestoreBackdropColors(frame)
+
+  if frame.GetRegions then
+    local regions={frame:GetRegions()}
+    for _,region in pairs(regions) do
+      if region and region.GetObjectType and region:GetObjectType()=="Texture" then
+        RestoreVertexColor(region)
+      end
+    end
+  end
+
+  if frame.GetChildren then
+    local children={frame:GetChildren()}
+    for _,child in pairs(children) do
+      RestoreDefaultTheme(child)
+    end
+  end
+end
+
 local function ShouldSkipShellTexture(region)
   if not region or not region.GetTexture then return true end
   local texture=region:GetTexture()
@@ -51,6 +116,7 @@ end
 local function DarkenOuterShell(frame)
   if not frame then return end
 
+  CaptureBackdropColors(frame)
   if frame.SetBackdropBorderColor then
     frame:SetBackdropBorderColor(SHELL_R,SHELL_G,SHELL_B,SHELL_A)
   end
@@ -60,6 +126,7 @@ local function DarkenOuterShell(frame)
     for _,region in pairs(regions) do
       if region and region.GetObjectType and region:GetObjectType()=="Texture"
          and region.SetVertexColor and not ShouldSkipShellTexture(region) then
+        CaptureVertexColor(region)
         region:SetVertexColor(SHELL_R,SHELL_G,SHELL_B,SHELL_A)
       end
     end
@@ -132,6 +199,7 @@ local function DarkenInnerContent(frame)
   -- darkening pass. It is a control, not a content backdrop.
   if IsAceConfigScrollbar(frame) then return end
 
+  CaptureBackdropColors(frame)
   if frame.SetBackdropColor then
     frame:SetBackdropColor(INNER_R,INNER_G,INNER_B,INNER_A)
   end
@@ -147,6 +215,7 @@ local function DarkenInnerContent(frame)
     for _,region in pairs(regions) do
       if region and region.GetObjectType and region:GetObjectType()=="Texture"
          and region.SetVertexColor and IsTabTexture(region) then
+        CaptureVertexColor(region)
         region:SetVertexColor(TAB_R,TAB_G,TAB_B,TAB_A)
       end
     end
@@ -160,24 +229,34 @@ local function DarkenInnerContent(frame)
   end
 end
 
-function O:ApplyDarkTheme()
+function O:ApplyDarkTheme(apply)
   if not self.configFrame or not self.configFrame.frame then return end
 
-  local shell=self.configFrame.frame
-  DarkenOuterShell(shell)
-
-  -- Apply the inner treatment only below the outer shell. Keeping the shell
-  -- separate is important because its DialogFrame textures need vertex tinting,
-  -- while AceConfig's content containers look better with dark backdrops.
-  if shell.GetChildren then
-    local children={shell:GetChildren()}
-    for _,child in pairs(children) do
-      DarkenInnerContent(child)
-    end
+  -- Initial opens and AceConfig's post-refresh callback use the saved setting.
+  if apply==nil then
+    apply=(QuestieOcto.MinimapSettings and QuestieOcto.MinimapSettings:Get("useDarkTheme")) and true or false
   end
 
-  -- Run after backdrop darkening so the scrollbar is always the final/top UI
-  -- layer, including after AceConfig rebuilds the currently selected tab.
+  local shell=self.configFrame.frame
+  if apply then
+    DarkenOuterShell(shell)
+
+    -- Apply the inner treatment only below the outer shell. Keeping the shell
+    -- separate is important because its DialogFrame textures need vertex tinting,
+    -- while AceConfig's content containers look better with dark backdrops.
+    if shell.GetChildren then
+      local children={shell:GetChildren()}
+      for _,child in pairs(children) do
+        DarkenInnerContent(child)
+      end
+    end
+  else
+    -- Restore the exact colors captured before our dark pass. New AceConfig
+    -- widgets that were never darkened are already at their native/skin values.
+    RestoreDefaultTheme(shell)
+  end
+
+  -- Keep the native Vanilla scrollbar above the content in either theme.
   RaiseScrollbar(shell)
 end
 
@@ -213,6 +292,15 @@ local function SetValue(info,value)
   -- AceConfigDialog refreshes the custom frame immediately after setters.
   -- Clear AceGUI's persisted drag coordinates before that refresh happens.
   ClearSavedConfigPosition()
+end
+
+local function SetMinimapButtonValue(info,value)
+  local before=Settings():Get("showMinimapButton") and true or false
+  SetValue(info,value)
+  local after=Settings():Get("showMinimapButton") and true or false
+  if before~=after then
+    QuestieOcto:Print("Minimap Button change will apply after /reload. When disabled, its minimap frame is not created.")
+  end
 end
 
 local function EnabledMinimap()
@@ -259,10 +347,16 @@ local function CreateGeneralTab()
         showEventQuests={type="toggle",order=4,name="Show Event Quests",desc="Show available event quests.",width="full",get=GetValue,set=SetValue},
         showPvPRelatedQuests={type="toggle",order=5,name="Show PVP Related Quests",desc="Show PvP quest icons on the map and minimap.",width="full",get=GetValue,set=SetValue},
       }},
+      useDarkTheme={type="toggle",order=88,name="Enable Dark Theme",desc="Use Questie-Octo's dark Shagu-style options appearance. This only skins the Questie-Octo settings window.",width="full",get=GetValue,set=SetValue},
+      showMinimapButton={type="toggle",order=89,name="Show Minimap Button",desc="Show the Questie-Octo settings button beside the minimap. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue},
       reset_header={type="header",order=90,name="Reset Questie Options"},
       reset_text={type="description",order=91,name="Restore Questie-Octo options to their defaults. Quest data and completed-quest history are not deleted.",fontSize="medium"},
       resetOptions={type="execute",order=92,name="Reset Options",desc="Restore option defaults.",func=function()
+        local beforeMinimapButton=Settings():Get("showMinimapButton") and true or false
         Settings():Reset()
+        if beforeMinimapButton~=(Settings():Get("showMinimapButton") and true or false) then
+          QuestieOcto:Print("Minimap Button reset will apply after /reload.")
+        end
         ClearSavedConfigPosition()
         local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
         if Registry and Registry.NotifyChange then Registry:NotifyChange(APP_NAME) end

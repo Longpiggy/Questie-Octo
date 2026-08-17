@@ -109,7 +109,14 @@ S.defaults={
   trackerMaxWidth=280,
   trackerVisibleRows=30,
   trackerBackgroundOpacity=0,
-  trackerHideInCombat=false
+  trackerHideInCombat=false,
+
+  -- Questie-Octo interface conveniences. Dark Theme preserves the accepted
+  -- 1.0.96 Shagu-style options appearance by default. The settings minimap
+  -- button is created only when enabled at login; disabling it therefore
+  -- removes the frame entirely after /reload instead of merely hiding it.
+  useDarkTheme=true,
+  showMinimapButton=true
 }
 
 local function Clamp(value,minValue,maxValue)
@@ -238,7 +245,8 @@ function S:Set(key,value)
       key=="questLogShowLevels" or key=="questLogDifficultyColors" or
       key=="trackerEnabled" or key=="trackerLocked" or key=="trackerAutoTrack" or
       key=="trackerQuestLogCheckmarks" or key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
-      key=="trackerOutlineText" or key=="trackerThickOutlineText" then
+      key=="trackerOutlineText" or key=="trackerThickOutlineText" or
+      key=="useDarkTheme" or key=="showMinimapButton" then
     value=value and true or false
   elseif key=="lowLevelQuestRange" then
     value=tonumber(value)
@@ -280,6 +288,18 @@ function S:Set(key,value)
     self.charDB[key]=value
   else
     self.db[key]=value
+  end
+
+  -- Interface-only settings do not need map/minimap data refreshes. Dark
+  -- Theme can be applied immediately. The minimap button intentionally waits
+  -- for /reload because OFF means the Minimap child frame must not exist at all.
+  if key=="useDarkTheme" then
+    if QuestieOcto.Options and QuestieOcto.Options.ApplyDarkTheme then
+      QuestieOcto.Options:ApplyDarkTheme(value)
+    end
+    return true
+  elseif key=="showMinimapButton" then
+    return true
   end
 
   if string.find(key,"^questLog") then
@@ -429,6 +449,12 @@ function S:Reset()
   end
   if QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.FastRefresh then
     QuestieOcto.AvailableQuests:FastRefresh()
+  end
+  if QuestieOcto.Options and QuestieOcto.Options.ApplyDarkTheme then
+    QuestieOcto.Options:ApplyDarkTheme(self.defaults.useDarkTheme)
+  end
+  if QuestieOcto.MinimapButton and QuestieOcto.MinimapButton.ResetPosition then
+    QuestieOcto.MinimapButton:ResetPosition()
   end
 end
 

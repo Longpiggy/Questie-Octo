@@ -23,21 +23,22 @@ A lightweight quest helper for Turtle WoW / OctoWoW, focused on clear quest, obj
 
 ### Open Questie-Octo settings
 
-Type this in chat:
+By default, Questie-Octo adds a yellow **!** button beside the minimap.
 
-`/qo`
-
-This is the easiest way to open the settings and works regardless of which UI addon you use.
-
-You can also use:
-
-`/questieocto`
+- **Left Click:** Open settings
+- **Drag:** Move the button around the minimap
 
 On supported game menus, including pfUI and DragonflightUI-Reforged, you may also see a **Questie Options** button in the Escape menu.
 
+You can also open the settings with either slash command:
+
+`/qo`
+
+`/questieocto`
+
 ### Unlock and move the quest tracker
 
-1. Open the settings with `/qo`.
+1. Open the settings.
 2. Select the **Tracker** tab.
 3. Uncheck **Lock Tracker**.
 4. Left-click and drag the **top/header area of the tracker** to move it.
@@ -47,6 +48,22 @@ The tracker is transparent by default, so the draggable header can be easy to mi
 
 If the tracker gets moved somewhere inconvenient, use **Tracker → Reset Tracker Position**.
 
+### Dark Theme
+
+Questie-Octo uses its dark options theme by default.
+
+To change it, open the settings, scroll to the bottom of the **General** tab, and toggle **Enable Dark Theme** just above Reset Settings. The theme only changes the Questie-Octo settings window and does not reskin pfUI, DragonflightUI-Reforged, or other UI addons.
+
+### Minimap settings button
+
+The Questie-Octo settings button is shown beside the minimap by default and can be dragged around the minimap.
+
+To disable it, open the settings, scroll to the bottom of the **General** tab, and uncheck **Show Minimap Button** just above Reset Settings.
+
+**Changing this option requires `/reload`.** When disabled, Questie-Octo does not create the minimap-button frame at all; it is not merely hidden. This avoids compatibility problems with older Vanilla minimap-button collector addons.
+
+The other settings access methods described above remain available when the minimap button is disabled.
+
 ### Track quests manually
 
 Questie-Octo can automatically track accepted quests.
@@ -55,7 +72,7 @@ To manually track or untrack a quest, use **Shift + Left Click** on the quest in
 
 ## Useful Commands
 
-- `/qo` — open or close Questie-Octo settings
+- `/qo` or `/questieocto` — open or close Questie-Octo settings
 - `/qo quests` — open the quest browser
 - `/qo help` — show available Questie-Octo commands
 

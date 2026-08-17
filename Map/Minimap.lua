@@ -275,6 +275,13 @@ local function UsesSquareMinimap()
   return false
 end
 
+-- Reuse the same live square-minimap compatibility decision for Questie-Octo's
+-- optional settings button. Keeping one detector avoids pfUI/DragonflightUI/
+-- ShaguTweaks disagreement between quest pins and the button's drag geometry.
+function MM:UsesSquareMinimap()
+  return UsesSquareMinimap()
+end
+
 local function WorldMapBrowsingAwayFromPlayer(mapID)
   if not WorldMapFrame or not WorldMapFrame:IsShown() then return false end
   if not QuestieOcto.Map or not QuestieOcto.Map.GetDisplayedMapID then return true end

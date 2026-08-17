@@ -2,7 +2,7 @@
 ## Title: Questie-Octo
 ## Notes: Quest helper.
 ## Author: Questie-Octo
-## Version: 1.0.96
+## Version: 1.0.98
 ## SavedVariables: QuestieOctoGlobalDB
 ## SavedVariablesPerCharacter: QuestieOctoDB
 
@@ -55,6 +55,7 @@ Libs\AceConfigDialog-3.0\AceConfigDialog-3.0.xml
 UI\QuestResearch.lua
 UI\QuestLinkTooltip.lua
 UI\Options.lua
+UI\MinimapButton.lua
 UI\GameMenu.lua
 Core\Bootstrap.lua
 Quest\CreatureDiagnostics.lua

@@ -1591,3 +1591,37 @@ wording, respawn values, drop rates, or thresholds changed.
 1.0.96 — spaced drop-rate range separator
 - Item-start drop-rate ranges that compare min/max now display as `0.01% ~ 0.20%`.
 - Rare respawn lines remain `~15h` / `~2h30m` with no added spaces.
+
+1.0.97 - DARK THEME TOGGLE + SAFE MINIMAP SETTINGS BUTTON
+----------------------------------------------------------
+- Added `Enable Dark Theme` at the bottom of General, immediately above the
+  reset section. The accepted 1.0.96 Shagu-style dark appearance remains ON by
+  default. Turning it off restores the exact AceGUI colors captured before
+  Questie-Octo's own dark pass; no pfUI/DragonflightUI/global frame is skinned.
+- Added `Show Minimap Button` beside it, default ON. Changing this option
+  requires `/reload`. When OFF at login, Questie-Octo never creates the minimap
+  button frame instead of creating and hiding it. This avoids old Vanilla
+  minimap-button collectors discovering/reparenting a hidden frame.
+- The settings button is a small native Questie-style button with no LDB/
+  LibDBIcon dependency, opens `/qo` settings on left click, saves its dragged
+  position, and reuses Questie-Octo's round/square minimap detection for pfUI,
+  ShaguTweaks, and DragonflightUI-Reforged compatibility. Its frame name starts with
+  `MinimapIcon`, which the supplied pfUI and DragonflightUI collectors already
+  exclude from collection.
+- Updated README first-use documentation for `/qo`, moving/unlocking the tracker,
+  Dark Theme, and the reload-required Minimap Button toggle.
+- No quest/map/drop-rate/tooltip gameplay data changed. No navigation arrow was
+  added.
+
+
+
+1.0.98 - MINIMAP BUTTON LABEL + YELLOW QUEST ICON
+---------------------------------------------------
+- Minimap settings-button tooltip title is now simply `Questie-Octo`; the
+  addon version is no longer appended to the button name.
+- Replaced the completion `?` artwork on the minimap settings button with
+  Questie-Octo's existing ordinary yellow available-quest `!` artwork.
+- The safe reload-required Show Minimap Button behavior, drag position, square/
+  round minimap handling, pfUI/DragonflightUI collector avoidance, and `/qo`
+  fallback are unchanged.
+- No quest/map/drop-rate/gameplay data changed.
