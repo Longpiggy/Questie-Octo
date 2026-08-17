@@ -1415,3 +1415,19 @@ Moonwhisper Coast (for example Andanil Sunsworn 63119 and Rhys Dawnbreeze
 63122, both recorded as Alliance-only starter NPCs) even though the live NPCs
 will not offer those quests. Unknown faction metadata remains fail-open, and
 item-start quests remain unaffected by a separate NPC starter's faction.
+
+1.0.85 - LONG RARE RESPAWN TIME FORMATTING
+-------------------------------------------
+Rare/static respawn times shown on dedicated Rare Monster nodes and rare
+creature sources inside item-start quest tooltips now switch to hour/minute
+format when the recorded static DB respawn exceeds 60 minutes.
+
+Examples:
+  60 min  -> ~60 min
+  90 min  -> ~1h30m
+  320 min -> ~5h20m
+
+The change is presentation-only. Respawn source data and rare/item-start node
+selection are unchanged. The creature diagnostic command uses the same display
+format for consistency.
+

@@ -173,6 +173,20 @@ local function RespawnText(seconds)
   seconds=tonumber(seconds)
   if not seconds or seconds<=0 then return nil end
 
+  -- Keep short respawns in minutes, but once a static DB respawn is longer
+  -- than one hour make it easier to read at a glance. 60 minutes itself stays
+  -- as "~60 min"; 90 minutes becomes "~1h30m" and 320 becomes "~5h20m".
+  if seconds>3600 then
+    local hours=math.floor(seconds/3600)
+    local remainder=math.mod(seconds,3600)
+    local minutes=math.floor(remainder/60)
+    local secs=math.mod(remainder,60)
+    local text="~"..tostring(hours).."h"
+    if minutes>0 then text=text..tostring(minutes).."m" end
+    if secs>0 then text=text.." "..tostring(secs).."s" end
+    return text
+  end
+
   if math.mod(seconds,60)==0 then
     return "~"..tostring(math.floor(seconds/60)).." min"
   end

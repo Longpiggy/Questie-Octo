@@ -677,3 +677,24 @@ service markers, but did not apply it to ordinary available quest starters.
 
 This is a presentation/eligibility correction using existing pfQuest source
 truth; it does not invent race masks in the generated quest database.
+
+## 1.0.85 long rare respawn time formatting
+
+Static rare respawn metadata is still sourced from the existing creature DB and
+is not inferred from live kills. The tooltip formatter now keeps values through
+60 minutes in the existing minute form, but converts values **above** 60 minutes
+to compact hour/minute text. This applies to the same shared rare-source display
+path used by dedicated Rare Monster nodes and rare sources shown inside
+item-start quest tooltips.
+
+Boundary/examples:
+
+- 60 minutes -> `~60 min`
+- 61 minutes -> `~1h1m`
+- 90 minutes -> `~1h30m`
+- 320 minutes -> `~5h20m`
+
+If the underlying static respawn contains a non-zero seconds remainder, that
+remainder is retained after the hour/minute portion. No respawn data, rare-node
+eligibility, or item-start source logic is changed.
+
