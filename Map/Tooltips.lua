@@ -143,7 +143,7 @@ local function ItemStartAreaDropRateText(area)
   if not minText or not maxText then return nil end
 
   if minText==maxText then return minText.."%" end
-  return minText.."% - "..maxText.."%"
+  return minText.."% to "..maxText.."%"
 end
 
 local function DifficultyColor(level,questID)
@@ -359,7 +359,7 @@ local function AddRareSourceRespawn(pin,tooltip)
   local rank,respawnSeconds=RareSourceInfo(pin)
   if not rank then return end
   local respawn=RespawnText(respawnSeconds)
-  if respawn then tooltip:AddLine("Respawn: "..respawn,.75,.75,.75) end
+  if respawn then tooltip:AddLine("Respawn: approx. "..respawn,.75,.75,.75) end
 end
 
 local function TooltipRelationshipSignature(pin)
@@ -1107,7 +1107,7 @@ function T:Show(pin)
       end
       local respawn=RespawnText(respawnSeconds)
       if respawn then
-        tooltip:AddLine("Respawn: "..respawn,.75,.75,.75)
+        tooltip:AddLine("Respawn: approx. "..respawn,.75,.75,.75)
       end
     else
       tooltip:SetText(tostring(title),.2,1,.35)
@@ -1171,7 +1171,7 @@ function T:Show(pin)
         local respawn=rank and RespawnText(source.respawnSeconds) or nil
         if respawn then
           local rareTag=RareRankText(source.rank) or "Rare"
-          tooltip:AddLine("["..rareTag.."] Respawn: "..respawn,.75,.75,.75)
+          tooltip:AddLine("["..rareTag.."] Respawn: approx. "..respawn,.75,.75,.75)
         end
       end
     end

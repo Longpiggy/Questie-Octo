@@ -732,3 +732,15 @@ User-facing tooltip tildes use the centered `∼` glyph rather than the raised A
 ### 1.0.88 — tooltip font-safe range and respawn formatting
 
 The current in-game tooltip font does not render the mathematical `∼` glyph used in 1.0.87. That made the approximation prefix disappear and, more importantly, made item-start ranges run together. 1.0.88 therefore avoids that unsupported glyph entirely. Rare/static respawn text is shown directly (`15h`, `2h30m`, etc.), while item-start drop-rate ranges use a plain ` - ` separator (`0.007% - 0.20%`). The existing timing rules remain unchanged: seconds are shown only below five minutes, and hour formatting is used above sixty minutes. No respawn or drop-rate data changed.
+
+
+### 1.0.89 — font-safe approximation and range wording
+
+Do not use ASCII `~` or Unicode approximation/tilde glyphs in user-facing
+tooltips. The ASCII glyph sits too high in the current game font, while the
+mathematical `∼` glyph is not rendered at all. Rare/static respawn tooltips
+therefore use the explicit ASCII-only wording `Respawn: approx. <time>` (and
+`[Rare] Respawn: approx. <time>` for rare item-start sources). Item-start
+drop-rate ranges use `<minimum>% to <maximum>%`. Single-value drop rates remain
+unchanged. This rule is presentation-only and must not alter respawn/drop data
+or threshold semantics.

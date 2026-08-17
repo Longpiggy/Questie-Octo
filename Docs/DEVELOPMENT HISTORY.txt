@@ -1463,3 +1463,22 @@ for those three IDs, so no replacement respawn value is invented.
 - Rare respawn text no longer uses an approximation glyph; values are shown directly (for example, Respawn: 15h or Respawn: 2h30m).
 - Item-start drop-rate ranges now use a plain supported separator (for example, 0.007% - 0.20%).
 - This is presentation-only; respawn values, short-respawn second rules, drop-rate values, and item-start thresholds are unchanged.
+
+
+1.0.89 - FONT-SAFE APPROXIMATION / RANGE WORDING
+-------------------------------------------------
+The previous attempt to replace the raised ASCII tilde with a mathematical
+glyph failed because the current in-game tooltip font does not render that
+glyph. Removing the approximation marker entirely was also too ambiguous.
+
+User-facing rare respawn tooltips now use plain supported text instead:
+  Respawn: approx. 20h
+  [Rare] Respawn: approx. 15h
+
+Item-start drop-rate ranges now use the word `to` rather than a tilde-like
+glyph or punctuation:
+  0.007% to 0.20%
+
+Single drop rates remain unchanged. This is presentation-only: recorded
+respawn values, the below-five-minute seconds rule, hour conversion, drop
+rates, and the <0.50% representative item-start threshold are unchanged.
