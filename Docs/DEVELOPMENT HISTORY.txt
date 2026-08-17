@@ -1,3 +1,8 @@
+1.0.15 - QUEST BROWSER WORDING
+
+- Simplified the Quest Options browser description to: "Browse the quest database in a dedicated lightweight window."
+- Wording only; no quest-browser, database, search, map, tracker, or gameplay behavior changed.
+
 1.0.14 - RELOAD STABILITY / LAZY QUEST ELIGIBILITY
 
 - The global availability pass no longer materializes and retains a full canonical
