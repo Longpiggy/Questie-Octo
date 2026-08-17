@@ -145,16 +145,40 @@ local function ConditionalCreatureCoords(q,creatureID,role)
   return nil
 end
 
+
+local function HasCoords(coords)
+  for _,coord in pairs(coords or {}) do
+    if type(coord)=="table" and tonumber(coord[1]) and tonumber(coord[2]) and tonumber(coord[3]) then
+      return true
+    end
+  end
+  return false
+end
+
+local function ScriptedEncounterInfo(creatureID,role)
+  if role~="objectiveCreature" and role~="objectiveItemSource" and role~="itemStart" then return nil end
+  local data=QuestieOcto.ScriptedEncounterData
+  return data and data[tonumber(creatureID)] or nil
+end
+
 local function AddCreatureNode(questID,role,creatureID,itemID,chance,objectiveState,vendor)
   local q=QuestieOcto.QuestModel:Get(questID)
+  local coords=ConditionalCreatureCoords(q,creatureID,role) or QuestieOcto.DatabaseAPI:GetCreatureCoords(creatureID)
+  local scripted=ScriptedEncounterInfo(creatureID,role)
+  local usedScripted=false
+  if scripted and not HasCoords(coords) and HasCoords(scripted.coords) then
+    coords=scripted.coords
+    usedScripted=true
+  end
   local node={
     questID=questID,role=role,event=IsPresentationEvent(q),eventID=q and q.eventID or nil,pvp=q and q.pvp or false,repeatable=q and q.presentationRepeatable or false,sourceKind="creature",sourceID=creatureID,
     sourceName=QuestieOcto.DatabaseAPI:GetCreatureName(creatureID),
     sourceRank=QuestieOcto.DatabaseAPI:GetCreatureRank(creatureID),
     respawnSeconds=QuestieOcto.DatabaseAPI:GetCreatureRespawnSeconds(creatureID),
     itemID=itemID,itemName=itemID and QuestieOcto.DatabaseAPI:GetItemName(itemID) or nil,
-    chance=chance,vendor=vendor and true or false,coords=ConditionalCreatureCoords(q,creatureID,role) or QuestieOcto.DatabaseAPI:GetCreatureCoords(creatureID),
-    conditionalOffer=q and q.conditionalOffer or nil
+    chance=chance,vendor=vendor and true or false,coords=coords,
+    conditionalOffer=q and q.conditionalOffer or nil,
+    scriptedEncounterNote=usedScripted and scripted.note or nil,
   }
   AddNode(ApplyObjectiveState(node,objectiveState))
 end

@@ -153,29 +153,32 @@ local function RestoreCurrentZoneMapContext(reason)
 end
 
 local function CurrentMapID()
-  -- The minimap must follow the player's PHYSICAL zone, never the zone being
-  -- browsed in WorldMapFrame. On Vanilla/Turtle the global map context can
-  -- leak into C_Map/GetPlayerMapPosition while the World Map is open, so use
-  -- GetRealZoneText first just like pfQuest's minimap projection does.
+  -- ClassicAPI's GetBestMapForUnit is tied to the player's physical location
+  -- and returns the current AreaTable ID directly. Prefer it over a zone-name
+  -- reverse lookup so duplicate/custom/localized dungeon names cannot select an
+  -- arbitrary map row. This also remains independent from the World Map zone
+  -- the player may be browsing.
+  local id=QuestieOcto.API:GetBestMapForPlayer()
+  if id then
+    MM.physicalMapID=tonumber(id)
+    return MM.physicalMapID
+  end
+
+  -- Fallback for an unexpected API failure: use the physical zone text only
+  -- when it maps unambiguously.
   if GetRealZoneText and QuestieOcto.DatabaseAPI.GetMapIDByName then
     local zoneName=GetRealZoneText()
-    local id=zoneName and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneName)
+    id=zoneName and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneName)
     if id then
       MM.physicalMapID=tonumber(id)
       return MM.physicalMapID
     end
   end
 
-  -- If the World Map is currently browsing somewhere else and the physical
-  -- zone name could not be resolved, keep the last known physical map rather
+  -- If the World Map is currently browsing somewhere else and physical map
+  -- identity could not be resolved, keep the last known physical map rather
   -- than adopting the browsed map context.
   if WorldMapFrame and WorldMapFrame:IsShown() and MM.physicalMapID then
-    return MM.physicalMapID
-  end
-
-  local id=QuestieOcto.API:GetBestMapForPlayer()
-  if id then
-    MM.physicalMapID=tonumber(id)
     return MM.physicalMapID
   end
 

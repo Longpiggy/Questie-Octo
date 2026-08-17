@@ -1,3 +1,11 @@
+1.0.41 - CURRENT DUNGEON MAP IDENTITY / SCRIPTED WC ENCOUNTER
+- Audited the supplied Atlas-CFM dungeon quest/map presentation against current Questie-Octo, Turtle server data, ClassicAPI and pfQuest ClassicAPI without importing Atlas as database authority.
+- World Map identity now prefers current ClassicAPI WorldMapArea texture IDs instead of display-name lookup, covering custom instances/cities/wings that GetMapZones does not enumerate.
+- Minimap physical map identity now prefers C_Map.GetBestMapForUnit("player"), avoiding ambiguous duplicate custom zone names and improving localized-client map identity.
+- Name fallback now uses current C_Map.GetAreas data and fails safe on duplicate display names instead of depending on nondeterministic pairs() order.
+- Added presentation-only Mutanus the Devourer scripted encounter guidance at current server-derived Wailing Caverns map position 45.8, 9.2. Tooltips explain the four-Fanglord + Disciple/Naralex event requirement.
+- Added Docs/DUNGEON_MAP_AUDIT_2026-08-17.md; no destructive quest-template/objective import was made from Atlas-CFM.
+
 1.0.40 - README BASELINE UPDATE
 - Replaced README.md with the current user-approved README baseline.
 - No addon behavior changed in this version.

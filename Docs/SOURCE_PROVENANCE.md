@@ -157,3 +157,7 @@ existing provenance and licensing scope. Release TOCs intentionally load only
 records during every login and `/reload`. Compilation/pruning changes runtime
 representation and startup cost only; it does not transfer ownership or alter
 the provenance/license of the underlying data.
+
+## Atlas-CFM reference audit (2026-08-17)
+
+The user-supplied Atlas-CFM snapshot was inspected as a reference-only source for current dungeon layout/quest presentation during the 1.0.41 dungeon-map audit. Questie-Octo does not import Atlas-CFM code, map artwork, or quest-template data. Wailing Caverns scripted-encounter guidance is derived from current Turtle/Tortoise server script coordinates and cross-checked against the Atlas presentation.

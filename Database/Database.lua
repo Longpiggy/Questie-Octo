@@ -17,6 +17,8 @@ DB.ready = false
 DB.questIDs = DB.questIDs or nil
 DB.questTitleCache = DB.questTitleCache or {}
 DB.questSearchTitleCache = DB.questSearchTitleCache or {}
+DB.clientMapNameIndex = DB.clientMapNameIndex or nil
+DB.packagedMapNameIndex = DB.packagedMapNameIndex or nil
 
 local function RawQuest(id)
   return QuestieOcto.Database:GetRawQuest(id)
@@ -208,6 +210,8 @@ function DB:OnLegacyReady()
   self.ready=false
   self.questTitleCache={}
   self.questSearchTitleCache={}
+  self.clientMapNameIndex=nil
+  self.packagedMapNameIndex=nil
 
   -- The compiled release database ships the exact sorted quest-ID list. Avoid
   -- walking all 6,700 quests and lowercasing every title during login; titles
@@ -296,23 +300,55 @@ function DB:ObjectAllowsPlayerFaction(id)
 end
 
 
-function DB:GetMapIDByName(name)
-  if not self.ready or not name then return nil end
-  if not pfDB or not pfDB.zones or not pfDB.zones.loc then return nil end
-
-  for id,zoneName in pairs(pfDB.zones.loc) do
-    if zoneName==name then return id end
+local function AddUniqueMapName(index,name,id)
+  if type(name)~="string" or name=="" then return end
+  id=tonumber(id)
+  if not id then return end
+  local previous=index[name]
+  if previous==nil then
+    index[name]=id
+  elseif previous~=id then
+    -- A display name can legitimately refer to several current AreaTable rows
+    -- (for example custom dungeon parent/wing rows). A name-only lookup cannot
+    -- safely choose between them, so mark it ambiguous instead of depending on
+    -- nondeterministic pairs() order.
+    index[name]=false
   end
+end
 
-  -- The active localized table uses English through __index for missing direct
-  -- lookups. pairs() does not enumerate __index entries on Vanilla Lua, so
-  -- search the English fallback explicitly for untranslated Turtle zones.
-  if pfDB.zones.enUS and pfDB.zones.loc~=pfDB.zones.enUS then
-    for id,zoneName in pairs(pfDB.zones.enUS) do
-      if pfDB.zones.loc[id]==nil and zoneName==name then return id end
+function DB:BuildMapNameIndexes()
+  local client={}
+  if QuestieOcto.API and QuestieOcto.API.GetClientAreas then
+    local areas=QuestieOcto.API:GetClientAreas()
+    for id,zoneName in pairs(areas or {}) do AddUniqueMapName(client,zoneName,id) end
+  end
+  self.clientMapNameIndex=client
+
+  local packaged={}
+  if pfDB and pfDB.zones then
+    for id,zoneName in pairs(pfDB.zones.loc or {}) do AddUniqueMapName(packaged,zoneName,id) end
+    if pfDB.zones.enUS and pfDB.zones.loc~=pfDB.zones.enUS then
+      for id,zoneName in pairs(pfDB.zones.enUS) do AddUniqueMapName(packaged,zoneName,id) end
     end
   end
+  self.packagedMapNameIndex=packaged
+end
 
+function DB:GetMapIDByName(name)
+  if not self.ready or not name then return nil end
+  if not self.clientMapNameIndex or not self.packagedMapNameIndex then
+    self:BuildMapNameIndexes()
+  end
+
+  local client=self.clientMapNameIndex and self.clientMapNameIndex[name]
+  if type(client)=="number" then return client end
+  -- If the current client says the name is ambiguous, do not override that
+  -- knowledge with a guessed packaged ID. Callers with map context should use
+  -- the texture/BestMap paths instead.
+  if client==false then return nil end
+
+  local packaged=self.packagedMapNameIndex and self.packagedMapNameIndex[name]
+  if type(packaged)=="number" then return packaged end
   return nil
 end
 

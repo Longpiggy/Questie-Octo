@@ -43,6 +43,8 @@ function A:Validate()
     queryQuestsCompleted = type(QueryQuestsCompleted)=="function",
     questFlaggedCompleted = type(IsQuestFlaggedCompleted)=="function" or Has(C_QuestLog,"IsQuestFlaggedCompleted"),
     mapWorldSize = Has(C_Map,"GetMapWorldSize"),
+    mapAreas = Has(C_Map,"GetAreas"),
+    mapAreaIDs = Has(C_Map,"GetMapAreaIDs"),
     instanceInfo = type(GetInstanceInfo)=="function",
     leaderboardObjectiveID = type(GetQuestLogLeaderBoardID)=="function",
     areaTriggerInfo = Has(C_Map,"GetAreaTriggerInfo"),
@@ -118,6 +120,46 @@ end
 function A:IsOnQuest(questID)
   if not self.valid then return false end
   return C_QuestLog.IsOnQuest(questID) and true or false
+end
+
+
+-- Current Octo/ClassicAPI exposes AreaTable.dbc and WorldMapArea.dbc directly.
+-- Use these live client tables for map identity instead of assuming English
+-- packaged zone names are unique/current. This is especially important for
+-- custom instances where several AreaTable rows can share one display name.
+function A:GetClientAreas()
+  if self.clientAreasLoaded then
+    return self.clientAreas or nil
+  end
+  self.clientAreasLoaded=true
+  if not C_Map or type(C_Map.GetAreas)~="function" then return nil end
+  local ok,areas=pcall(C_Map.GetAreas)
+  if ok and type(areas)=="table" then self.clientAreas=areas end
+  return self.clientAreas or nil
+end
+
+function A:GetMapAreaIDs()
+  if self.mapAreaIDsLoaded then
+    return self.mapAreaIDs or nil
+  end
+  self.mapAreaIDsLoaded=true
+  if not C_Map or type(C_Map.GetMapAreaIDs)~="function" then return nil end
+  local ok,ids=pcall(C_Map.GetMapAreaIDs)
+  if ok and type(ids)=="table" then self.mapAreaIDs=ids end
+  return self.mapAreaIDs or nil
+end
+
+function A:GetMapAreaIDForTexture(textureName)
+  if not textureName or textureName=="" then return nil end
+  local ids=self:GetMapAreaIDs()
+  return ids and tonumber(ids[textureName]) or nil
+end
+
+function A:GetDisplayedMapAreaID()
+  if type(GetMapInfo)~="function" then return nil end
+  local ok,textureName=pcall(GetMapInfo)
+  if not ok then return nil end
+  return self:GetMapAreaIDForTexture(textureName)
 end
 
 function A:GetBestMapForPlayer()

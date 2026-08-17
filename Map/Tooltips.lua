@@ -464,6 +464,9 @@ local function AddQuestEntries(pin,seen,tooltip)
         )
         local extra=Extra(node)
         if extra then tooltip:AddLine("  "..extra,.82,.82,.82,true) end
+        if node.scriptedEncounterNote then
+          tooltip:AddLine("  "..tostring(node.scriptedEncounterNote),1,.72,.2,true)
+        end
         if node.itemID and Settings():Get("enableTooltipsItemID") then
           tooltip:AddLine("  Item ID: "..tostring(node.itemID),.65,.65,.65)
         end

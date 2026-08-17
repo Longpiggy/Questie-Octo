@@ -340,22 +340,37 @@ local function UpdatePosition(pin,x,y,offsetX,offsetY)
 end
 
 local function DisplayedMapID()
-  -- Vanilla selected-zone map -> name -> canonical DB map ID.
   local cid=GetCurrentMapContinent and GetCurrentMapContinent() or 0
   local zid=GetCurrentMapZone and GetCurrentMapZone() or 0
-  if not cid or cid<=0 or not zid or zid<=0 then return nil end
-  if not GetMapZones then return nil end
 
+  -- ClassicAPI exposes WorldMapArea.dbc as texture-dir -> AreaTable ID. This is
+  -- the authoritative way to distinguish custom instances/wings that share the
+  -- same localized display name, and it also covers instance/city maps that
+  -- GetMapZones() does not enumerate.
+  local textureMapID=QuestieOcto.API and QuestieOcto.API.GetDisplayedMapAreaID
+    and QuestieOcto.API:GetDisplayedMapAreaID() or nil
+
+  -- A continent overview also has a map texture. Do not mistake that texture
+  -- for a selected zone; preserve the dedicated continent projection path.
+  if cid and cid>0 and (not zid or zid<=0) then
+    local continentMapID=QuestieOcto.ContinentProjection
+      and QuestieOcto.ContinentProjection:GetClientContinentMapID(cid) or nil
+    if textureMapID and continentMapID~=nil and tonumber(textureMapID)~=tonumber(continentMapID) then
+      return tonumber(textureMapID)
+    end
+    return nil
+  end
+
+  if textureMapID then return tonumber(textureMapID) end
+
+  -- Vanilla selected-zone fallback: localized zone name -> canonical DB map ID.
+  if not cid or cid<=0 or not zid or zid<=0 or not GetMapZones then return nil end
   local zones={GetMapZones(cid)}
   local name=zones[zid]
   if not name then return nil end
-
-  -- Derive ID by looking at existing canonical node map indexes.
-  -- Zone DB identity remains hidden behind generated node coordinates.
   if QuestieOcto.DatabaseAPI.GetMapIDByName then
     return QuestieOcto.DatabaseAPI:GetMapIDByName(name)
   end
-
   return nil
 end
 
