@@ -143,7 +143,7 @@ local function ItemStartAreaDropRateText(area)
   if not minText or not maxText then return nil end
 
   if minText==maxText then return minText.."%" end
-  return minText.."%~"..maxText.."%"
+  return minText.."%",maxText.."%"
 end
 
 local function DifficultyColor(level,questID)
@@ -176,22 +176,158 @@ local function RespawnText(seconds)
   -- Seconds are only useful for very short rare respawns. At five minutes and
   -- above, keep the tooltip compact and show whole minutes/hours only.
   if seconds<300 then
-    if seconds<60 then return "~"..tostring(seconds).."s" end
+    if seconds<60 then return tostring(seconds).."s" end
     local minutes=math.floor(seconds/60)
     local secs=math.mod(seconds,60)
-    if secs==0 then return "~"..tostring(minutes).." min" end
-    return "~"..tostring(minutes).."m"..tostring(secs).."s"
+    if secs==0 then return tostring(minutes).." min" end
+    return tostring(minutes).."m"..tostring(secs).."s"
   end
 
   if seconds>3600 then
     local hours=math.floor(seconds/3600)
     local minutes=math.floor(math.mod(seconds,3600)/60)
-    local text="~"..tostring(hours).."h"
+    local text=tostring(hours).."h"
     if minutes>0 then text=text..tostring(minutes).."m" end
     return text
   end
 
-  return "~"..tostring(math.floor(seconds/60)).." min"
+  return tostring(math.floor(seconds/60)).." min"
+end
+
+-- The stock GameTooltipText font is FRIZQT__.TTF and renders ASCII `~`
+-- visibly high.  The current Turtle/Octo FrameXML also exposes the native
+-- Fonts\\ARIALN.TTF family.  Keep every surrounding tooltip character in the
+-- normal tooltip font, reserve one ordinary space for the separator, and draw
+-- only the ASCII tilde in ARIALN at that slot.  This avoids unsupported Unicode
+-- and texture escapes while limiting the font change to the one requested
+-- glyph.  The marker is nudged down one pixel relative to the line center.
+local function ResetCenteredTildes(tooltip)
+  if not tooltip then return end
+  tooltip.questieOctoCenteredTildeCount=0
+  for _,fs in pairs(tooltip.questieOctoCenteredTildes or {}) do
+    if fs and fs.Hide then fs:Hide() end
+  end
+end
+
+local function TooltipLeftLine(tooltip,lineNumber)
+  if not tooltip or not getglobal then return nil end
+  local name=tooltip.GetName and tooltip:GetName() or nil
+  if not name or name=="" then return nil end
+  return getglobal(tostring(name).."TextLeft"..tostring(lineNumber))
+end
+
+local function CurrentTooltipLineNumber(tooltip)
+  if tooltip and type(tooltip.NumLines)=="function" then
+    local count=tonumber(tooltip:NumLines())
+    if count then return count end
+  end
+  local name=tooltip and tooltip.GetName and tooltip:GetName() or nil
+  if not name or not getglobal then return nil end
+  local count=0
+  for i=1,30 do
+    local left=getglobal(tostring(name).."TextLeft"..tostring(i))
+    local text=left and left.GetText and left:GetText() or nil
+    if text then count=i end
+  end
+  if count>0 then return count end
+  return nil
+end
+
+local function PositionCenteredTilde(tooltip,marker)
+  if not tooltip or not marker then return end
+  local lineNumber=tonumber(marker.questieOctoLineNumber)
+  local line=TooltipLeftLine(tooltip,lineNumber)
+  if not line or not line.GetFont then return end
+
+  local _,size=line:GetFont()
+  size=tonumber(size) or tonumber(marker.questieOctoFontSize) or 12
+
+  local measure=tooltip.questieOctoCenteredTildeMeasure
+  if not measure then
+    measure=tooltip:CreateFontString(nil,"OVERLAY")
+    tooltip.questieOctoCenteredTildeMeasure=measure
+  end
+  if not measure then return end
+
+  local font,lineSize,flags=line:GetFont()
+  if font and lineSize and measure.SetFont then measure:SetFont(font,lineSize,flags) end
+  measure:SetText(tostring(marker.questieOctoPrefix or ""))
+  local prefixWidth=measure.GetStringWidth and tonumber(measure:GetStringWidth()) or 0
+  measure:SetText(" ")
+  local spaceWidth=measure.GetStringWidth and tonumber(measure:GetStringWidth()) or 4
+  local spaceIndex=tonumber(marker.questieOctoSpaceIndex) or 1
+  local markerOffset=prefixWidth+((spaceIndex-0.5)*spaceWidth)
+
+  marker:ClearAllPoints()
+  -- GameTooltip finalizes line wrapping only when it is shown.  Before Show(),
+  -- GetHeight() can still report a one-row height even though the final line
+  -- will wrap.  Always run this positioning once more after tooltip:Show().
+  -- For a finalized wrapped row, anchor from TOPLEFT to the center of the first
+  -- visual row; single-line rows keep the already accepted 1.0.93 placement.
+  local lineHeight=line.GetHeight and tonumber(line:GetHeight()) or nil
+  if lineHeight and lineHeight>(size*1.5) then
+    marker:SetPoint("CENTER",line,"TOPLEFT",markerOffset,-(size/2)-1)
+  else
+    marker:SetPoint("CENTER",line,"LEFT",markerOffset,-1)
+  end
+  marker:Show()
+end
+
+local function PlaceCenteredTilde(tooltip,prefix,r,g,b,spaceIndex)
+  if not tooltip or not tooltip.CreateFontString then return end
+  local lineNumber=CurrentTooltipLineNumber(tooltip)
+  local line=TooltipLeftLine(tooltip,lineNumber)
+  if not line or not line.GetFont then return end
+
+  local _,size=line:GetFont()
+  size=tonumber(size) or 12
+
+  tooltip.questieOctoCenteredTildes=tooltip.questieOctoCenteredTildes or {}
+  local index=(tonumber(tooltip.questieOctoCenteredTildeCount) or 0)+1
+  tooltip.questieOctoCenteredTildeCount=index
+
+  local marker=tooltip.questieOctoCenteredTildes[index]
+  if not marker then
+    marker=tooltip:CreateFontString(nil,"OVERLAY")
+    tooltip.questieOctoCenteredTildes[index]=marker
+  end
+  if not marker then return end
+
+  -- ARIALN.TTF is a native Turtle/Octo font (used by NumberFont/ChatFont).
+  -- Do not alter the surrounding tooltip font; only this one ASCII glyph uses
+  -- ARIALN.  The font exists in the client source, so no addon font is bundled.
+  if marker.SetFont then marker:SetFont("Fonts\\ARIALN.TTF",size) end
+  marker:SetText("~")
+  marker:SetTextColor(r or 1,g or 1,b or 1)
+  marker.questieOctoLineNumber=lineNumber
+  marker.questieOctoPrefix=tostring(prefix or "")
+  marker.questieOctoFontSize=size
+  marker.questieOctoSpaceIndex=tonumber(spaceIndex) or 1
+
+  -- Initial placement handles ordinary rows immediately.  A second pass after
+  -- tooltip:Show() below uses the *final* wrapped height for long rows.
+  PositionCenteredTilde(tooltip,marker)
+end
+
+local function FinalizeCenteredTildes(tooltip)
+  if not tooltip then return end
+  local count=tonumber(tooltip.questieOctoCenteredTildeCount) or 0
+  for i=1,count do
+    local marker=tooltip.questieOctoCenteredTildes and tooltip.questieOctoCenteredTildes[i]
+    if marker then PositionCenteredTilde(tooltip,marker) end
+  end
+end
+
+local function AddCenteredTildeLine(tooltip,prefix,suffix,r,g,b,wrap,spaceAroundTilde)
+  if not tooltip then return end
+  local spacer=" "
+  local spaceIndex=1
+  if spaceAroundTilde then
+    spacer="   "
+    spaceIndex=2
+  end
+  tooltip:AddLine(tostring(prefix or "")..spacer..tostring(suffix or ""),r,g,b,wrap)
+  PlaceCenteredTilde(tooltip,prefix,r,g,b,spaceIndex)
 end
 
 local function SourceDisplayName(source)
@@ -359,7 +495,7 @@ local function AddRareSourceRespawn(pin,tooltip)
   local rank,respawnSeconds=RareSourceInfo(pin)
   if not rank then return end
   local respawn=RespawnText(respawnSeconds)
-  if respawn then tooltip:AddLine("Respawn: "..respawn,.75,.75,.75) end
+  if respawn then AddCenteredTildeLine(tooltip,"Respawn: ",respawn,.75,.75,.75) end
 end
 
 local function TooltipRelationshipSignature(pin)
@@ -486,6 +622,7 @@ local function ShowCombinedNearbyFullNodeTooltip(pin,pins)
   local tooltip=MapTooltip()
   tooltip:SetOwner(pin,"ANCHOR_CURSOR")
   tooltip:ClearLines()
+  ResetCenteredTildes(tooltip)
 
   -- Full Nodes can place several coordinates of the same source within only a
   -- few screen pixels. Collapse only semantically identical source/relationship
@@ -504,12 +641,14 @@ local function ShowCombinedNearbyFullNodeTooltip(pin,pins)
 
   NormalizeFirstRowFont(tooltip)
   tooltip:Show()
+  FinalizeCenteredTildes(tooltip)
 end
 
 local function ShowCombinedNearbyQuestTooltip(pin,pins)
   local tooltip=MapTooltip()
   tooltip:SetOwner(pin,"ANCHOR_CURSOR")
   tooltip:ClearLines()
+  ResetCenteredTildes(tooltip)
 
   local seen={}
   local first=true
@@ -551,6 +690,7 @@ local function ShowCombinedNearbyQuestTooltip(pin,pins)
 
   NormalizeFirstRowFont(tooltip)
   tooltip:Show()
+  FinalizeCenteredTildes(tooltip)
 end
 
 local function IsQuestHoverRole(role)
@@ -1088,6 +1228,7 @@ function T:Show(pin)
   if permanentLabel then
     tooltip:SetOwner(pin,"ANCHOR_CURSOR")
     tooltip:ClearLines()
+    ResetCenteredTildes(tooltip)
     local title=pin.displayName or permanentLabel
     if pin.role=="rareMob" then
       tooltip:SetText(tostring(title),1,.82,0)
@@ -1107,13 +1248,14 @@ function T:Show(pin)
       end
       local respawn=RespawnText(respawnSeconds)
       if respawn then
-        tooltip:AddLine("Respawn: "..respawn,.75,.75,.75)
+        AddCenteredTildeLine(tooltip,"Respawn: ",respawn,.75,.75,.75)
       end
     else
       tooltip:SetText(tostring(title),.2,1,.35)
       tooltip:AddLine(permanentLabel,1,.82,0)
     end
     tooltip:Show()
+    FinalizeCenteredTildes(tooltip)
     return
   end
 
@@ -1137,6 +1279,7 @@ function T:Show(pin)
 
   tooltip:SetOwner(pin,"ANCHOR_CURSOR")
   tooltip:ClearLines()
+  ResetCenteredTildes(tooltip)
 
   if pin.itemStartArea then
     local area=pin.itemStartArea
@@ -1171,7 +1314,7 @@ function T:Show(pin)
         local respawn=rank and RespawnText(source.respawnSeconds) or nil
         if respawn then
           local rareTag=RareRankText(source.rank) or "Rare"
-          tooltip:AddLine("["..rareTag.."] Respawn: "..respawn,.75,.75,.75)
+          AddCenteredTildeLine(tooltip,"["..rareTag.."] Respawn: ",respawn,.75,.75,.75)
         end
       end
     end
@@ -1187,7 +1330,7 @@ function T:Show(pin)
       )
     end
 
-    local dropRateText=ItemStartAreaDropRateText(area)
+    local dropRateText,dropRateMaxText=ItemStartAreaDropRateText(area)
 
     local itemLabel=tostring(area.itemName or ("Item "..tostring(area.itemID)))
     if Settings():Get("enableTooltipsItemID") and area.itemID then
@@ -1195,12 +1338,23 @@ function T:Show(pin)
     end
     local line="Drops ["..itemLabel.."]"
     if dropRateText and Settings():Get("enableTooltipDroprates") then
-      line=line.." ("..dropRateText..")"
+      if dropRateMaxText then
+        AddCenteredTildeLine(
+          tooltip,
+          line.." ("..dropRateText,
+          dropRateMaxText..") - item starts quest",
+          .82,.82,.82,true,true
+        )
+        line=nil
+      else
+        line=line.." ("..dropRateText..")"
+      end
     end
-    tooltip:AddLine(line.." - item starts quest",.82,.82,.82,true)
+    if line then tooltip:AddLine(line.." - item starts quest",.82,.82,.82,true) end
 
     if not area.zoneWideRare then NormalizeFirstRowFont(tooltip) end
     tooltip:Show()
+    FinalizeCenteredTildes(tooltip)
     return
   end
 
@@ -1221,5 +1375,6 @@ function T:Show(pin)
   end
 
   tooltip:Show()
+  FinalizeCenteredTildes(tooltip)
 end
 

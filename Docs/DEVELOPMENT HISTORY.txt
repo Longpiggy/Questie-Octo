@@ -1537,3 +1537,57 @@ Per the maintainer's explicit fallback decision, 1.0.92 restores the exact
 The failed 1.0.87-1.0.91 presentation approaches are retained in history but
 must not be reintroduced as accepted behavior. The temporary `tilde_mid.tga`
 asset from 1.0.91 is removed.
+
+
+1.0.93 - ARIALN MIDDLE-TILDE TEST
+----------------------------------
+The direct current Turtle/Octo FrameXML confirms that normal tooltip rows use
+Fonts\\FRIZQT__.TTF at 12px while the client also ships and natively uses
+Fonts\\ARIALN.TTF (NumberFont/ChatFont families).
+
+Per the maintainer's request, the compact ASCII `~` notation is retained, but
+only the tilde is now drawn with ARIALN in a separate tooltip FontString. The
+normal tooltip line reserves one space at the marker position; the ARIALN tilde
+is centered over that slot and nudged down one pixel. All surrounding text
+continues to use the tooltip's normal font.
+
+This applies only to user-facing rare respawn approximation markers and
+item-start min/max drop-rate separators. No timer/drop-rate values or threshold
+rules change. If this native-font experiment is still visually unsatisfactory
+in the actual client, the accepted fallback remains the 1.0.92/1.0.86 direct
+ASCII-tilde presentation; do not revive the rejected Unicode/texture methods.
+
+
+1.0.94 - WRAPPED-LINE ARIALN TILDE ALIGNMENT
+-----------------------------------------------
+In-game 1.0.93 testing confirmed that the ARIALN ASCII tilde is visually
+centered correctly on ordinary single-line rare respawn rows. It also exposed
+a separate layout bug on long item-start drop-rate rows: GameTooltip represents
+a wrapped AddLine as one tall FontString, so anchoring the tilde to that
+FontString's vertical LEFT point placed the marker between the two visual rows.
+
+The ARIALN presentation is retained. Single-line positioning is unchanged. For
+wrapped tooltip FontStrings only, the tilde now anchors from TOPLEFT and is
+centered on the first visual row where the reserved marker slot actually lives.
+This is a presentation-only correction; no tooltip wording, rates, respawn
+values, thresholds, or item-start behavior changed.
+
+
+1.0.95 - FINALIZE WRAPPED TILDE AFTER TOOLTIP LAYOUT
+-------------------------------------------------------
+In-game 1.0.94 testing showed the ranged item-start tilde could still land
+between visual rows. The problem was timing rather than the ARIALN glyph: the
+marker position was calculated immediately after AddLine(), before GameTooltip
+had finalized wrapping. At that point the FontString could still report a
+single-row height, then become two rows only when Show() laid the tooltip out.
+
+Questie-Octo now stores each tilde's source line/prefix and performs a second
+positioning pass immediately after tooltip:Show(), when the real wrapped height
+is available. Single-line rare respawn placement is unchanged. Final wrapped
+rows anchor the ARIALN tilde to the center of the first visual row. No tooltip
+wording, respawn values, drop rates, or thresholds changed.
+
+
+1.0.96 — spaced drop-rate range separator
+- Item-start drop-rate ranges that compare min/max now display as `0.01% ~ 0.20%`.
+- Rare respawn lines remain `~15h` / `~2h30m` with no added spaces.

@@ -788,3 +788,54 @@ Current timing presentation remains:
 Do not re-add `tilde_mid.tga` or the 1.0.90/1.0.91 overlay/texture machinery
 unless a future client-side method is first demonstrated to render correctly in
 Octo/Turtle 1.12.
+
+### 1.0.93 — native ARIALN font for the middle tilde
+
+The latest direct Turtle/Octo `FrameXML/Fonts.xml` establishes two relevant
+native font facts: `GameTooltipText` uses `Fonts\\FRIZQT__.TTF` at 12px, while
+`Fonts\\ARIALN.TTF` is shipped and used by native NumberFont/ChatFont families.
+The stock FRIZQT ASCII `~` is still the compatibility fallback, but 1.0.93 tests
+a narrower presentation-only solution: only the tilde is rendered in ARIALN.
+
+Implementation constraints:
+
+- surrounding tooltip text remains in the existing GameTooltip font;
+- one normal space reserves the inline marker width;
+- a child FontString draws the guaranteed ASCII `~` in native ARIALN over that
+  slot, centered on the line and nudged down one pixel;
+- overlays are reset whenever Questie-Octo rebuilds the relevant tooltip;
+- no Unicode approximation glyph and no inline/addon tilde texture are used;
+- rare respawn timing and item-start drop-rate data/thresholds are unchanged.
+
+This requires an in-client visual check. If ARIALN still does not give the
+requested middle tilde, roll this presentation path back to the accepted
+1.0.92/1.0.86 direct ASCII `~` rather than adding more speculative mechanisms.
+
+### 1.0.94 — wrapped-line ARIALN tilde alignment
+
+In-game testing accepted the ARIALN `~` position on normal single-line rare
+respawn rows, but showed that item-start drop-rate lines that wrap can place the
+separate tilde between visual rows. A wrapped GameTooltip line is one tall
+FontString, so its `LEFT` anchor is vertically centered across the whole wrapped
+region. Questie-Octo must preserve the 1.0.93 single-line placement while using
+`TOPLEFT` plus a first-row vertical offset for wrapped lines. This changes only
+the tilde's visual anchor and must not alter tooltip text, drop rates, respawn
+values, or item-start rules.
+
+
+### 1.0.95 — finalize centered tilde after GameTooltip wrapping
+
+The 1.0.94 wrapped-line branch was evaluated too early: WoW 1.12 does not
+necessarily finalize an AddLine FontString's wrapped height until the tooltip
+is shown. A long item-start drop-rate row could therefore be classified as a
+single line before `Show()`, then wrap afterward and drag the tilde into the
+vertical center between rows. Questie-Octo now records the marker's tooltip line
+and prefix, calls `Show()`, and then repositions every active ARIALN tilde from
+the finalized FontString geometry. Single-line respawn rows retain the accepted
+1.0.93 position; finalized wrapped rows target the first visual row. This is
+presentation-only.
+
+
+1.0.96 — spaced drop-rate range separator
+- Item-start drop-rate ranges that compare min/max now display as `0.01% ~ 0.20%`.
+- Rare respawn lines remain `~15h` / `~2h30m` with no added spaces.
