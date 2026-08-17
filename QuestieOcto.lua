@@ -2,11 +2,14 @@
 QuestieOcto = QuestieOcto or {}
 local QO = QuestieOcto
 
-QO.version = "1.0.9"
+QO.version = "1.0.11"
 QO.enabled = false
 QO.ready = false
 QO.messages = {}
 QO.startedAt = 0
+QO.fileLoadStartedAt = GetTime and GetTime() or 0
+QO.fileLoadFinishedAt = 0
+QO.foundationReadyAt = 0
 
 -- Turtle/Vanilla is authoritative for quest difficulty colors.  Questie-Octo
 -- deliberately does not reproduce Questie level-band thresholds here.

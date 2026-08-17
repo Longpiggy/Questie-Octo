@@ -627,7 +627,6 @@ function O:Toggle()
   end
 end
 
--- Build the hidden frame after login rather than during file load.
-QuestieOcto.Scheduler:After(0.10,function()
-  O:Initialize()
-end,"questie-options-init")
+-- Deliberately lazy: the full AceConfig/AceGUI tree is created only when the
+-- player actually opens settings. Building a hidden 625x700 options tree during
+-- login added avoidable allocations and layout work to the busiest startup window.

@@ -1,7 +1,8 @@
 QuestieOcto.MapCandidateIndex = QuestieOcto.MapCandidateIndex or {}
 local X = QuestieOcto.MapCandidateIndex
 
-X.byMap={}
+X.byMap=QuestieOcto.RuntimeMapCandidateIndex or {}
+X.compiled=QuestieOcto.RuntimeMapCandidateIndex and true or false
 X.ready=false
 X.running=false
 X.generation=0
@@ -72,15 +73,18 @@ end
 
 function X:Get(mapID)
   local bucket=self.byMap[tonumber(mapID)]
-  local ids={}
-
-  if bucket then
-    for questID in pairs(bucket) do
-      table.insert(ids,questID)
-    end
-    table.sort(ids)
+  if self.compiled then
+    -- Build-time candidate buckets are already sorted arrays and are read-only
+    -- for all current consumers, so return them directly without allocating and
+    -- sorting a fresh list every zone visit.
+    return bucket or {}
   end
 
+  local ids={}
+  if bucket then
+    for questID in pairs(bucket) do table.insert(ids,questID) end
+    table.sort(ids)
+  end
   return ids
 end
 
@@ -90,6 +94,22 @@ end
 
 function X:Build()
   if not QuestieOcto.DatabaseAPI:IsReady() then return end
+
+  if self.compiled then
+    local stats=QuestieOcto.RuntimeDatabaseStats or {}
+    self.running=false
+    self.ready=true
+    self.stats={
+      scanned=QuestieOcto.DatabaseAPI:GetQuestCount(),
+      maps=tonumber(stats.maps) or 0,
+      links=tonumber(stats.links) or 0,
+      currentReady=true,
+      currentMap=QuestieOcto.API:GetBestMapForPlayer()
+    }
+    if self.stats.currentMap then QuestieOcto:SendMessage("MAP_CANDIDATE_INDEX_CURRENT",self.stats.currentMap) end
+    QuestieOcto:SendMessage("MAP_CANDIDATE_INDEX_READY")
+    return
+  end
 
   self.generation=self.generation+1
   local generation=self.generation

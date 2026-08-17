@@ -6,6 +6,7 @@ function QuestieOcto:OnFoundationServiceReady()
 
   if self.Database.ready and self.DatabaseAPI:IsReady() and self.Completion.ready and self.QuestLog.snapshot then
     self.ready=true
+    self.foundationReadyAt=GetTime and GetTime() or 0
     local q=self.DatabaseAPI:GetQuestCount()
     self:Print("foundation ready - "..tostring(q).." quests, "..tostring(self.Completion:Count())..
       " completed, "..tostring(self.QuestLog.stats.resolved).." active quest IDs resolved.")
@@ -35,7 +36,11 @@ f:SetScript("OnEvent",function()
 
   QuestieOcto:Print("ClassicAPI detected; starting Questie-Octo.")
 
-  QuestieOcto.Database:Start()
+  -- Prime character-local state before publishing the compiled database. The
+  -- compiled DB is immediately ready (there is no runtime merge), so installing
+  -- Quest Log/completion work first keeps the player's current state ahead of
+  -- world-wide background presentation work in the startup queue.
   QuestieOcto.QuestLog:Start()
   QuestieOcto.Completion:ScheduleStart()
+  QuestieOcto.Database:Start()
 end)

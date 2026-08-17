@@ -1,3 +1,5 @@
+QuestieOcto.fileLoadFinishedAt = GetTime and GetTime() or QuestieOcto.fileLoadFinishedAt or 0
+
 SLASH_QUESTIEOCTO1="/qo"
 SLASH_QUESTIEOCTO2="/questieocto"
 
@@ -57,7 +59,37 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
   elseif msg=="help" then
     QuestieOcto:Print("/qo -- toggle Questie-Octo options")
     QuestieOcto:Print("/qo quests -- open the Quests browser")
-    QuestieOcto:Print("/qo options, /qo info, /qo minimap, /qo api, /qo resync, /qo questlog, /qo map")
+    QuestieOcto:Print("/qo options, /qo info, /qo perf, /qo minimap, /qo api, /qo resync, /qo questlog, /qo map")
+
+  elseif msg=="perf" then
+    local now=GetTime and GetTime() or 0
+    local fileStart=tonumber(QuestieOcto.fileLoadStartedAt or 0) or 0
+    local fileEnd=tonumber(QuestieOcto.fileLoadFinishedAt or 0) or 0
+    local entered=tonumber(QuestieOcto.startedAt or 0) or 0
+    local foundation=tonumber(QuestieOcto.foundationReadyAt or 0) or 0
+    local scheduler=QuestieOcto.Scheduler
+    local st=scheduler and scheduler.stats or {}
+    QuestieOcto:Print("performance diagnostic (manual, no polling)")
+    if fileEnd>fileStart and fileStart>0 then
+      QuestieOcto:Print(string.format("addon Lua load ~= %.3fs",fileEnd-fileStart))
+    end
+    if foundation>entered and entered>0 then
+      QuestieOcto:Print(string.format("enter-world to foundation ready = %.3fs",foundation-entered))
+    elseif entered>0 then
+      QuestieOcto:Print(string.format("foundation pending for %.3fs",math.max(0,now-entered)))
+    end
+    local dbStats=QuestieOcto.RuntimeDatabaseStats or {}
+    QuestieOcto:Print("runtime DB compiled="..Bool(pfDB and pfDB["octo-compiled-runtime"])..
+      " pruned="..Bool(dbStats.pruned)..
+      " quests/items/units/objects="..
+      tostring(QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI:GetQuestCount() or 0).."/"..
+      tostring(dbStats.items or 0).."/"..tostring(dbStats.units or 0).."/"..tostring(dbStats.objects or 0))
+    QuestieOcto:Print("scheduler queued/executed/maxQueue/maxJobsFrame="..
+      tostring(scheduler and table.getn(scheduler.queue) or 0).."/"..
+      tostring(scheduler and scheduler.executed or 0).."/"..
+      tostring(st.maxQueue or 0).."/"..tostring(st.maxJobsInFrame or 0))
+    QuestieOcto:Print(string.format("scheduler slowest=%s %.4fs, max budgeted frame %.4fs",
+      tostring(st.slowestLabel or "none"),tonumber(st.slowestSeconds or 0) or 0,tonumber(st.maxFrameSeconds or 0) or 0))
 
   elseif msg=="info" then
     QuestieOcto:Print(tostring(QuestieOcto.version).." infrastructure diagnostic")
@@ -66,6 +98,7 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
 
     local q=QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI:GetQuestCount() or 0
     QuestieOcto:Print("DB ready="..Bool(QuestieOcto.Database.ready)..
+      " compiled="..Bool(QuestieOcto.Database.stats.compiled)..
       " mergeJob="..tostring(QuestieOcto.Database.jobIndex).."/"..tostring(QuestieOcto.Database.stats.jobs)..
       " merged="..tostring(QuestieOcto.Database.stats.merged)..
       " quests="..tostring(q))
@@ -201,7 +234,7 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
 
     QuestieOcto:Print("Quest visibility policy=low-level quests shown")
     QuestieOcto:Print("Quest refresh policy=Questie immediate unload + 335 fast refresh")
-    QuestieOcto:Print("Scheduler policy=Questie-335 every-frame thread slices")
+    QuestieOcto:Print("Scheduler policy=Vanilla frame-budgeted bounded slices")
     QuestieOcto:Print("Startup policy=immediate completion/log + 335 fast initial availability")
     QuestieOcto:Print("Quest accept policy=immediate unload + fast objective-cache retry")
 

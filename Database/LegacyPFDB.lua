@@ -5,7 +5,7 @@ D.ready = false
 D.running = false
 D.jobs = {}
 D.jobIndex = 1
-D.stats = { merged=0, jobs=0 }
+D.stats = { merged=0, jobs=0, compiled=false }
 
 local DATASETS = {
   "items", "quests", "quests-itemreq", "objects", "units",
@@ -27,7 +27,7 @@ end
 local function BuildMergeJobs()
   D.jobs = {}
   D.jobIndex = 1
-  D.stats = { merged=0, jobs=0 }
+  D.stats = { merged=0, jobs=0, compiled=false }
 
   if not pfDB then return end
 
@@ -137,6 +137,24 @@ function D:Start()
 
   if not pfDB then
     QuestieOcto:Error("raw quest database did not load")
+    return
+  end
+
+  -- 1.0.10+: release packages load a build-time compiled final database. The
+  -- base + Turtle + Octo field merge and enrichment have already been applied,
+  -- so there is nothing useful to mutate on the player's first frames. Keep the
+  -- legacy merge path below for source/reference builds and compiler validation.
+  if pfDB["octo-compiled-runtime"] then
+    self.running=true
+    self.jobs={}
+    self.jobIndex=1
+    self.stats={merged=0,jobs=0,compiled=true}
+    if QuestieOcto.QuestModel and QuestieOcto.QuestModel.Clear then
+      QuestieOcto.QuestModel:Clear()
+    end
+    self.running=false
+    self.ready=true
+    QuestieOcto:SendMessage("DATABASE_READY")
     return
   end
 

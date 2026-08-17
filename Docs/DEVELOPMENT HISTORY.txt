@@ -1695,3 +1695,60 @@ wording, respawn values, drop rates, or thresholds changed.
   ScrollFrame widget, preserving the existing Spy/Ace coexistence boundary.
 - README now notes that compatible minimap-button panels may collect the enabled
   Questie-Octo button. No quest/map/tracker gameplay behavior changed.
+
+
+1.0.10 - COMPILED RUNTIME DATABASE + VANILLA STARTUP BUDGET
+------------------------------------------------------------
+- Replaced release-time loading of the ~39.5 MB pfQuest base + Turtle/Octo Lua
+  data inputs with ~16.9 MB of build-time compiled final runtime tables. The
+  source inputs remain in the repository for provenance/regeneration but are no
+  longer referenced by the addon TOC.
+- `Tools/compile_runtime_db.lua` reproduces the existing field merge and sparse
+  enrichment offline. `Tools/validate_runtime_db.lua` reconstructs the legacy
+  path and recursively verifies quests/items/units/objects/refloot/itemreq/zone/
+  AreaTrigger/minimap/meta/localized tables are identical to the compiled result.
+- Shipped the sorted 6,700 quest-ID list and the static 109-map / 8,677-link
+  starter-source candidate index so those whole-database indexes are no longer
+  rebuilt during login.
+- DatabaseAPI quest titles/search strings are now cached lazily instead of
+  lowercasing every quest title before the addon can become ready.
+- The scheduler now runs at most two queued continuation slices per frame and
+  observes an approximate 4 ms work budget when the client timer can measure it,
+  preventing multiple individually-bounded startup jobs from combining into one
+  large Vanilla frame.
+- Quest Log/completion startup is primed before the immediately-ready compiled
+  database publishes its background consumers.
+- Removed automatic construction of the hidden AceGUI options window at login;
+  the full options tree is now created only when the player opens settings.
+- Added manual `/qo perf` startup/scheduler diagnostics. It only reports stored
+  timing/counters and performs no polling, frame-tree scan, or automatic hooks.
+- No quest, objective, map, tracker, drop-rate, faction, or tooltip semantics
+  changed. No fullscreen-map experiment code was added.
+
+1.0.11 - REACHABILITY-PRUNED RUNTIME DATABASE
+------------------------------------------------------------
+- Continued the 1.0.10 build-time database optimization by pruning only the
+  TOC-loaded compiled runtime representation. Original pfQuest/Turtle/Octo
+  source files remain packaged for provenance, audits, and regeneration.
+- All 6,700 final quest rows, quest text, zones, AreaTriggers, minimap data,
+  tracking meta, and profession names remain complete. Large entity tables now
+  retain only records reachable from quest relationships, item sources,
+  reference loot, IR interaction targets, service/rare metadata, and the two
+  explicit presentation-source corrections used by Objectives.
+- Quest-browser reward item names are retained even when those items have no
+  objective/start relationship, preserving immediate reward labels before the
+  client item cache fills.
+- Runtime entity counts are 3,634 items, all 14,136 units, 1,637 objects, and
+  124 reference-loot rows, while all 6,700 quests remain present. Creatures are
+  intentionally unpruned to preserve `/qo creature` and arbitrary live objective
+  IDs. The TOC-loaded runtime database shrinks from about 16.2 MiB in 1.0.10 to
+  about 9.3 MiB.
+- `Tools/validate_runtime_db.lua` now independently derives the reachability set
+  from the reconstructed legacy final database and verifies every retained raw
+  record/name, complete quest/global datasets, quest IDs, and the exact
+  109-map / 8,677-link candidate index.
+- `/qo perf` now reports whether the runtime DB is pruned and its loaded
+  quest/item/unit/object counts.
+- No quest, objective, map, tracker, tooltip, faction, drop-rate, or fullscreen
+  behavior was changed.
+

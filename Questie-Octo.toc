@@ -2,7 +2,7 @@
 ## Title: Questie-Octo
 ## Notes: Quest helper.
 ## Author: Questie-Octo
-## Version: 1.0.9
+## Version: 1.0.11
 ## SavedVariables: QuestieOctoGlobalDB
 ## SavedVariablesPerCharacter: QuestieOctoDB
 
@@ -10,13 +10,22 @@ QuestieOcto.lua
 Core\Scheduler.lua
 API\ClassicAPI.lua
 
-Data\init\data.xml
-Data\init\enUS.xml
-Data\init\data-turtle.xml
-Data\init\enUS-turtle.xml
-Data\pfDB\overwrites-octo.lua
-Data\PvPQuestTypes.lua
-Data\pfDB\enrichment.lua
+Data\runtime\init.lua
+Data\runtime\quests.lua
+Data\runtime\items.lua
+Data\runtime\units.lua
+Data\runtime\objects.lua
+Data\runtime\refloot.lua
+Data\runtime\quests-itemreq.lua
+Data\runtime\zones.lua
+Data\runtime\areatrigger.lua
+Data\runtime\minimap.lua
+Data\runtime\meta.lua
+Data\runtime\enUS.lua
+Data\runtime\quest-ids.lua
+Data\runtime\map-candidates.lua
+Data\runtime\runtime-stats.lua
+Data\runtime\finalize.lua
 Data\EventSchedule.lua
 Data\CalendarEventRules.lua
 Data\QuestRewards.lua

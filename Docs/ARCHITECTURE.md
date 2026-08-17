@@ -18,8 +18,8 @@
 ## Runtime service order
 
 ClassicAPI contract
-  -> Scheduler
-  -> raw-data provider merge (incremental)
+  -> build-time compiled runtime database
+  -> frame-budgeted Scheduler
   -> QuestLog cache (ClassicAPI IDs)
   -> Turtle completion history
   -> canonical Quest model
@@ -27,6 +27,38 @@ ClassicAPI contract
   -> Objectives / ItemStarts
   -> persistent Map + Minimap
   -> Tracker / Tooltips / Options
+
+## 1.0.10 runtime database / startup rule
+
+Release packages no longer load pfQuest base + Turtle patch databases and merge
+them on the player's client. `Tools/compile_runtime_db.lua` reconstructs the
+existing field-by-field merge and Questie-Octo enrichment at build time, then
+serializes the final runtime tables under `Data/runtime/`. The original source
+data remains in the repository for provenance, audits, and regeneration but is
+not referenced by the release TOC.
+
+Runtime invariants:
+
+- every quest row and the complete quest/zone/profession text tables remain
+  authoritative and unpruned;
+- large item/object/reference-loot tables are build-time reachability
+  projections containing every record reachable from quest starts, finishes,
+  objectives, item sources, IR targets, service/rare metadata, and reward-name
+  presentation;
+- the complete creature table/name set remains loaded because `/qo creature`
+  and live ClassicAPI objective IDs can legitimately query arbitrary known NPCs;
+- `Tools/validate_runtime_db.lua` reconstructs the legacy final database and
+  verifies the pruned runtime is recursively identical for every reachable
+  record plus all complete quest/global datasets;
+- no quest/data semantics may be changed merely to reduce load time;
+- the original `Data/pfDB/` source remains packaged for provenance/regeneration
+  but is never loaded by the release TOC;
+- the sorted quest-ID list and starter/source map candidate index are generated
+  offline so login does not rescan all quests for those static indexes;
+- AceConfig options are lazy and must not construct a hidden options tree at
+  login;
+- the scheduler runs a small bounded number of continuation slices per Vanilla
+  frame instead of resuming every queued job in one frame.
 
 ## 0.1.0 scope
 

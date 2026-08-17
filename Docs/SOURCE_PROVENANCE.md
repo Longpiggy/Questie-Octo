@@ -130,3 +130,30 @@ uncompressed bytes. Licensing/provenance files are additions only. A future AI
 or human contributor should not use a licensing cleanup as a reason to rewrite
 source, change gameplay, strip comments, remove historical notes, or normalize
 third-party files.
+
+## Compiled runtime database (1.0.10+)
+
+`Data/runtime/` is generated Questie-Octo release data, not a new independent
+data source. It is a build-time serialization of the same packaged pfQuest base,
+Turtle/Octo overwrite, and Questie-Octo enrichment layers documented above.
+`Tools/compile_runtime_db.lua` performs the historical runtime merge offline.
+Starting with 1.0.11 it also emits a conservative reachability projection for
+the large item/object/reference-loot tables: every record reachable through quest
+starts, finishes, objectives, item-drop/reference/vendor sources, IR interaction
+targets, tracking/service/rare metadata, and quest-browser reward names is
+retained. The complete creature table/name set remains loaded because the manual
+creature diagnostic and live ClassicAPI objective IDs may query arbitrary known
+NPCs. Quest rows and the small global zone/AreaTrigger/minimap/meta tables remain
+complete.
+
+`Tools/validate_runtime_db.lua` independently reconstructs the old final state,
+derives the runtime reachability contract, recursively compares every retained
+record/localized name, and verifies that the complete quest/global tables and
+precomputed map candidate index are unchanged.
+
+The original `Data/pfDB/` source material remains in the repository with its
+existing provenance and licensing scope. Release TOCs intentionally load only
+`Data/runtime/` so the Vanilla client does not parse duplicate or unreachable
+records during every login and `/reload`. Compilation/pruning changes runtime
+representation and startup cost only; it does not transfer ownership or alter
+the provenance/license of the underlying data.

@@ -199,34 +199,37 @@ function DB:GetObjectCoords(id)
 end
 
 function DB:OnLegacyReady()
-  -- Build the quest-ID index incrementally as well. Iterating the entire quest
-  -- database in the DATABASE_READY callback creates an avoidable single-frame
-  -- spike on Vanilla clients. No consumer is released until the cache is done.
   self.ready=false
-  self.questIDs={}
   self.questTitleCache={}
   self.questSearchTitleCache={}
+
+  -- The compiled release database ships the exact sorted quest-ID list. Avoid
+  -- walking all 6,700 quests and lowercasing every title during login; titles
+  -- and search strings are cached lazily when a consumer actually asks for them.
+  if QuestieOcto.RuntimeQuestIDs then
+    self.questIDs=QuestieOcto.RuntimeQuestIDs
+    self.ready=true
+    QuestieOcto:SendMessage("DATABASE_API_READY")
+    return
+  end
+
+  -- Source/reference fallback: build incrementally when no compiled index exists.
+  self.questIDs={}
   local data=pfDB and pfDB.quests and pfDB.quests.data or {}
   local cursor=nil
 
   local function Slice()
     local count=0
-    while count<200 do
+    while count<100 do
       local key=next(data,cursor)
       if key==nil then
+        table.sort(DB.questIDs)
         DB.ready=true
         QuestieOcto:SendMessage("DATABASE_API_READY")
         return
       end
       cursor=key
       table.insert(DB.questIDs,key)
-      local loc=QuestLocale(key)
-      local title=nil
-      if type(loc)=="table" then title=loc["T"] or loc[1]
-      elseif type(loc)=="string" then title=loc end
-      title=title or ("Quest "..tostring(key))
-      DB.questTitleCache[key]=title
-      DB.questSearchTitleCache[key]=string.lower(title)
       count=count+1
     end
     QuestieOcto.Scheduler:Enqueue(Slice,"database-quest-id-cache")
@@ -363,6 +366,8 @@ end
 
 function DB:GetTrackingMeta(metaKey)
   if not self.ready or not metaKey or not pfDB then return nil end
+  -- Compiled releases contain the already-merged final meta table. Preserve the
+  -- old Turtle-first fallback for source/reference builds.
   local turtle=pfDB["meta-turtle"]
   if turtle and turtle[metaKey] then return turtle[metaKey] end
   return pfDB.meta and pfDB.meta[metaKey] or nil
