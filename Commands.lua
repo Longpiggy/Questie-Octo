@@ -79,7 +79,7 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
       QuestieOcto:Print(string.format("foundation pending for %.3fs",math.max(0,now-entered)))
     end
     local dbStats=QuestieOcto.RuntimeDatabaseStats or {}
-    QuestieOcto:Print("runtime DB compiled="..Bool(pfDB and pfDB["octo-compiled-runtime"])..
+    QuestieOcto:Print("runtime DB compiled="..Bool(QuestieOcto.RuntimePFDB and QuestieOcto.RuntimePFDB["octo-compiled-runtime"])..
       " pruned="..Bool(dbStats.pruned)..
       " quests/items/units/objects="..
       tostring(QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI:GetQuestCount() or 0).."/"..

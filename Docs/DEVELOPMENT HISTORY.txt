@@ -1,3 +1,11 @@
+1.0.13 - PRIVATE COMPILED DATABASE / LOAD-COLLISION HARDENING
+
+- Release runtime data now lives under QuestieOcto.RuntimePFDB instead of the shared global pfDB name.
+- Prevents pfQuest-family or other addons from replacing/clearing Questie-Octo's compiled database between addon load and PLAYER_ENTERING_WORLD.
+- Database modules capture the private runtime DB locally and ignore foreign global pfDB values; explicit developer/source builds can opt into the legacy loader with useCompiledRuntime=false.
+- Startup error now explicitly identifies a missing/failed Data/runtime install when the private compiled DB is unavailable.
+- No quest/data semantics, pruning rules, map behavior, tracker behavior, or minimap-button behavior changed.
+
 Questie-Octo 1.0.2
 
 

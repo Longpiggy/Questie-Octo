@@ -1,6 +1,12 @@
 QuestieOcto.Database = QuestieOcto.Database or {}
 local D = QuestieOcto.Database
 
+-- Release builds use a private compiled database and deliberately ignore the
+-- shared global pfDB name. An explicit developer/source build can opt back into
+-- the historical Data/pfDB loader by setting useCompiledRuntime=false.
+local pfDB = QuestieOcto.RuntimePFDB
+if not pfDB and QuestieOcto.useCompiledRuntime==false then pfDB=_G.pfDB end
+
 D.ready = false
 D.running = false
 D.jobs = {}
@@ -136,7 +142,7 @@ function D:Start()
   if self.ready or self.running then return end
 
   if not pfDB then
-    QuestieOcto:Error("raw quest database did not load")
+    QuestieOcto:Error("compiled quest database is unavailable; reinstall the full Questie-Octo package (Data/runtime is missing or failed to load)")
     return
   end
 

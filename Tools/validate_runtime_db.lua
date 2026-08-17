@@ -165,7 +165,7 @@ for _,path in ipairs({
   "init.lua","quests.lua","items.lua","units.lua","objects.lua","refloot.lua","quests-itemreq.lua",
   "zones.lua","areatrigger.lua","minimap.lua","meta.lua","enUS.lua","quest-ids.lua","map-candidates.lua","runtime-stats.lua","finalize.lua"
 }) do load("Data/runtime/"..path) end
-local runtime=pfDB
+local runtime=QuestieOcto.RuntimePFDB
 
 -- Full-authority datasets stay recursively identical.
 assertEqual(legacy.quests.data,runtime.quests.data,"quests.data")

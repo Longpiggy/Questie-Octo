@@ -269,16 +269,16 @@ local runtimeObjects=subset(pfDB.objects.data,neededObjects)
 local runtimeRefs=subset(pfDB.refloot.data,neededRefs)
 local runtimeItemReq=subset(pfDB["quests-itemreq"].data,neededItemReq)
 
-writeAssignment("Data/runtime/quests.lua",'pfDB["quests"]["data"]',pfDB.quests.data)
-writeAssignment("Data/runtime/items.lua",'pfDB["items"]["data"]',runtimeItems)
-writeAssignment("Data/runtime/units.lua",'pfDB["units"]["data"]',runtimeUnits)
-writeAssignment("Data/runtime/objects.lua",'pfDB["objects"]["data"]',runtimeObjects)
-writeAssignment("Data/runtime/refloot.lua",'pfDB["refloot"]["data"]',runtimeRefs)
-writeAssignment("Data/runtime/quests-itemreq.lua",'pfDB["quests-itemreq"]["data"]',runtimeItemReq)
-writeAssignment("Data/runtime/zones.lua",'pfDB["zones"]["data"]',pfDB.zones.data)
-writeAssignment("Data/runtime/areatrigger.lua",'pfDB["areatrigger"]["data"]',pfDB.areatrigger.data)
-writeAssignment("Data/runtime/minimap.lua",'pfDB["minimap"]',pfDB.minimap)
-writeAssignment("Data/runtime/meta.lua",'pfDB["meta"]',pfDB.meta)
+writeAssignment("Data/runtime/quests.lua",'QuestieOcto.RuntimePFDB["quests"]["data"]',pfDB.quests.data)
+writeAssignment("Data/runtime/items.lua",'QuestieOcto.RuntimePFDB["items"]["data"]',runtimeItems)
+writeAssignment("Data/runtime/units.lua",'QuestieOcto.RuntimePFDB["units"]["data"]',runtimeUnits)
+writeAssignment("Data/runtime/objects.lua",'QuestieOcto.RuntimePFDB["objects"]["data"]',runtimeObjects)
+writeAssignment("Data/runtime/refloot.lua",'QuestieOcto.RuntimePFDB["refloot"]["data"]',runtimeRefs)
+writeAssignment("Data/runtime/quests-itemreq.lua",'QuestieOcto.RuntimePFDB["quests-itemreq"]["data"]',runtimeItemReq)
+writeAssignment("Data/runtime/zones.lua",'QuestieOcto.RuntimePFDB["zones"]["data"]',pfDB.zones.data)
+writeAssignment("Data/runtime/areatrigger.lua",'QuestieOcto.RuntimePFDB["areatrigger"]["data"]',pfDB.areatrigger.data)
+writeAssignment("Data/runtime/minimap.lua",'QuestieOcto.RuntimePFDB["minimap"]',pfDB.minimap)
+writeAssignment("Data/runtime/meta.lua",'QuestieOcto.RuntimePFDB["meta"]',pfDB.meta)
 
 local locales={
   quests=pfDB.quests.enUS or {},
@@ -349,26 +349,31 @@ writeAssignment("Data/runtime/runtime-stats.lua",'QuestieOcto.RuntimeDatabaseSta
 
 local init=assert(io.open("Data/runtime/init.lua","wb"))
 init:write([[-- GENERATED RUNTIME DATABASE INITIALIZER.
-pfDB = {
+-- Release builds keep the compiled DB private so pfQuest-family addons cannot
+-- replace or clear Questie-Octo's runtime state through the shared pfDB global.
+QuestieOcto.RuntimePFDB = {
   ["areatrigger"]={data={}}, ["items"]={data={},enUS={}}, ["meta"]={}, ["minimap"]={},
   ["objects"]={data={},enUS={}}, ["professions"]={enUS={}}, ["quests"]={data={},enUS={}},
   ["quests-itemreq"]={data={}}, ["refloot"]={data={}}, ["units"]={data={},enUS={}}, ["zones"]={data={},enUS={}},
 }
-pfDB["octo-compiled-runtime"]=true
+QuestieOcto.RuntimePFDB["octo-compiled-runtime"]=true
 ]])
 init:close()
 
 local finalize=assert(io.open("Data/runtime/finalize.lua","wb"))
 finalize:write([[-- GENERATED RUNTIME DATABASE FINALIZER.
+local db=QuestieOcto.RuntimePFDB
 local L=QuestieOcto.RuntimeLocales or {}
-for _,name in pairs({"items","quests","objects","units","zones","professions"}) do
-  if pfDB[name] then
-    pfDB[name].enUS=L[name] or {}
-    pfDB[name].loc=pfDB[name].enUS
+if db then
+  for _,name in pairs({"items","quests","objects","units","zones","professions"}) do
+    if db[name] then
+      db[name].enUS=L[name] or {}
+      db[name].loc=db[name].enUS
+    end
   end
+  db["octo-enrichment-complete"]=true
 end
 QuestieOcto.RuntimeLocales=nil
-pfDB["octo-enrichment-complete"]=true
 ]])
 finalize:close()
 

@@ -1,7 +1,7 @@
 -- GENERATED FILE - DO NOT EDIT BY HAND.
 -- Built from Questie-Octo's packaged pfQuest/Turtle/Octo source data.
 -- Regenerate with Tools/compile_runtime_db.lua.
-pfDB["areatrigger"]["data"]={
+QuestieOcto.RuntimePFDB["areatrigger"]["data"]={
 [1]={["coords"]={{35.8,62.1,11}}},
 [2]={["coords"]={{21.9,67.9,85}}},
 [3]={["coords"]={{41.5,69.1,2040},{57.5,34.9,5225}}},

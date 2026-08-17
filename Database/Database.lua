@@ -7,6 +7,12 @@
 QuestieOcto.DatabaseAPI = QuestieOcto.DatabaseAPI or {}
 local DB = QuestieOcto.DatabaseAPI
 
+-- Release builds use a private compiled database and deliberately ignore the
+-- shared global pfDB name. An explicit developer/source build can opt back into
+-- the historical Data/pfDB loader by setting useCompiledRuntime=false.
+local pfDB = QuestieOcto.RuntimePFDB
+if not pfDB and QuestieOcto.useCompiledRuntime==false then pfDB=_G.pfDB end
+
 DB.ready = false
 DB.questIDs = DB.questIDs or nil
 DB.questTitleCache = DB.questTitleCache or {}

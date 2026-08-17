@@ -1,10 +1,13 @@
 -- GENERATED RUNTIME DATABASE FINALIZER.
+local db=QuestieOcto.RuntimePFDB
 local L=QuestieOcto.RuntimeLocales or {}
-for _,name in pairs({"items","quests","objects","units","zones","professions"}) do
-  if pfDB[name] then
-    pfDB[name].enUS=L[name] or {}
-    pfDB[name].loc=pfDB[name].enUS
+if db then
+  for _,name in pairs({"items","quests","objects","units","zones","professions"}) do
+    if db[name] then
+      db[name].enUS=L[name] or {}
+      db[name].loc=db[name].enUS
+    end
   end
+  db["octo-enrichment-complete"]=true
 end
 QuestieOcto.RuntimeLocales=nil
-pfDB["octo-enrichment-complete"]=true

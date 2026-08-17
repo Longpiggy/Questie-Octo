@@ -1,7 +1,7 @@
 -- GENERATED FILE - DO NOT EDIT BY HAND.
 -- Built from Questie-Octo's packaged pfQuest/Turtle/Octo source data.
 -- Regenerate with Tools/compile_runtime_db.lua.
-pfDB["objects"]["data"]={
+QuestieOcto.RuntimePFDB["objects"]["data"]={
 [2]={["coords"]={}},
 [31]={["coords"]={{84.5,46.8,44,2}},["fac"]="A"},
 [32]={["coords"]={{41.5,54.7,44,2}},["fac"]="A"},

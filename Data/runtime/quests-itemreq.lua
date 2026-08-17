@@ -1,7 +1,7 @@
 -- GENERATED FILE - DO NOT EDIT BY HAND.
 -- Built from Questie-Octo's packaged pfQuest/Turtle/Octo source data.
 -- Regenerate with Tools/compile_runtime_db.lua.
-pfDB["quests-itemreq"]["data"]={
+QuestieOcto.RuntimePFDB["quests-itemreq"]["data"]={
 [3467]={[-1721]=0},
 [3499]={[-1722]=0},
 [3710]={[-1770]=0,[-1769]=0,[-1768]=0},

@@ -2,9 +2,12 @@
 QuestieOcto = QuestieOcto or {}
 local QO = QuestieOcto
 
-QO.version = "1.0.12"
+QO.version = "1.0.13"
 QO.enabled = false
 QO.ready = false
+-- Release packages use Questie-Octo's private compiled runtime database.
+-- Set false only in an explicit developer/source build that loads Data/pfDB.
+QO.useCompiledRuntime = true
 QO.messages = {}
 QO.startedAt = 0
 QO.fileLoadStartedAt = GetTime and GetTime() or 0

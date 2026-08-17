@@ -1,7 +1,7 @@
 -- GENERATED FILE - DO NOT EDIT BY HAND.
 -- Built from Questie-Octo's packaged pfQuest/Turtle/Octo source data.
 -- Regenerate with Tools/compile_runtime_db.lua.
-pfDB["minimap"]={
+QuestieOcto.RuntimePFDB["minimap"]={
 [0]={0.0,0.0},
 [1]={4925.0,3283.34},
 [3]={2487.5,1658.34},

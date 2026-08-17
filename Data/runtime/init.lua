@@ -1,7 +1,9 @@
 -- GENERATED RUNTIME DATABASE INITIALIZER.
-pfDB = {
+-- Release builds keep the compiled DB private so pfQuest-family addons cannot
+-- replace or clear Questie-Octo's runtime state through the shared pfDB global.
+QuestieOcto.RuntimePFDB = {
   ["areatrigger"]={data={}}, ["items"]={data={},enUS={}}, ["meta"]={}, ["minimap"]={},
   ["objects"]={data={},enUS={}}, ["professions"]={enUS={}}, ["quests"]={data={},enUS={}},
   ["quests-itemreq"]={data={}}, ["refloot"]={data={}}, ["units"]={data={},enUS={}}, ["zones"]={data={},enUS={}},
 }
-pfDB["octo-compiled-runtime"]=true
+QuestieOcto.RuntimePFDB["octo-compiled-runtime"]=true
