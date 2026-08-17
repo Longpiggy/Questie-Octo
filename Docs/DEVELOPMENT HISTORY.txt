@@ -1456,3 +1456,10 @@ for those three IDs, so no replacement respawn value is invented.
 - Rare respawn text now uses the centered mathematical tilde (∼) instead of the raised ASCII tilde (~).
 - Item-start drop-rate ranges use the same centered marker (for example, 0.02%∼0.08%).
 - Formatting, respawn values, and drop-rate values are unchanged; this is presentation-only.
+
+
+1.0.88 - Tooltip range/respawn font compatibility
+- The centered mathematical tilde introduced in 1.0.87 is not rendered by the current in-game tooltip font, causing the separator/prefix to disappear.
+- Rare respawn text no longer uses an approximation glyph; values are shown directly (for example, Respawn: 15h or Respawn: 2h30m).
+- Item-start drop-rate ranges now use a plain supported separator (for example, 0.007% - 0.20%).
+- This is presentation-only; respawn values, short-respawn second rules, drop-rate values, and item-start thresholds are unchanged.
