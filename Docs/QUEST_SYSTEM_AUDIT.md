@@ -698,3 +698,29 @@ If the underlying static respawn contains a non-zero seconds remainder, that
 remainder is retained after the hour/minute portion. No respawn data, rare-node
 eligibility, or item-start source logic is changed.
 
+## 1.0.86 short-respawn seconds formatting
+
+Rare/static respawn display now includes seconds only when the full recorded
+respawn is **strictly below 300 seconds (5 minutes)**. At 300 seconds or above,
+the seconds remainder is intentionally omitted. Long timers continue using the
+1.0.85 hour/minute conversion.
+
+Boundary/examples:
+
+- 25 seconds -> `~25s`
+- 2 minutes -> `~2 min`
+- 2 minutes 30 seconds -> `~2m30s`
+- 5 minutes -> `~5 min`
+- 5 minutes 20 seconds -> `~5 min`
+- 60 minutes -> `~60 min`
+- 61 minutes 45 seconds -> `~1h1m`
+- 90 minutes 15 seconds -> `~1h30m`
+- 10h33m20s -> `~10h33m`
+
+This remains presentation-only. A recorded respawn of `0` is still treated as
+unknown/unavailable static timing and produces no tooltip line. The current
+pfQuest Turtle data records `0` for the nearby Silithus rare-elites Xil'xix
+(15286), Aluntir (15288), and Arakis (15290). The supplied current Tortoise
+server source contains their creature templates but no ordinary static creature
+spawn rows for those IDs, so Questie-Octo must not fabricate a respawn timer.
+

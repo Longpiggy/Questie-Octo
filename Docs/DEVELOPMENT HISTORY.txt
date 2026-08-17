@@ -1431,3 +1431,24 @@ The change is presentation-only. Respawn source data and rare/item-start node
 selection are unchanged. The creature diagnostic command uses the same display
 format for consistency.
 
+1.0.86 - SHORT-RESPAWN SECONDS ONLY
+------------------------------------
+Rare/static respawn tooltips now show seconds only when the recorded respawn is
+strictly below 5 minutes. At 5 minutes and above, seconds are suppressed to keep
+long rare timers readable. Hour conversion from 1.0.85 remains unchanged.
+
+Examples:
+  25 sec      -> ~25s
+  2 min       -> ~2 min
+  2 min 30 s  -> ~2m30s
+  5 min 20 s  -> ~5 min
+  90 min 15 s -> ~1h30m
+  10h33m20s   -> ~10h33m
+
+The Silithus rare-elites Xil'xix (15286), Aluntir (15288), and Arakis (15290)
+remain without a displayed respawn timer because their current pfQuest Turtle
+coordinates record a respawn value of 0. Questie-Octo treats 0 as no reliable
+static timer rather than displaying "0s". The supplied current Tortoise server
+source retains the creature templates but has no ordinary static creature rows
+for those three IDs, so no replacement respawn value is invented.
+
