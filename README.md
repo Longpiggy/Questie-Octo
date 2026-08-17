@@ -23,10 +23,12 @@ A lightweight quest helper for Turtle WoW / OctoWoW, focused on clear quest, obj
 
 ### Open Questie-Octo settings
 
-By default, Questie-Octo adds a yellow **!** button beside the minimap.
+By default, Questie-Octo adds a yellow **!** settings button.
 
 - **Left Click:** Open settings
-- **Drag:** Move the button around the minimap
+- **Drag:** Move the button around the minimap when it is not managed by a button panel
+
+If your UI provides a minimap-button panel, such as pfUI's **Addon Buttons** panel, the enabled Questie-Octo button can appear there with your other addon buttons.
 
 On supported game menus, including pfUI and DragonflightUI-Reforged, you may also see a **Questie Options** button in the Escape menu.
 
@@ -56,7 +58,7 @@ To change it, open the settings, scroll to the bottom of the **General** tab, an
 
 ### Minimap settings button
 
-The Questie-Octo settings button is shown beside the minimap by default and can be dragged around the minimap.
+The Questie-Octo settings button is enabled by default. It can sit beside the minimap or be collected by a compatible minimap-button panel such as pfUI's **Addon Buttons** panel.
 
 To disable it, open the settings, scroll to the bottom of the **General** tab, and uncheck **Show Minimap Button** just above Reset Settings.
 

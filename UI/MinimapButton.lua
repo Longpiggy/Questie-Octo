@@ -42,6 +42,12 @@ function MB:UpdatePosition(position)
   local button=self.button
   if not button or not Minimap then return end
 
+  -- When pfUI, DragonflightUI-Reforged, MBB, or another minimap-button panel
+  -- reparents the enabled button, that panel owns placement. Do not ClearAllPoints
+  -- out from under it. If the panel later releases the button back to Minimap,
+  -- Questie-Octo's saved orbit position becomes authoritative again.
+  if button.GetParent and button:GetParent()~=Minimap then return end
+
   position=tonumber(position) or self.defaultPosition
   local angle=math.rad(position)
   local x=math.cos(angle)
@@ -100,7 +106,11 @@ local function OnEnter()
   GameTooltip:SetOwner(button,"ANCHOR_LEFT")
   GameTooltip:AddLine("Questie-Octo",1,1,1)
   GameTooltip:AddLine("Left Click: Open settings",0.75,0.75,0.75)
-  GameTooltip:AddLine("Drag: Move button",0.75,0.75,0.75)
+  if button.GetParent and button:GetParent()==Minimap then
+    GameTooltip:AddLine("Drag: Move button",0.75,0.75,0.75)
+  else
+    GameTooltip:AddLine("Managed by minimap button panel",0.75,0.75,0.75)
+  end
   GameTooltip:Show()
 end
 
@@ -119,6 +129,7 @@ end
 local function OnDragStart()
   local button=this or MB.button
   if not button then return end
+  if button.GetParent and button:GetParent()~=Minimap then return end
   MB.stats.drags=MB.stats.drags+1
   if GameTooltip then GameTooltip:Hide() end
   if button.LockHighlight then button:LockHighlight() end
@@ -139,18 +150,11 @@ function MB:Create()
   -- is OFF. We deliberately do not create-and-Hide a Minimap child, because
   -- older button collectors can still discover/reparent hidden frames and have
   -- caused ERROR #132 reports on Vanilla clients.
-  local button=CreateFrame("Button","MinimapIconQuestieOcto",Minimap)
-
-  -- Questie has historically opted its map/minimap frames out of MBB. Do the
-  -- same for this settings button when MBB exposes its optional ignore table.
-  -- pfUI and DragonflightUI-Reforged already ignore the MinimapIcon prefix.
-  if type(MBB_Ignore)=="table" then
-    local found=false
-    for _,name in pairs(MBB_Ignore) do
-      if name==button:GetName() then found=true break end
-    end
-    if not found then table.insert(MBB_Ignore,button:GetName()) end
-  end
+  -- The button is intentionally discoverable while enabled so minimap-button
+  -- panels such as pfUI's Addon Buttons can collect it like other addon buttons.
+  -- The ERROR #132 safety boundary remains the setting itself: when disabled at
+  -- login, this frame is never created, so collectors have nothing to discover.
+  local button=CreateFrame("Button","QuestieOctoMinimapButton",Minimap)
 
   button:SetWidth(31)
   button:SetHeight(31)

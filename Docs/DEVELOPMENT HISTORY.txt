@@ -1674,3 +1674,24 @@ wording, respawn values, drop rates, or thresholds changed.
   difficulty-color repaint on PLAYER_LEVEL_UP, and safe timed-quest log-index
   validation after header reindexing.
 - No fullscreen-map experiment code is included.
+
+
+1.0.9 - MINIMAP BUTTON PANEL + GENERAL SCROLL COMPATIBILITY
+------------------------------------------------------------
+- The enabled Questie-Octo minimap settings button is no longer named with the
+  `MinimapIcon` prefix that pfUI and DragonflightUI-Reforged intentionally
+  exclude from addon-button collection. pfUI's Addon Buttons panel can now
+  discover and manage the button while it is enabled.
+- Removed the optional MBB ignore registration for the settings button. The
+  Vanilla safety rule remains stronger than Hide(): when Show Minimap Button is
+  OFF at login, Questie-Octo never creates the button frame at all, so collectors
+  have no hidden object to grab.
+- Questie-Octo no longer changes the button anchor while another button panel has
+  reparented it. The saved minimap orbit position remains available if the button
+  is later returned to the Minimap.
+- Added local blank footer space to the General options tab so Dark Theme, Show
+  Minimap Button, and Reset Options can all be scrolled fully into view. This is
+  deliberately local to Questie-Octo rather than changing the shared AceGUI
+  ScrollFrame widget, preserving the existing Spy/Ace coexistence boundary.
+- README now notes that compatible minimap-button panels may collect the enabled
+  Questie-Octo button. No quest/map/tracker gameplay behavior changed.

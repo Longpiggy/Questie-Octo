@@ -361,6 +361,12 @@ local function CreateGeneralTab()
         local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
         if Registry and Registry.NotifyChange then Registry:NotifyChange(APP_NAME) end
       end},
+      -- AceGUI 3's Vanilla ScrollFrame reports the exact layout height with no
+      -- dependable trailing viewport margin. The two General footer toggles can
+      -- otherwise leave the reset controls clipped behind the outer frame on
+      -- replacement UIs. A local blank footer keeps the whole General tab
+      -- reachable without modifying the shared AceGUI widget used by Spy/others.
+      general_bottom_padding={type="description",order=99,name=" \n \n \n ",width="full"},
     },
   }
 end
