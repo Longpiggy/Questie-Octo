@@ -348,7 +348,7 @@ local function CreateGeneralTab()
         showPvPRelatedQuests={type="toggle",order=5,name="Show PVP Related Quests",desc="Show PvP quest icons on the map and minimap.",width="full",get=GetValue,set=SetValue},
       }},
       useDarkTheme={type="toggle",order=88,name="Enable Dark Theme",desc="Use Questie-Octo's dark Shagu-style options appearance. This only skins the Questie-Octo settings window.",width="full",get=GetValue,set=SetValue},
-      showMinimapButton={type="toggle",order=89,name="Show Minimap Button",desc="Show the Questie-Octo settings button beside the minimap. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue},
+      showMinimapButton={type="toggle",order=89,name="Show Minimap Button",desc="Show the Questie-Octo settings button. Minimap-button panels can manage it like a normal addon button. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue},
       reset_header={type="header",order=90,name="Reset Questie Options"},
       reset_text={type="description",order=91,name="Restore Questie-Octo options to their defaults. Quest data and completed-quest history are not deleted.",fontSize="medium"},
       resetOptions={type="execute",order=92,name="Reset Options",desc="Restore option defaults.",func=function()

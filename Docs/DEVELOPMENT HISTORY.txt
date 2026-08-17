@@ -1752,3 +1752,21 @@ wording, respawn values, drop rates, or thresholds changed.
 - No quest, objective, map, tracker, tooltip, faction, drop-rate, or fullscreen
   behavior was changed.
 
+1.0.12 - STANDARD EARLY MINIMAP BUTTON LIFECYCLE
+------------------------------------------------------------
+- Reworked the enabled Questie-Octo settings button as a plain, discoverable
+  Vanilla minimap button with no UI-specific collector integration. Any addon
+  button manager may reparent, hide, show, or arrange it using normal frame
+  behavior. Questie-Octo only owns its orbit position while the parent remains
+  the Minimap.
+- Removed the delayed 0.20-second PLAYER_LOGIN creation. The enabled button is
+  now created on Questie-Octo's ADDON_LOADED event, after SavedVariables are
+  available but before common one-shot minimap-button collector scans. This
+  addresses pfUI/DragonflightUI-style panels missing the button until a manual
+  rescan/open.
+- The Show Minimap Button safety boundary is unchanged: OFF still requires
+  /reload and never creates QuestieOctoMinimapButton at all for that UI session.
+  The enabled button itself may be hidden normally by its own/parent frame.
+- README/options wording now describes generic minimap-button-panel behavior
+  instead of compatibility-specific handling. No quest/map/tracker/database
+  semantics changed.

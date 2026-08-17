@@ -42,10 +42,9 @@ function MB:UpdatePosition(position)
   local button=self.button
   if not button or not Minimap then return end
 
-  -- When pfUI, DragonflightUI-Reforged, MBB, or another minimap-button panel
-  -- reparents the enabled button, that panel owns placement. Do not ClearAllPoints
-  -- out from under it. If the panel later releases the button back to Minimap,
-  -- Questie-Octo's saved orbit position becomes authoritative again.
+  -- Behave like a normal Vanilla minimap button. If another addon reparents
+  -- the button into its own button panel, that parent owns visibility and
+  -- placement until it returns the button to the Minimap.
   if button.GetParent and button:GetParent()~=Minimap then return end
 
   position=tonumber(position) or self.defaultPosition
@@ -106,10 +105,8 @@ local function OnEnter()
   GameTooltip:SetOwner(button,"ANCHOR_LEFT")
   GameTooltip:AddLine("Questie-Octo",1,1,1)
   GameTooltip:AddLine("Left Click: Open settings",0.75,0.75,0.75)
-  if button.GetParent and button:GetParent()==Minimap then
+  if not button.GetParent or button:GetParent()==Minimap then
     GameTooltip:AddLine("Drag: Move button",0.75,0.75,0.75)
-  else
-    GameTooltip:AddLine("Managed by minimap button panel",0.75,0.75,0.75)
   end
   GameTooltip:Show()
 end
@@ -146,14 +143,10 @@ end
 function MB:Create()
   if self.button or not Minimap then return self.button end
 
-  -- Compatibility rule: this function is never called when Show Minimap Button
-  -- is OFF. We deliberately do not create-and-Hide a Minimap child, because
-  -- older button collectors can still discover/reparent hidden frames and have
-  -- caused ERROR #132 reports on Vanilla clients.
-  -- The button is intentionally discoverable while enabled so minimap-button
-  -- panels such as pfUI's Addon Buttons can collect it like other addon buttons.
-  -- The ERROR #132 safety boundary remains the setting itself: when disabled at
-  -- login, this frame is never created, so collectors have nothing to discover.
+  -- ON uses an ordinary, discoverable Minimap child so any Vanilla minimap
+  -- button manager can reparent, hide, show, or arrange it normally. OFF is the
+  -- separate safety boundary: Initialize() never calls Create(), so no button
+  -- frame exists during that UI session.
   local button=CreateFrame("Button","QuestieOctoMinimapButton",Minimap)
 
   button:SetWidth(31)
@@ -207,12 +200,35 @@ function MB:Initialize()
   self:Create()
 end
 
--- SavedVariables and replacement minimap UIs are established by PLAYER_LOGIN.
--- The loader frame is parented to UIParent, not Minimap, and is not a button;
--- therefore OFF creates no collectable Questie-Octo minimap-button object.
+-- Create the enabled button as soon as Questie-Octo's SavedVariables are
+-- available. Vanilla minimap-button panels commonly perform one early startup
+-- scan; delaying this until after PLAYER_LOGIN can make them miss the button
+-- until a manual rescan. ADDON_LOADED is early enough while still guaranteeing
+-- that this addon's SavedVariables have been restored.
+--
+-- The loader itself is not a Minimap child/button, so OFF still creates no
+-- collectable Questie-Octo minimap-button object. PLAYER_LOGIN is only a safe
+-- fallback for unusual loaders that do not deliver our ADDON_LOADED event.
 local loader=CreateFrame("Frame","QuestieOctoMinimapButtonLoader",UIParent)
+local initialized=false
+
+local function InitializeButtonOnce()
+  if initialized then return end
+  initialized=true
+  MB:Initialize()
+end
+
+loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent",function()
-  loader:UnregisterEvent("PLAYER_LOGIN")
-  QuestieOcto.Scheduler:After(0.20,function() MB:Initialize() end,"questie-minimap-button-init")
+  if event=="ADDON_LOADED" then
+    if arg1~="Questie-Octo" then return end
+    loader:UnregisterEvent("ADDON_LOADED")
+    loader:UnregisterEvent("PLAYER_LOGIN")
+    InitializeButtonOnce()
+  elseif event=="PLAYER_LOGIN" then
+    loader:UnregisterEvent("ADDON_LOADED")
+    loader:UnregisterEvent("PLAYER_LOGIN")
+    InitializeButtonOnce()
+  end
 end)
