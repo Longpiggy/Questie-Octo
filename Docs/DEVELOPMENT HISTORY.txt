@@ -1,3 +1,26 @@
+1.0.14 - RELOAD STABILITY / LAZY QUEST ELIGIBILITY
+
+- The global availability pass no longer materializes and retains a full canonical
+  QuestModel for all 6,700 quests. Eligibility now reads the compiled raw quest
+  record directly; full QuestModel objects remain lazy and are created only for
+  active/rendered/browsed quests that actually need objective/presentation data.
+- Completion prerequisite/blocking checks use the same static raw quest flags
+  when no canonical model is already supplied, preventing prerequisite scans from
+  recreating the eager all-quest model cache indirectly.
+- Event availability exposes raw-ID helpers so Darkmoon/event gating remains
+  semantically identical without forcing a full QuestModel during availability.
+- Replaced the startup scheduler's table.remove(queue,1) FIFO with an O(1)
+  head/tail queue. Due timers now enter the same bounded work queue instead of
+  all executing synchronously before the frame budget begins.
+- Offline equivalence tests across all 6,700 quests and five eligibility profiles
+  produced identical available/unavailable reasons to 1.0.13. Completion blocking
+  semantics also matched for all 6,700 quests under a mixed synthetic state.
+- In the isolated availability scan, retained QuestModel count fell from 6,700 to
+  0 and temporary/model allocations fell from about 24.9 MiB to under 1 MiB.
+  These are offline Lua measurements, not promises of exact in-game memory use.
+- Runtime database files/pruning, Map, Tracker, tooltip, minimap-button, and quest
+  data are unchanged from 1.0.13. No fullscreen-map experiment code was added.
+
 1.0.13 - PRIVATE COMPILED DATABASE / LOAD-COLLISION HARDENING
 
 - Release runtime data now lives under QuestieOcto.RuntimePFDB instead of the shared global pfDB name.

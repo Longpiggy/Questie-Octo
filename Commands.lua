@@ -314,7 +314,7 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
       Bool(gm and gm.installed).."/"..tostring(gm and gm.stats.clicks or 0).."/"..
       tostring(gm and gm.stats.anchor or "none"))
     QuestieOcto:Print("Rare tooltip policy=static DB respawn only; no kill tracking")
-    QuestieOcto:Print("Scheduler queued="..tostring(table.getn(QuestieOcto.Scheduler.queue))..
+    QuestieOcto:Print("Scheduler queued="..tostring((QuestieOcto.Scheduler.PendingCount and QuestieOcto.Scheduler:PendingCount()) or table.getn(QuestieOcto.Scheduler.queue))..
       " executed="..tostring(QuestieOcto.Scheduler.executed))
 
   elseif msg=="minimap" then

@@ -186,6 +186,17 @@ function E:IsDarkmoonFaireActive()
   return state==4 or state==5
 end
 
+function E:IsVerifiedDarkmoonRaw(raw)
+  if not raw then return false end
+  local rawEventID=tonumber(raw["event"])
+  if rawEventID~=4 and rawEventID~=5 then return false end
+  local starts=raw["start"] and raw["start"]["U"] or nil
+  for _,npcID in pairs(starts or {}) do
+    if VERIFIED_DARKMOON_STARTERS[tonumber(npcID)] then return true end
+  end
+  return false
+end
+
 function E:IsVerifiedDarkmoonQuest(q)
   if not q then return false end
   local rawEventID=tonumber(q.rawEventID or q.eventID)
@@ -358,34 +369,27 @@ function E:ObserveQuestID(questID)
   return false
 end
 
-function E:IsActiveForQuest(q)
-  if not q or not q.eventID then return true end
-  local eventID=LogicalEventID(q.eventID)
+function E:IsActiveForQuestID(questID,eventID)
+  if not eventID then return true end
+  eventID=LogicalEventID(eventID)
   local classification=self:GetClassification(eventID)
 
-  -- Active quests already accepted by the player always remain visible.
-  if QuestieOcto.QuestLog and QuestieOcto.QuestLog:IsOnQuest(q.id) then
+  if QuestieOcto.QuestLog and QuestieOcto.QuestLog:IsOnQuest(questID) then
     self:MarkEventActive(eventID)
     return true
   end
 
-  -- Verified content/release gates are not seasonal availability gates.
   if classification=="nonseasonal" then return true end
-
-  -- Verified seasonal events are controlled only by their explicit schedule.
-  -- Darkmoon uses the anchored 14-day Elwynn/Mulgore rule; event IDs 4 and 5
-  -- are treated as one logical Faire while either location is active because
-  -- the pfQuest data assigns shared Faire quests to both IDs. Curated annual
-  -- festivals use CalendarEventRules; narrow events use their server timer.
   if classification=="seasonal" then
     local state=self:GetScheduledState(eventID)
     return state and true or false
   end
-
-  -- Unknown/unverified event IDs are intentionally on standby for Beta 1.1.
-  -- Observation does not promote them; this avoids flooding the map with stale
-  -- festival or server-internal event quests.
   return false
+end
+
+function E:IsActiveForQuest(q)
+  if not q then return true end
+  return self:IsActiveForQuestID(q.id,q.eventID)
 end
 
 local function ObserveRepeatability(entry,questID)

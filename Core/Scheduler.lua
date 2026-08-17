@@ -1,17 +1,18 @@
 QuestieOcto.Scheduler = QuestieOcto.Scheduler or {}
 local S = QuestieOcto.Scheduler
 
+-- O(1) FIFO queue. Vanilla's Lua table.remove(t,1) shifts every remaining
+-- element and becomes disproportionately expensive when several incremental
+-- startup jobs are queued together. Keep a monotonically advancing head/tail
+-- instead, then reset the table when drained.
 S.queue = {}
+S.queueHead = 1
+S.queueTail = 0
 S.delayed = {}
 S.elapsed = 0
 S.interval = 0
 S.executed = 0
 
--- Vanilla's frame budget is much smaller than modern WoW's. The old scheduler
--- ran one slice from every active job each frame; during login that could turn
--- many individually-bounded jobs into one large visible stall. Run at most two
--- queued slices per frame and stop after roughly four milliseconds when the
--- client timer has enough resolution to measure it.
 S.maxJobsPerFrame = 2
 S.maxSecondsPerFrame = 0.004
 S.stats = {
@@ -19,19 +20,26 @@ S.stats = {
   slowestLabel="none", slowestSeconds=0, lastLabel="none"
 }
 
+function S:PendingCount()
+  local n=(self.queueTail or 0)-(self.queueHead or 1)+1
+  if n<0 then return 0 end
+  return n
+end
+
 function S:Enqueue(fn, label)
   if not fn then return end
-  table.insert(self.queue, { fn=fn, label=label })
-  local n=table.getn(self.queue)
+  self.queueTail=(self.queueTail or 0)+1
+  self.queue[self.queueTail]={fn=fn,label=label}
+  local n=self:PendingCount()
   if n>(self.stats.maxQueue or 0) then self.stats.maxQueue=n end
 end
 
 function S:After(delay, fn, key)
   if not fn then return end
   if key then
-    self.delayed[key] = { remaining=delay or 0, fn=fn }
+    self.delayed[key] = { remaining=delay or 0, fn=fn, label=tostring(key) }
   else
-    table.insert(self.delayed, { remaining=delay or 0, fn=fn })
+    table.insert(self.delayed, { remaining=delay or 0, fn=fn, label="delayed" })
   end
 end
 
@@ -41,26 +49,36 @@ local function RunDelayed(self, delta)
     v.remaining = v.remaining - delta
     if v.remaining <= 0 then table.insert(remove, k) end
   end
-  -- Delayed callbacks are intentionally left lightweight: most of them only
-  -- enqueue a bounded job or trigger a small UI refresh. The queue itself is
-  -- the expensive-work boundary and is budgeted below.
+
+  -- Due timers enter the same bounded FIFO as every other continuation. The
+  -- previous scheduler executed every due callback synchronously before its
+  -- frame budget even started; a login/reload event burst could therefore put
+  -- substantial work back into one frame despite the queue budget.
   for _,k in pairs(remove) do
     local entry = self.delayed[k]
     self.delayed[k] = nil
-    if entry and entry.fn then entry.fn() end
+    if entry and entry.fn then
+      self:Enqueue(entry.fn,"timer:"..tostring(entry.label or k))
+    end
   end
 end
 
 function S:Tick()
-  local count=table.getn(self.queue)
+  local count=self:PendingCount()
   if count<=0 then return end
 
   local start=(GetTime and GetTime()) or 0
   local ran=0
   local limit=math.min(count,self.maxJobsPerFrame or 2)
 
-  while ran<limit do
-    local entry=table.remove(self.queue,1)
+  while ran<limit and self.queueHead<=self.queueTail do
+    local index=self.queueHead
+    local entry=self.queue[index]
+    self.queue[index]=nil
+    self.queueHead=index+1
+
+    -- A missing/cancelled slot must never trap the scheduler in a while loop.
+    -- Continue advancing the head even if an entry was somehow cleared.
     if entry and entry.fn then
       local jobStart=(GetTime and GetTime()) or start
       entry.fn()
@@ -76,6 +94,12 @@ function S:Tick()
     end
 
     if ran>=1 and GetTime and ((GetTime()-start)>=(self.maxSecondsPerFrame or 0.004)) then break end
+  end
+
+  if self.queueHead>self.queueTail then
+    self.queue={}
+    self.queueHead=1
+    self.queueTail=0
   end
 
   local total=(GetTime and (GetTime()-start)) or 0

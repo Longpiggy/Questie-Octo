@@ -127,6 +127,25 @@ local function ObservedRepeatables()
   return QuestieOctoGlobalDB.observedRepeatableQuests
 end
 
+
+function QM:IsRepeatableRaw(questID,raw)
+  questID=tonumber(questID)
+  raw=raw or (questID and QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI:GetQuestRaw(questID)) or nil
+  return ((raw and raw["repeatable"]) or (questID and ObservedRepeatables()[questID])) and true or false
+end
+
+function QM:GetConditionalOffer(questID)
+  return CONDITIONAL_OFFERS[tonumber(questID)]
+end
+
+function QM:GetConditionalMapMarker(questID)
+  return CONDITIONAL_MAP_MARKERS[tonumber(questID)]
+end
+
+function QM:IsNormalRepeatablePresentation(questID)
+  return NORMAL_REPEATABLE_PRESENTATION[tonumber(questID)] and true or false
+end
+
 function QM:MarkObservedRepeatable(questID)
   questID=tonumber(questID)
   if not questID then return false end
@@ -186,15 +205,15 @@ function QM:Get(questID)
     rawEventID=tonumber(raw["event"]),
     eventID=(tonumber(raw["event"])==5 and 4 or tonumber(raw["event"])),
     event=raw["event"],
-    repeatable=(raw["repeatable"] or ObservedRepeatables()[tonumber(questID)]) and true or false,
+    repeatable=self:IsRepeatableRaw(questID,raw),
     hideAfterFirstCompletion=raw["hideAfterFirstCompletion"] and true or false,
     daily=raw["daily"] and true or false,
     yearly=raw["yearly"] and true or false,
     hardcore=raw["hardcore"] and true or false,
     timed=raw["timed"] and true or false,
     disabled=raw["disabled"] and true or false,
-    conditionalOffer=CONDITIONAL_OFFERS[tonumber(questID)],
-    conditionalMapMarker=CONDITIONAL_MAP_MARKERS[tonumber(questID)],
+    conditionalOffer=self:GetConditionalOffer(questID),
+    conditionalMapMarker=self:GetConditionalMapMarker(questID),
     exclusive=raw["exclusive"] and true or false,
     nextChain=tonumber(raw["nextChain"]),
 

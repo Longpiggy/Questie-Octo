@@ -82,10 +82,20 @@ function C:IsEverComplete(questID)
   return self.history[questID] and true or false
 end
 
+local function StaticQuestFlags(questID,q)
+  if q then
+    return q.daily and true or false,q.yearly and true or false,q.repeatable and true or false,q.hideAfterFirstCompletion and true or false
+  end
+  local raw=QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI.GetQuestRaw and QuestieOcto.DatabaseAPI:GetQuestRaw(questID) or nil
+  if not raw then return false,false,false,false end
+  local repeatable=QuestieOcto.QuestModel and QuestieOcto.QuestModel.IsRepeatableRaw and QuestieOcto.QuestModel:IsRepeatableRaw(questID,raw)
+  return raw["daily"] and true or false,raw["yearly"] and true or false,repeatable and true or false,raw["hideAfterFirstCompletion"] and true or false
+end
+
 function C:IsCurrentComplete(questID)
   if self.current[questID] or self.sessionLocks[questID] then return true end
-  local q=QuestieOcto.QuestModel and QuestieOcto.QuestModel:Get(questID) or nil
-  if q and q.daily and self:IsDailyLocked(questID) then return true end
+  local daily=StaticQuestFlags(questID,nil)
+  if daily and self:IsDailyLocked(questID) then return true end
   return false
 end
 
@@ -97,11 +107,10 @@ function C:IsComplete(questID)
 end
 
 function C:IsQuestBlockedByCompletion(questID,q)
-  q=q or (QuestieOcto.QuestModel and QuestieOcto.QuestModel:Get(questID))
-  if q and q.daily then return self:IsCurrentComplete(questID) end
-  if q and q.yearly then return self:IsCurrentComplete(questID) end
-  if q and q.repeatable then
-    if q.hideAfterFirstCompletion then
+  local daily,yearly,repeatable,hideAfterFirst=StaticQuestFlags(questID,q)
+  if daily or yearly then return self:IsCurrentComplete(questID) end
+  if repeatable then
+    if hideAfterFirst then
       return self:IsEverComplete(questID) or self:IsCurrentComplete(questID)
     end
     return false
@@ -110,10 +119,8 @@ function C:IsQuestBlockedByCompletion(questID,q)
 end
 
 function C:IsRewardedForPrerequisite(questID)
-  local q=QuestieOcto.QuestModel and QuestieOcto.QuestModel:Get(questID) or nil
-  if q and (q.daily or q.yearly) then
-    return self:IsCurrentComplete(questID)
-  end
+  local daily,yearly=StaticQuestFlags(questID,nil)
+  if daily or yearly then return self:IsCurrentComplete(questID) end
   return self:IsEverComplete(questID) or self:IsCurrentComplete(questID)
 end
 
@@ -121,10 +128,8 @@ function C:HasBlockingStatus(questID)
   local state=QuestieOcto.QuestLog and QuestieOcto.QuestLog.active and QuestieOcto.QuestLog.active[questID]
   if state and not state.failed then return true end
 
-  local q=QuestieOcto.QuestModel and QuestieOcto.QuestModel:Get(questID) or nil
-  if q and q.repeatable and not q.daily and not q.yearly then
-    return false
-  end
+  local daily,yearly,repeatable=StaticQuestFlags(questID,nil)
+  if repeatable and not daily and not yearly then return false end
   return self:IsRewardedForPrerequisite(questID)
 end
 

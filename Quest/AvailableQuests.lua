@@ -141,67 +141,69 @@ function A:IsHardcorePlayer()
   return false
 end
 
-local function HasStarter(q)
-  return
-    (q.starts.creature and next(q.starts.creature)) or
-    (q.starts.gameObject and next(q.starts.gameObject)) or
-    (q.starts.item and next(q.starts.item))
+local function RawStarts(raw,kind)
+  return raw and raw["start"] and raw["start"][kind] or nil
 end
 
-local function StarterFactionAllowsPlayer(q)
+local function HasStarterRaw(raw)
+  return
+    (RawStarts(raw,"U") and next(RawStarts(raw,"U"))) or
+    (RawStarts(raw,"O") and next(RawStarts(raw,"O"))) or
+    (RawStarts(raw,"I") and next(RawStarts(raw,"I")))
+end
+
+local function StarterFactionAllowsPlayerRaw(raw)
   local db=QuestieOcto.DatabaseAPI
   if not db then return true end
 
-  -- An item starter is not tied to an NPC/object faction, so it remains a valid
-  -- alternate pickup path even when another listed starter is faction-specific.
-  if q.starts.item and next(q.starts.item) then return true end
+  local itemStarts=RawStarts(raw,"I")
+  if itemStarts and next(itemStarts) then return true end
 
   local sawDirectStarter=false
-  for _,id in pairs(q.starts.creature or {}) do
+  for _,id in pairs(RawStarts(raw,"U") or {}) do
     sawDirectStarter=true
     if not db.CreatureAllowsPlayerFaction or db:CreatureAllowsPlayerFaction(id) then return true end
   end
-  for _,id in pairs(q.starts.gameObject or {}) do
+  for _,id in pairs(RawStarts(raw,"O") or {}) do
     sawDirectStarter=true
     if not db.ObjectAllowsPlayerFaction or db:ObjectAllowsPlayerFaction(id) then return true end
   end
 
-  -- Missing faction metadata is deliberately treated as usable by the DB helper.
-  -- Only reject when direct starters are known and every one excludes the player.
   return not sawDirectStarter
 end
 
-local function PrerequisitesSatisfied(q)
-  if not q.preQuestSingle and not q.preQuestActive and not q.preQuestAll then return true end
+local function PrerequisitesSatisfiedRaw(raw)
+  local pre=raw and raw["pre"] or nil
+  local preActive=raw and raw["preActive"] or nil
+  local preAll=raw and raw["preAll"] or nil
+  if not pre and not preActive and not preAll then return true end
 
   local satisfied=false
   local activeSet=nil
   local allSet=nil
 
-  if q.preQuestActive then
+  if preActive then
     activeSet={}
-    for _,id in pairs(q.preQuestActive) do
+    for _,id in pairs(preActive) do
       activeSet[id]=true
       if QuestieOcto.QuestLog:IsOnQuest(id) then satisfied=true end
     end
   end
 
-  if q.preQuestAll then
+  if preAll then
     allSet={}
-    for _,group in pairs(q.preQuestAll) do
+    for _,group in pairs(preAll) do
       local groupComplete=true
       for _,id in pairs(group) do
         allSet[id]=true
-        if not QuestieOcto.Completion:IsRewardedForPrerequisite(id) then
-          groupComplete=false
-        end
+        if not QuestieOcto.Completion:IsRewardedForPrerequisite(id) then groupComplete=false end
       end
       if groupComplete then satisfied=true end
     end
   end
 
-  if q.preQuestSingle then
-    for _,id in pairs(q.preQuestSingle) do
+  if pre then
+    for _,id in pairs(pre) do
       if (not activeSet or not activeSet[id]) and (not allSet or not allSet[id]) then
         if QuestieOcto.Completion:IsRewardedForPrerequisite(id) then satisfied=true end
       end
@@ -211,10 +213,10 @@ local function PrerequisitesSatisfied(q)
   return satisfied
 end
 
-local function BlockedByExclusive(q)
-  if not q.exclusive or not q.exclusiveTo then return false end
-  for _,id in pairs(q.exclusiveTo) do
-    if id~=q.id and QuestieOcto.Completion:HasBlockingStatus(id) then return true end
+local function BlockedByExclusiveRaw(raw,questID)
+  if not raw or not raw["exclusive"] or not raw["close"] then return false end
+  for _,id in pairs(raw["close"]) do
+    if id~=questID and QuestieOcto.Completion:HasBlockingStatus(id) then return true end
   end
   return false
 end
@@ -236,71 +238,63 @@ local function Track(self,name,enabled)
 end
 
 function A:EvaluateQuest(questID,trackStats)
-  local q=QuestieOcto.QuestModel:Get(questID)
-  if not q then return false,"noModel" end
+  questID=tonumber(questID)
+  local raw=questID and QuestieOcto.DatabaseAPI:GetQuestRaw(questID) or nil
+  if not raw then return false,"noModel" end
 
-  if q.disabled then
+  if raw["disabled"] then
     Track(self,"disabled",trackStats)
     return false,"disabled"
   end
 
-  -- Darkmoon is a verified live exception to several stale pfQuest/Turtle
-  -- quest-row details.  The same quest-givers and hand-in quests are reused in
-  -- Elwynn and Mulgore even though raw rows are split between event 4 and 5.
-  -- The player's live Elwynn screenshots also confirm these NPCs offer every
-  -- level-eligible tier regardless of the old DMF repMax metadata.  Keep the
-  -- ordinary safety gates (completion, race/class, level, repeatable setting)
-  -- but do not let stale Darkmoon reputation/chain metadata suppress them.
+  local rawEventID=tonumber(raw["event"])
+  local eventID=(rawEventID==5 and 4 or rawEventID)
   local eventService=QuestieOcto.EventAvailability
-  local verifiedDarkmoon=eventService and eventService:IsVerifiedDarkmoonQuest(q)
-      and eventService:IsDarkmoonFaireActive() and true or false
+  local verifiedDarkmoon=eventService and eventService.IsVerifiedDarkmoonRaw
+      and eventService:IsVerifiedDarkmoonRaw(raw) and eventService:IsDarkmoonFaireActive() and true or false
 
   if QuestieOcto.QuestLog:IsOnQuest(questID) then
     Track(self,"active",trackStats)
     return false,"active"
   end
 
-  if QuestieOcto.Completion:IsQuestBlockedByCompletion(questID,q) then
+  if QuestieOcto.Completion:IsQuestBlockedByCompletion(questID,nil) then
     Track(self,"completed",trackStats)
     return false,"completed"
   end
 
-  if not verifiedDarkmoon and q.nextChain and QuestieOcto.Completion:HasBlockingStatus(q.nextChain) then
+  local nextChain=tonumber(raw["nextChain"])
+  if not verifiedDarkmoon and nextChain and QuestieOcto.Completion:HasBlockingStatus(nextChain) then
     Track(self,"prerequisite",trackStats)
     return false,"nextChain"
   end
 
-  if not verifiedDarkmoon and BlockedByExclusive(q) then
+  if not verifiedDarkmoon and BlockedByExclusiveRaw(raw,questID) then
     Track(self,"exclusive",trackStats)
     return false,"exclusive"
   end
 
-  if not verifiedDarkmoon and not PrerequisitesSatisfied(q) then
+  if not verifiedDarkmoon and not PrerequisitesSatisfiedRaw(raw) then
     Track(self,"prerequisite",trackStats)
     return false,"prerequisite"
   end
 
-  if q.raceMask and not MaskContains(q.raceMask,PlayerRaceBit()) then
+  if raw["race"] and not MaskContains(raw["race"],PlayerRaceBit()) then
     Track(self,"race",trackStats)
     return false,"race"
   end
 
-  if q.classMask and not MaskContains(q.classMask,PlayerClassBit()) then
+  if raw["class"] and not MaskContains(raw["class"],PlayerClassBit()) then
     Track(self,"class",trackStats)
     return false,"class"
   end
 
-  -- pfQuest's source data also carries the effective faction of quest-giver
-  -- creatures/objects (A/H/AH). Turtle quests can have RequiredRaces=0 while
-  -- being practically faction-locked because the only quest giver is hostile.
-  -- Respect that source-level truth so hostile Sunsworn-style NPCs are not
-  -- advertised as available to the opposite faction.
-  if not StarterFactionAllowsPlayer(q) then
+  if not StarterFactionAllowsPlayerRaw(raw) then
     Track(self,"starterFaction",trackStats)
     return false,"starterFaction"
   end
 
-  if q.hardcore then
+  if raw["hardcore"] then
     local hardcore=self:IsHardcorePlayer()
     if not hardcore then
       Track(self,"hardcore",trackStats)
@@ -308,125 +302,112 @@ function A:EvaluateQuest(questID,trackStats)
     end
   end
 
-  if q.requiredSkill then
-    local rank=PlayerSkillRank(q.requiredSkill)
-    if not rank or rank<(q.requiredSkillValue or 1) then
+  local requiredSkill=raw["skill"]
+  if requiredSkill then
+    local requiredSkillValue=tonumber(raw["skillValue"] or 1) or 1
+    local rank=PlayerSkillRank(requiredSkill)
+    if not rank or rank<requiredSkillValue then
       Track(self,"skill",trackStats)
       return false,"skill"
     end
   end
 
-  if q.repMinFaction and not verifiedDarkmoon then
-    local rep=self:GetPlayerReputation(q.repMinFaction)
-    if rep==nil or rep<(q.repMinValue or 0) then
+  local repMinFaction=tonumber(raw["repMinFaction"])
+  if repMinFaction and not verifiedDarkmoon then
+    local rep=self:GetPlayerReputation(repMinFaction)
+    local repMinValue=tonumber(raw["repMinValue"] or 0) or 0
+    if rep==nil or rep<repMinValue then
       Track(self,"reputation",trackStats)
       return false,"repMin"
     end
   end
 
-  if q.repMaxFaction and not verifiedDarkmoon then
-    local rep=self:GetPlayerReputation(q.repMaxFaction)
-    if rep==nil or rep>=(q.repMaxValue or 0) then
+  local repMaxFaction=tonumber(raw["repMaxFaction"])
+  if repMaxFaction and not verifiedDarkmoon then
+    local rep=self:GetPlayerReputation(repMaxFaction)
+    local repMaxValue=tonumber(raw["repMaxValue"] or 0) or 0
+    if rep==nil or rep>=repMaxValue then
       Track(self,"reputation",trackStats)
       return false,"repMax"
     end
   end
 
-  -- Some quests are conditionally exposed by scripted world interactions rather
-  -- than normal NPC availability. Most stay hidden as static pickups. A narrow
-  -- presentation exception may provide one representative discovery marker; in
-  -- that case continue through all ordinary level/race/filter gates and let the
-  -- node builders use only that representative coordinate.
-  if q.conditionalOffer and not q.conditionalMapMarker then
-    return false,"conditional"
-  end
+  local conditional=QuestieOcto.QuestModel and QuestieOcto.QuestModel.GetConditionalOffer and QuestieOcto.QuestModel:GetConditionalOffer(questID) or nil
+  local conditionalMarker=QuestieOcto.QuestModel and QuestieOcto.QuestModel.GetConditionalMapMarker and QuestieOcto.QuestModel:GetConditionalMapMarker(questID) or nil
+  if conditional and not conditionalMarker then return false,"conditional" end
 
-  local settings=QuestieOcto.MinimapSettings
-
-  -- Conservative beta event policy. The pfQuest/Turtle `event` field mixes
-  -- true festivals with permanent release/content gates, so presentation
-  -- classification and runtime availability must stay separate. Ordinary
-  -- content-gate events (for example event 159 cloth turn-ins) pass through
-  -- normal quest eligibility. Festival-style events require BOTH the user's
-  -- Show Event Quests toggle and positive evidence that the event is active.
-  -- Active quests are handled by the Quest Log path before this function, so
-  -- accepted objectives/turn-ins remain visible even when this gate is closed.
-  if q.eventID then
+  if eventID then
     eventService=eventService or QuestieOcto.EventAvailability
-    local gated=eventService and eventService:ShouldGateQuest(q.eventID) or true
+    local gated=eventService and eventService:ShouldGateQuest(eventID) or true
     if gated then
+      local settings=QuestieOcto.MinimapSettings
       if not settings:Get("showEventQuests") then
         Track(self,"event",trackStats)
         return false,"eventHidden"
       end
-      if eventService and eventService:IsStandbyEvent(q.eventID) then
+      if eventService and eventService:IsStandbyEvent(eventID) then
         Track(self,"event",trackStats)
         return false,"eventStandby"
       end
-      if not (eventService and eventService:IsActiveForQuest(q)) then
+      if not (eventService and eventService:IsActiveForQuestID(questID,eventID)) then
         Track(self,"event",trackStats)
         return false,"eventInactive"
       end
     end
   end
 
+  local settings=QuestieOcto.MinimapSettings
   local level=UnitLevel("player") or 1
   local showLowLevel=settings:Get("showLowLevelQuests") and true or false
+  local questLevel=tonumber(raw["lvl"] or 0) or 0
 
-  -- lvl is presentation/triviality; it is NOT the high-level acceptance gate.
-  -- When low-level quests are enabled, players may optionally bound how far
-  -- below their current level Questie-Octo exposes them. The value 35 is the
-  -- options UI's "All" sentinel and preserves the historical unrestricted
-  -- Show Low-Level Quests behavior.
-  if q.level and q.level>0 then
-    if not showLowLevel and q.level<level-4 then
+  if questLevel>0 then
+    if not showLowLevel and questLevel<level-4 then
       Track(self,"level",trackStats)
       return false,"lowLevel"
     elseif showLowLevel then
       local below=tonumber(settings:Get("lowLevelQuestRange")) or 35
-      if below<35 and q.level<level-below then
+      if below<35 and questLevel<level-below then
         Track(self,"level",trackStats)
         return false,"lowLevel"
       end
     end
   end
 
-  -- Actual upper eligibility uses the minimum required level. Future quests are
-  -- not exposed through a separate Level Above Player setting.
-  if q.requiredLevel and q.requiredLevel>level then
+  local requiredLevel=tonumber(raw["min"] or 0) or 0
+  if requiredLevel>level then
     Track(self,"level",trackStats)
     return false,"minLevel"
   end
 
-  if q.pvp and not settings:Get("showPvPRelatedQuests") then
+  if (tonumber(raw["type"] or 0) or 0)==41 and not settings:Get("showPvPRelatedQuests") then
     Track(self,"pvp",trackStats)
     return false,"pvpHidden"
   end
 
-  if q.repeatable and not settings:Get("showRepeatableQuests") then
+  local repeatable=QuestieOcto.QuestModel and QuestieOcto.QuestModel:IsRepeatableRaw(questID,raw) or (raw["repeatable"] and true or false)
+  if repeatable and not settings:Get("showRepeatableQuests") then
     Track(self,"repeatable",trackStats)
     return false,"repeatable"
   end
 
-  -- MaxLevel is a separate hard server acceptance cap.
-  if q.maximumLevel and q.maximumLevel>0 and level>q.maximumLevel then
+  local maximumLevel=tonumber(raw["max"] or 0) or 0
+  if maximumLevel>0 and level>maximumLevel then
     Track(self,"level",trackStats)
     return false,"maxLevel"
   end
 
-  if q.timed and HasOtherTimedQuest(questID) then
+  if raw["timed"] and HasOtherTimedQuest(questID) then
     Track(self,"timed",trackStats)
     return false,"timed"
   end
 
-  if not HasStarter(q) then
+  if not HasStarterRaw(raw) then
     Track(self,"noStarter",trackStats)
     return false,"noStarter"
   end
 
-  if q.conditionalOffer and q.conditionalMapMarker then
-    return true,"conditional"
-  end
+  if conditional and conditionalMarker then return true,"conditional" end
 
   return true,"available"
 end
