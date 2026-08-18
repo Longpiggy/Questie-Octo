@@ -632,6 +632,8 @@ function M:SetMap(mapID)
   self.prune=false
   self.renderedPreparedPlan=nil
   self.syncPreparedPlan=nil
+  self.continentPhysicalRegistry=nil
+  self.continentItemAreaRegistry=nil
   self:HideAll()
 end
 
@@ -857,6 +859,14 @@ local function IsContinentQuestRole(role)
   return role=="available" or role=="turnin" or role=="itemStart"
 end
 
+-- Continent maps combine several independent zone coordinate systems. Turtle
+-- data can legitimately describe the same physical source through two adjacent
+-- zone maps, so mapID itself must not make those representations distinct once
+-- they have been converted back to world coordinates.
+local CONTINENT_SOURCE_DEDUPE_DISTANCE=20
+local CONTINENT_ITEM_AREA_DEDUPE_DISTANCE=40
+local CONTINENT_ITEM_AREA_ALT_MAP_DISTANCE=350
+
 local function ContinentPinKey(node,mapID,x,y)
   if IsContinentQuestRole(node.role) then
     return "continent:quest-source:"..tostring(node.sourceKind)..":"..tostring(node.sourceID)..":"..
@@ -866,9 +876,182 @@ local function ContinentPinKey(node,mapID,x,y)
     tostring(mapID)..":"..string.format("%.2f",x)..":"..string.format("%.2f",y)
 end
 
-function M:RenderContinentNode(node,mapID,generation)
+local function ContinentSourceSemanticKey(node)
+  local sourceIdentity=tostring(node.sourceKind)..":"..tostring(node.sourceID)
+  if node.sourceID==nil then
+    -- Fail safe for synthetic/scripted sources that have no stable DB ID.
+    sourceIdentity=sourceIdentity..":"..tostring(node.questID or 0)..":"..tostring(node.sourceName or "")
+  end
+  if IsContinentQuestRole(node.role) then
+    -- Keep the established behavior where all quest relationships on one
+    -- physical giver/source share one continent pin.
+    return "continent:quest-source:"..sourceIdentity
+  end
+  return "continent:"..tostring(node.role)..":"..sourceIdentity
+end
+
+local function ClaimContinentPhysicalKey(registry,semanticKey,worldX,worldY,maxDistance)
+  if not registry or not semanticKey or not worldX or not worldY then return nil,nil end
+  local entries=registry[semanticKey]
+  if not entries then
+    entries={}
+    registry[semanticKey]=entries
+  end
+
+  local limit=tonumber(maxDistance) or CONTINENT_SOURCE_DEDUPE_DISTANCE
+  local limitSquared=limit*limit
+  for _,entry in pairs(entries) do
+    local dx=worldX-entry.worldX
+    local dy=worldY-entry.worldY
+    if dx*dx+dy*dy<=limitSquared then
+      return entry.key,entry
+    end
+  end
+
+  local key=semanticKey..":"..string.format("%.1f",worldX)..":"..string.format("%.1f",worldY)
+  local entry={key=key,worldX=worldX,worldY=worldY}
+  table.insert(entries,entry)
+  return key,entry
+end
+
+local function CopyContinentItemSource(source)
+  return {
+    id=source.id,
+    name=source.name,
+    count=tonumber(source.count) or 0,
+    chance=source.chance,
+    rank=source.rank,
+    respawnSeconds=source.respawnSeconds
+  }
+end
+
+local function ItemSourceKey(source)
+  if source and source.id~=nil then return "id:"..tostring(source.id) end
+  return "name:"..tostring(source and source.name or "")
+end
+
+local function SortContinentItemSources(list)
+  table.sort(list,function(a,b)
+    local ac=tonumber(a.count) or 0
+    local bc=tonumber(b.count) or 0
+    if ac==bc then return tostring(a.name)<tostring(b.name) end
+    return ac>bc
+  end)
+end
+
+local function ContinentItemAreaSourceOverlap(a,b)
+  local aSources={}
+  local aCount=0
+  for _,source in pairs((a and a.sourceList) or {}) do
+    local key=ItemSourceKey(source)
+    if not aSources[key] then aSources[key]=true; aCount=aCount+1 end
+  end
+
+  local bCount=0
+  local common=0
+  local seen={}
+  for _,source in pairs((b and b.sourceList) or {}) do
+    local key=ItemSourceKey(source)
+    if not seen[key] then
+      seen[key]=true
+      bCount=bCount+1
+      if aSources[key] then common=common+1 end
+    end
+  end
+
+  local smaller=aCount
+  if bCount<smaller then smaller=bCount end
+  if smaller<=0 then return 0 end
+  return common/smaller
+end
+
+local function ClaimContinentItemAreaKey(registry,semanticKey,worldX,worldY,area)
+  if not registry or not semanticKey or not worldX or not worldY then return nil,nil end
+  local entries=registry[semanticKey]
+  if not entries then
+    entries={}
+    registry[semanticKey]=entries
+  end
+
+  local exactSquared=CONTINENT_ITEM_AREA_DEDUPE_DISTANCE*CONTINENT_ITEM_AREA_DEDUPE_DISTANCE
+  local alternateSquared=CONTINENT_ITEM_AREA_ALT_MAP_DISTANCE*CONTINENT_ITEM_AREA_ALT_MAP_DISTANCE
+  for _,entry in pairs(entries) do
+    local dx=worldX-entry.worldX
+    local dy=worldY-entry.worldY
+    local distanceSquared=dx*dx+dy*dy
+    if distanceSquared<=exactSquared then
+      return entry.key,entry
+    end
+
+    -- Adjacent zone maps can partition the same physical hunting population
+    -- differently, shifting the two area centroids even though their creature
+    -- source sets clearly describe the same border population. Merge only when
+    -- the source overlap is strong; proximity alone is never enough here.
+    if distanceSquared<=alternateSquared and entry.area
+       and ContinentItemAreaSourceOverlap(entry.area,area)>=0.75 then
+      return entry.key,entry
+    end
+  end
+
+  local key=semanticKey..":"..string.format("%.1f",worldX)..":"..string.format("%.1f",worldY)
+  local entry={key=key,worldX=worldX,worldY=worldY}
+  table.insert(entries,entry)
+  return key,entry
+end
+
+local function CopyContinentItemArea(area,x,y,key)
+  local copy={
+    x=x,y=y,n=0,
+    questID=area.questID,itemID=area.itemID,itemName=area.itemName,
+    sourceList={},displayName=area.displayName,key=key,
+    zoneWideRare=area.zoneWideRare and true or nil,
+    rareThreshold=area.rareThreshold
+  }
+  local byKey={}
+  for _,source in pairs(area.sourceList or {}) do
+    local sourceCopy=CopyContinentItemSource(source)
+    local sourceKey=ItemSourceKey(sourceCopy)
+    byKey[sourceKey]=sourceCopy
+    table.insert(copy.sourceList,sourceCopy)
+  end
+  copy._continentSourceByKey=byKey
+  SortContinentItemSources(copy.sourceList)
+  for _,source in pairs(copy.sourceList) do copy.n=copy.n+(tonumber(source.count) or 0) end
+  local first=copy.sourceList[1]
+  if first then copy.displayName=first.name end
+  return copy
+end
+
+local function MergeContinentItemArea(target,incoming)
+  if not target or not incoming then return end
+  target._continentSourceByKey=target._continentSourceByKey or {}
+
+  for _,source in pairs(incoming.sourceList or {}) do
+    local sourceKey=ItemSourceKey(source)
+    local current=target._continentSourceByKey[sourceKey]
+    if not current then
+      current=CopyContinentItemSource(source)
+      target._continentSourceByKey[sourceKey]=current
+      table.insert(target.sourceList,current)
+    elseif (tonumber(source.count) or 0)>(tonumber(current.count) or 0) then
+      -- Neighboring map representations can contain the same physical spawn
+      -- set. Keep the larger representation instead of double-counting it.
+      current.count=tonumber(source.count) or current.count
+    end
+  end
+
+  SortContinentItemSources(target.sourceList)
+  target.n=0
+  for _,source in pairs(target.sourceList) do target.n=target.n+(tonumber(source.count) or 0) end
+  local first=target.sourceList[1]
+  if first then target.displayName=first.name end
+end
+
+function M:RenderContinentNode(node,mapID,generation,physicalRegistry)
   if not node or not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) then return 0 end
-  if node.role=="itemStart" and QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance) then return 0 end
+  -- Continent item starts are rendered later from quest+item hunting areas for
+  -- both Clustered and Full Nodes. Full Nodes remains a zone/minimap detail mode.
+  if node.role=="itemStart" then return 0 end
   -- World Map Visibility toggles apply only to continent/world overviews.
   -- Selected zone and city maps keep normal/special quest markers visible and
   -- are controlled by Enable Available/Completed Quest Icons instead.
@@ -883,39 +1066,85 @@ function M:RenderContinentNode(node,mapID,generation)
   if not points or table.getn(points)==0 then return 0 end
 
   local rendered=0
-  if node.role=="itemStart" then
-    -- Item-start sources can have dozens of spawn points. On a continent map
-    -- they represent one available quest, so use a single centroid marker per
-    -- source/zone instead of turning the continent into an objective-node map.
-    local sx,sy,n=0,0,0
-    for _,point in pairs(points) do
-      local px,py=projection:Project(mapID,point.x,point.y)
-      if px and py then sx=sx+px; sy=sy+py; n=n+1 end
-    end
-    if n>0 then
-      local x,y=sx/n,sy/n
-      local pin=self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
-      if pin then pin.continentZoneMapID=mapID end
-      return 1
-    end
-    return 0
-  end
-
   for _,point in pairs(points) do
     local x,y=projection:Project(mapID,point.x,point.y)
     if x and y then
-      local pin=self:GetOrCreate(ContinentPinKey(node,mapID,x,y),node,x,y,1,generation,"exact")
-      if pin then pin.continentZoneMapID=mapID end
+      local worldX,worldY=projection:ToWorld(mapID,point.x,point.y)
+      local key=nil
+      if worldX and worldY then
+        key=ClaimContinentPhysicalKey(
+          physicalRegistry,
+          ContinentSourceSemanticKey(node),
+          worldX,worldY,
+          CONTINENT_SOURCE_DEDUPE_DISTANCE
+        )
+      end
+      if not key then key=ContinentPinKey(node,mapID,x,y) end
+      local pin=self:GetOrCreate(key,node,x,y,1,generation,"exact")
+      -- Keep the first/canonical zone representation for click-through rather
+      -- than letting a duplicate neighboring-map representation replace it.
+      if pin and not pin.continentZoneMapID then pin.continentZoneMapID=mapID end
       rendered=rendered+1
     end
   end
   return rendered
 end
 
+local function ContinentItemStartNodeEnabled(node)
+  if not node or node.role~="itemStart" then return false end
+  if QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance) then return false end
+  if not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) then return false end
+  return IsQuestMarkerNodeEnabled(node) and true or false
+end
+
+local function RenderContinentItemStartAreas(nodes,mapID,generation,areaRegistry,questFilter)
+  if not IsRoleEnabled("itemStart") then return end
+  local projection=QuestieOcto.ContinentProjection
+  local itemAreas=QuestieOcto.ItemStartAreas
+  if not projection or not itemAreas then return end
+
+  -- Intentionally ignore itemStartDensity here. The continent never shows raw
+  -- monster spawn nodes; both Clustered and Full Nodes therefore use the same
+  -- quest+starter-item geographic areas on the overview map.
+  local function includeNode(node)
+    if questFilter and not questFilter[tonumber(node and node.questID)] then return false end
+    return ContinentItemStartNodeEnabled(node)
+  end
+  local areas=itemAreas:BuildForMap(nodes or {},mapID,includeNode)
+  for _,area in pairs(areas or {}) do
+    local x,y=projection:Project(mapID,area.x,area.y)
+    local worldX,worldY=projection:ToWorld(mapID,area.x,area.y)
+    if x and y then
+      local semanticKey="continent:item-area:"..tostring(area.questID)..":"..tostring(area.itemID or 0)
+      local key,entry=nil,nil
+      if worldX and worldY then
+        key,entry=ClaimContinentItemAreaKey(
+          areaRegistry,semanticKey,worldX,worldY,area
+        )
+      end
+      if not key then
+        key=semanticKey..":"..tostring(mapID)..":"..string.format("%.2f",x)..":"..string.format("%.2f",y)
+      end
+
+      if entry and entry.area then
+        MergeContinentItemArea(entry.area,area)
+        M:RenderItemStartArea(entry.area,generation,entry.zoneMapID)
+      else
+        local displayArea=CopyContinentItemArea(area,x,y,key)
+        if entry then
+          entry.area=displayArea
+          entry.zoneMapID=mapID
+        end
+        M:RenderItemStartArea(displayArea,generation,mapID)
+      end
+    end
+  end
+end
+
 local function AddContinentRareItemStart(groups,node,mapID)
   if not node or node.role~="itemStart" or not QuestieOcto.ItemStartAreas:IsZoneWideRareChance(node.chance) then return false end
   -- Consume ultra-rare nodes even when their world-map category is disabled so
-  -- they do not fall back to the ordinary per-source continent renderer.
+  -- they do not fall back to an ordinary continent renderer.
   if not IsRoleEnabled(node.role) or not IsPvPQuestNodeEnabled(node) or not IsQuestMarkerNodeEnabled(node) then return true end
   local projection=QuestieOcto.ContinentProjection
   if not projection then return false end
@@ -924,7 +1153,7 @@ local function AddContinentRareItemStart(groups,node,mapID)
   if not group then
     group={
       questID=node.questID,itemID=node.itemID,itemName=node.itemName,
-      sx=0,sy=0,n=0,sources={}
+      sx=0,sy=0,n=0,worldSX=0,worldSY=0,worldN=0,sources={}
     }
     groups[key]=group
   end
@@ -936,6 +1165,12 @@ local function AddContinentRareItemStart(groups,node,mapID)
       group.sx=group.sx+x
       group.sy=group.sy+y
       group.n=group.n+1
+      local worldX,worldY=projection:ToWorld(mapID,point.x,point.y)
+      if worldX and worldY then
+        group.worldSX=group.worldSX+worldX
+        group.worldSY=group.worldSY+worldY
+        group.worldN=group.worldN+1
+      end
       local source=group.sources[node.sourceID]
       if not source then
         source={
@@ -950,7 +1185,7 @@ local function AddContinentRareItemStart(groups,node,mapID)
   return true
 end
 
-local function RenderContinentRareItemStarts(groups,mapID,generation)
+local function RenderContinentRareItemStarts(groups,mapID,generation,areaRegistry)
   for _,group in pairs(groups or {}) do
     if group.n and group.n>0 then
       local sourceList={}
@@ -960,16 +1195,54 @@ local function RenderContinentRareItemStarts(groups,mapID,generation)
         return a.count>b.count
       end)
       local first=sourceList[1]
+      local x=group.sx/group.n
+      local y=group.sy/group.n
       local area={
-        x=group.sx/group.n,y=group.sy/group.n,n=group.n,
+        x=x,y=y,n=group.n,
         questID=group.questID,itemID=group.itemID,itemName=group.itemName,
         sourceList=sourceList,zoneWideRare=true,
         rareThreshold=QuestieOcto.ItemStartAreas.zoneWideRareThreshold,
-        displayName=first and first.name or "Rare item-start source",
-        key="continent:"..tostring(mapID)..":"..tostring(group.questID)..":"..tostring(group.itemID or 0)..":zone-rare"
+        displayName=first and first.name or "Rare item-start source"
       }
-      M:RenderItemStartArea(area,generation,mapID)
+
+      local semanticKey="continent:item-rare:"..tostring(group.questID)..":"..tostring(group.itemID or 0)
+      local key,entry=nil,nil
+      if group.worldN and group.worldN>0 then
+        key,entry=ClaimContinentItemAreaKey(
+          areaRegistry,semanticKey,
+          group.worldSX/group.worldN,group.worldSY/group.worldN,
+          area
+        )
+      end
+      if not key then
+        key=semanticKey..":"..tostring(mapID)..":"..string.format("%.2f",x)..":"..string.format("%.2f",y)
+      end
+
+      if entry and entry.area then
+        MergeContinentItemArea(entry.area,area)
+        M:RenderItemStartArea(entry.area,generation,entry.zoneMapID)
+      else
+        local displayArea=CopyContinentItemArea(area,x,y,key)
+        if entry then
+          entry.area=displayArea
+          entry.zoneMapID=mapID
+        end
+        M:RenderItemStartArea(displayArea,generation,mapID)
+      end
     end
+  end
+end
+
+local function ClearChangedContinentItemAreas(registry,changed)
+  if not registry or not changed then return end
+  for semanticKey,entries in pairs(registry) do
+    local keep={}
+    for _,entry in pairs(entries or {}) do
+      if not (entry.area and changed[tonumber(entry.area.questID)]) then
+        table.insert(keep,entry)
+      end
+    end
+    if table.getn(keep)>0 then registry[semanticKey]=keep else registry[semanticKey]=nil end
   end
 end
 
@@ -998,6 +1271,10 @@ function M:StartContinentSync(continentMapID,doPrune)
   local nodePos=1
   local nodes=nil
   local rareGroups={}
+  local physicalRegistry={}
+  local itemAreaRegistry={}
+  self.continentPhysicalRegistry=physicalRegistry
+  self.continentItemAreaRegistry=itemAreaRegistry
 
   local function step()
     if generation~=M.generation then return end
@@ -1014,15 +1291,20 @@ function M:StartContinentSync(continentMapID,doPrune)
       if nodePos<=table.getn(nodes) then
         local node=nodes[nodePos]
         if not AddContinentRareItemStart(rareGroups,node,mapIDs[mapPos]) then
-          M:RenderContinentNode(node,mapIDs[mapPos],generation)
+          M:RenderContinentNode(node,mapIDs[mapPos],generation,physicalRegistry)
         end
         nodePos=nodePos+1
         budget=budget-1
       else
-        RenderContinentRareItemStarts(rareGroups,mapIDs[mapPos],generation)
+        RenderContinentItemStartAreas(nodes,mapIDs[mapPos],generation,itemAreaRegistry)
+        RenderContinentRareItemStarts(rareGroups,mapIDs[mapPos],generation,itemAreaRegistry)
         nodes=nil
         rareGroups={}
         mapPos=mapPos+1
+        -- Item-start geographic aggregation is deliberately done one zone at a
+        -- time. Yield here so opening a continent map never turns the cleanup
+        -- pass into one large synchronous frame.
+        budget=0
       end
     end
 
@@ -1292,17 +1574,23 @@ function M:PatchContinentQuests(changedQuests)
   -- Add only the new semantic state for the changed quests. Unrelated continent
   -- icons never get rebound, cleared or recreated when Low-Level Quest range
   -- changes, so they remain visually stable throughout the update.
+  self.continentPhysicalRegistry=self.continentPhysicalRegistry or {}
+  self.continentItemAreaRegistry=self.continentItemAreaRegistry or {}
+  ClearChangedContinentItemAreas(self.continentItemAreaRegistry,changed)
+
   local mapIDs=QuestieOcto.ContinentProjection:GetZoneMapIDs(continentMapID)
   for _,mapID in ipairs(mapIDs or {}) do
     local rareGroups={}
-    for _,node in pairs(QuestieOcto.Nodes:GetMapNodes(mapID) or {}) do
+    local mapNodes=QuestieOcto.Nodes:GetMapNodes(mapID) or {}
+    for _,node in pairs(mapNodes) do
       if changed[tonumber(node.questID)] then
         if not AddContinentRareItemStart(rareGroups,node,mapID) then
-          self:RenderContinentNode(node,mapID,self.generation)
+          self:RenderContinentNode(node,mapID,self.generation,self.continentPhysicalRegistry)
         end
       end
     end
-    RenderContinentRareItemStarts(rareGroups,mapID,self.generation)
+    RenderContinentItemStartAreas(mapNodes,mapID,self.generation,self.continentItemAreaRegistry,changed)
+    RenderContinentRareItemStarts(rareGroups,mapID,self.generation,self.continentItemAreaRegistry)
   end
 
   -- Re-evaluate only pins that lost old relationships. AddEntry already handles

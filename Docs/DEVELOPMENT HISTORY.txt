@@ -1,3 +1,11 @@
+1.0.46 - CONTINENT QUEST-MARKER DEDUPLICATION
+- Corrected continent/world-overview quest-marker inflation caused by overlapping zone coordinate representations.
+- Converts continent candidates back to canonical world coordinates and merges duplicate representations of the same physical quest source before display.
+- Item-start quests now use quest+starter-item geographic hunting areas on continent maps regardless of Clustered or Full Nodes; raw monster spawn density remains a zone/minimap detail only.
+- Adjacent-map item-start areas are merged only when their physical positions and represented source populations identify the same border hunting area.
+- Preserved the strict <0.50% zone-wide rare item-start behavior, selected-zone maps, minimap behavior, Full Nodes semantics, and underlying quest/drop data.
+- Continent item-start aggregation yields after each zone so the cleanup remains inside the existing bounded scheduler flow.
+
 1.0.45 - COMPLETED QUEST MARKER SAFETY
 - Added a final ClassicAPI per-quest completion check before an otherwise-eligible ordinary quest can publish an Available marker.
 - Repairs missing ordinary completion history when the bulk completed-quest cache is stale or incomplete, so already rewarded quests disappear and their follow-ups can evaluate correctly.

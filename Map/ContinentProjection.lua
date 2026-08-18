@@ -91,26 +91,33 @@ function C:GetZoneContinent(mapID)
   return z and z.continent or nil
 end
 
-function C:Project(mapID,x,y)
+function C:ToWorld(mapID,x,y)
   local z=self.zones[tonumber(mapID)]
   if not z then return nil,nil,nil end
-  local c=self.continents[z.continent]
   x=tonumber(x); y=tonumber(y)
-  if not c or not x or not y then return nil,nil,nil end
+  if not x or not y then return nil,nil,z.continent end
   local zw=z.xMax-z.xMin
   local zh=z.yMax-z.yMin
-  local cw=c.xMax-c.xMin
-  local ch=c.yMax-c.yMin
-  if zw==0 or zh==0 or cw==0 or ch==0 then return nil,nil,nil end
+  if zw==0 or zh==0 then return nil,nil,z.continent end
   -- pfQuest extractor conversion is:
   -- localX = 100 - (worldY-yMin)/(yMax-yMin)*100
   -- localY = 100 - (worldX-xMin)/(xMax-xMin)*100
   local worldY=z.yMin+((100-x)/100)*zh
   local worldX=z.xMin+((100-y)/100)*zw
+  return worldX,worldY,z.continent
+end
+
+function C:Project(mapID,x,y)
+  local worldX,worldY,continent=self:ToWorld(mapID,x,y)
+  local c=self.continents[continent]
+  if not c or not worldX or not worldY then return nil,nil,continent end
+  local cw=c.xMax-c.xMin
+  local ch=c.yMax-c.yMin
+  if cw==0 or ch==0 then return nil,nil,continent end
   local cx=100-((worldY-c.yMin)/ch)*100
   local cy=100-((worldX-c.xMin)/cw)*100
-  if cx<0 or cx>100 or cy<0 or cy>100 then return nil,nil,z.continent end
-  return cx,cy,z.continent
+  if cx<0 or cx>100 or cy<0 or cy>100 then return nil,nil,continent end
+  return cx,cy,continent
 end
 
 function C:GetZoneMapIDs(continentMapID)
