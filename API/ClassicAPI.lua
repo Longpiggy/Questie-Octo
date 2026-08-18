@@ -55,7 +55,11 @@ end
 
 function A:GetQuestIDForLogIndex(index)
   if not self.valid then return nil end
-  return C_QuestLog.GetQuestIDForLogIndex(index)
+  -- Some ClassicAPI lookups return no Lua values when the quest/index no
+  -- longer exists. Capture the result first so callers always receive one
+  -- explicit value (nil when absent), which is safe for Lua 5.0 tonumber().
+  local questID=C_QuestLog.GetQuestIDForLogIndex(index)
+  return questID
 end
 
 -- Questie-facing normalized quest-log info.
@@ -102,7 +106,10 @@ end
 
 function A:GetLogIndexForQuestID(questID)
   if not self.valid then return nil end
-  return C_QuestLog.GetLogIndexForQuestID(questID)
+  -- See GetQuestIDForLogIndex above: normalize a C-side no-return result to
+  -- one explicit nil so Lua 5.0 callers never invoke tonumber() with 0 args.
+  local index=C_QuestLog.GetLogIndexForQuestID(questID)
+  return index
 end
 
 -- ClassicAPI exposes the quest's native zone-header index even when that

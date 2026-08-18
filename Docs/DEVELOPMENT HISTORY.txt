@@ -1,3 +1,8 @@
+1.0.44 - QUEST TURN-IN TRACKER TIMER SAFETY
+- Fixed a Lua 5.0 tracker error that could occur during quest turn-in while a removed quest still existed briefly in the tracker cache.
+- ClassicAPI quest-log ID/index lookups now normalize a C-side no-return result to explicit nil before numeric conversion.
+- Hardened the tracker timer and quest-log cache paths against the same stale-index race without changing normal timer behavior.
+
 1.0.43 - VOICEOVER QUEST LOG COMPATIBILITY
 - Fixed Questie-Octo quest-level text overwriting the left-side spacing reserved by VoiceOver's Quest Log play buttons.
 - After Questie-Octo finishes its Quest Log row presentation, it now asks VoiceOver to re-apply its own overlay layout when VoiceOver is present.

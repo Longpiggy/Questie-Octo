@@ -42,7 +42,8 @@ end
 local function QuestIDAt(index,info)
   local questID=info and tonumber(info.questID) or nil
   if not questID and QuestieOcto.API and QuestieOcto.API.GetQuestIDForLogIndex then
-    questID=tonumber(QuestieOcto.API:GetQuestIDForLogIndex(index))
+    local rawQuestID=QuestieOcto.API:GetQuestIDForLogIndex(index)
+    questID=tonumber(rawQuestID)
   end
   if questID and questID>0 then return questID end
 

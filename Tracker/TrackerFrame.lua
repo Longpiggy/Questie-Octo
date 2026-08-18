@@ -560,10 +560,13 @@ function T:GetQuestTimerSeconds(quest)
   -- quest after the log has been reindexed.
   local questID=tonumber(quest.id)
   if questID and QuestieOcto.API then
-    local indexedID=QuestieOcto.API.GetQuestIDForLogIndex and tonumber(QuestieOcto.API:GetQuestIDForLogIndex(index)) or nil
+    local rawIndexedID=QuestieOcto.API.GetQuestIDForLogIndex and QuestieOcto.API:GetQuestIDForLogIndex(index) or nil
+    local indexedID=tonumber(rawIndexedID)
     if indexedID~=questID then
-      local freshIndex=QuestieOcto.API.GetLogIndexForQuestID and tonumber(QuestieOcto.API:GetLogIndexForQuestID(questID)) or nil
-      local freshID=freshIndex and QuestieOcto.API.GetQuestIDForLogIndex and tonumber(QuestieOcto.API:GetQuestIDForLogIndex(freshIndex)) or nil
+      local rawFreshIndex=QuestieOcto.API.GetLogIndexForQuestID and QuestieOcto.API:GetLogIndexForQuestID(questID) or nil
+      local freshIndex=tonumber(rawFreshIndex)
+      local rawFreshID=freshIndex and QuestieOcto.API.GetQuestIDForLogIndex and QuestieOcto.API:GetQuestIDForLogIndex(freshIndex) or nil
+      local freshID=tonumber(rawFreshID)
       if not freshIndex or freshID~=questID then return nil end
       index=freshIndex
       quest.logIndex=freshIndex
