@@ -9,6 +9,10 @@ C.history={}
 C.current={}
 C.sessionLocks={}
 C.dailyReset={}
+-- Session cache for per-quest completion verification. This supplements the
+-- bulk completion query when that cache is incomplete for a character. Both
+-- true and false are cached; normal quest turn-in events update the true state.
+C.flaggedCompletionCache={}
 C.receivedPackets=0
 C.startedAt=0
 C.source="none"
@@ -118,6 +122,44 @@ function C:IsQuestBlockedByCompletion(questID,q)
   return self:IsEverComplete(questID) or self:IsCurrentComplete(questID)
 end
 
+-- Final safety check for ordinary one-time quests. Turtle/ClassicAPI's bulk
+-- completion cache can occasionally be incomplete for a character even though
+-- the direct per-quest flag already knows the quest was rewarded. Only use the
+-- direct flag for non-repeatable, non-daily, non-yearly quests so resettable
+-- quest semantics are never collapsed into permanent completion.
+--
+-- Returns:
+--   blocked  - true when the direct client flag says the quest is completed.
+--   learned  - true only when this call repaired previously-missing history.
+function C:VerifyOrdinaryCompletionFlag(questID,q)
+  questID=tonumber(questID)
+  if not questID then return false,false end
+
+  local daily,yearly,repeatable=StaticQuestFlags(questID,q)
+  if daily or yearly or repeatable then return false,false end
+
+  if not QuestieOcto.API or not QuestieOcto.API.optional
+     or not QuestieOcto.API.optional.questFlaggedCompleted
+     or not QuestieOcto.API.IsQuestFlaggedCompleted then
+    return false,false
+  end
+
+  local cached=self.flaggedCompletionCache[questID]
+  if cached~=nil then return cached and true or false,false end
+
+  local flagged=QuestieOcto.API:IsQuestFlaggedCompleted(questID)
+  if flagged==nil then return false,false end
+
+  self.flaggedCompletionCache[questID]=flagged and true or false
+  if not flagged then return false,false end
+
+  local learned=not self.history[questID]
+  self.history[questID]=true
+  self.current[questID]=true
+  if learned then Save() end
+  return true,learned
+end
+
 function C:IsRewardedForPrerequisite(questID)
   local daily,yearly=StaticQuestFlags(questID,nil)
   if daily or yearly then return self:IsCurrentComplete(questID) end
@@ -151,6 +193,7 @@ function C:OnQuestTurnedIn(questID)
   -- this persistent history is needed when another quest uses them as a
   -- historical prerequisite.
   self.history[questID]=true
+  self.flaggedCompletionCache[questID]=true
 
   if q and q.daily then
     self.current[questID]=true
@@ -207,6 +250,7 @@ function C:RefreshFromQuestieAPI()
   for questID in pairs(self.sessionLocks) do nextCurrent[questID]=true end
 
   self.current=nextCurrent
+  self.flaggedCompletionCache={}
   self.receiving=false
   self.stats.localRefreshes=(self.stats.localRefreshes or 0)+1
   Publish("GetQuestsCompleted")
@@ -268,6 +312,7 @@ function C:FinishServerFallback()
   if not self.receiving then return end
   self.receiving=false
   self.frame:UnregisterEvent("CHAT_MSG_ADDON")
+  self.flaggedCompletionCache={}
   self.stats.serverRefreshes=(self.stats.serverRefreshes or 0)+1
   Publish("TWQUEST")
 end

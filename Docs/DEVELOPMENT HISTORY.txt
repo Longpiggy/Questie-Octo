@@ -1,3 +1,9 @@
+1.0.45 - COMPLETED QUEST MARKER SAFETY
+- Added a final ClassicAPI per-quest completion check before an otherwise-eligible ordinary quest can publish an Available marker.
+- Repairs missing ordinary completion history when the bulk completed-quest cache is stale or incomplete, so already rewarded quests disappear and their follow-ups can evaluate correctly.
+- Direct completion checks are session-cached and deliberately exclude repeatable, daily, and yearly quests so resettable quest semantics remain unchanged.
+- A one-time fast availability rescan runs when missing completion history is repaired, covering follow-ups that were evaluated earlier in the same scan.
+
 1.0.44 - QUEST TURN-IN TRACKER TIMER SAFETY
 - Fixed a Lua 5.0 tracker error that could occur during quest turn-in while a removed quest still existed briefly in the tracker cache.
 - ClassicAPI quest-log ID/index lookups now normalize a C-side no-return result to explicit nil before numeric conversion.

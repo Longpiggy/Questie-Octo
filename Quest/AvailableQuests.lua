@@ -407,6 +407,19 @@ function A:EvaluateQuest(questID,trackStats)
     return false,"noStarter"
   end
 
+  -- The bulk completed-quest cache can be stale/incomplete on some clients.
+  -- Before publishing an otherwise-eligible ordinary quest, ask ClassicAPI for
+  -- its direct completion flag. Repeatable/daily/yearly quests are deliberately
+  -- excluded by Completion:VerifyOrdinaryCompletionFlag().
+  if QuestieOcto.Completion and QuestieOcto.Completion.VerifyOrdinaryCompletionFlag then
+    local blocked,learned=QuestieOcto.Completion:VerifyOrdinaryCompletionFlag(questID,nil)
+    if blocked then
+      if learned then self.learnedCompletionFlag=true end
+      Track(self,"completed",trackStats)
+      return false,"completed"
+    end
+  end
+
   if conditional and conditionalMarker then return true,"conditional" end
 
   return true,"available"
@@ -585,6 +598,7 @@ function A:Recalculate(fastRefresh)
   -- the live table before the async scan completed, which made map pins blink
   -- off/on whenever a filtering option changed.
   self.pendingAvailable={}
+  self.learnedCompletionFlag=false
   self.queue=QuestieOcto.DatabaseAPI:GetQuestIDs()
   self.pos=1
   self.running=true
@@ -640,7 +654,14 @@ function A:Recalculate(fastRefresh)
     A.scanStats=nil
     A.running=false
     A.ready=true
+    local learnedCompletionFlag=A.learnedCompletionFlag and true or false
+    A.learnedCompletionFlag=false
     QuestieOcto:SendMessage("AVAILABLE_QUESTS_READY",changed)
+
+    -- A repaired completion can unlock a follow-up that happened to be scanned
+    -- earlier in this pass. One fast follow-up scan is enough; the repaired
+    -- quest is now in persistent history and cannot trigger this again.
+    if learnedCompletionFlag then A:Schedule(true,0.01) end
   end
 
   QuestieOcto.Scheduler:Enqueue(step,"available-scan")
