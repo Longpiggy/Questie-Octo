@@ -58,7 +58,9 @@ Questie-Octo uses its dark options theme by default.
 
 To change it, open **Other → Interface** and toggle **Enable Dark Theme**. The theme only changes the Questie-Octo settings window.
 
-**Changing this option requires `/reload`.** When disabled, Questie-Octo does not create the minimap-button frame at all; it is not merely hidden. This avoids compatibility problems with older Vanilla minimap-button collector addons.
+### Show Minimap Button
+
+**Changing this option requires `/reload`.** When disabled, Questie-Octo does not create the minimap-button frame at all; it is not merely hidden. This avoids issues with older Vanilla minimap-button collector addons.
 
 The other settings access methods described above remain available when the minimap button is disabled.
 
