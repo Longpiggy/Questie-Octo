@@ -1,3 +1,13 @@
+1.0.43 - VOICEOVER QUEST LOG COMPATIBILITY
+- Fixed Questie-Octo quest-level text overwriting the left-side spacing reserved by VoiceOver's Quest Log play buttons.
+- After Questie-Octo finishes its Quest Log row presentation, it now asks VoiceOver to re-apply its own overlay layout when VoiceOver is present.
+- The compatibility is load-order tolerant and does not hardcode VoiceOver icon coordinates or modify VoiceOver itself.
+- Quest tracking state, Quest Log difficulty colors, and VoiceOver playback behavior are unchanged.
+
+1.0.42 - README BASELINE UPDATE
+- Replaced the packaged README with the newly approved current README baseline.
+- No addon behavior changed.
+
 1.0.41 - CURRENT DUNGEON MAP IDENTITY / SCRIPTED WC ENCOUNTER
 - Audited the supplied Atlas-CFM dungeon quest/map presentation against current Questie-Octo, Turtle server data, ClassicAPI and pfQuest ClassicAPI without importing Atlas as database authority.
 - World Map identity now prefers current ClassicAPI WorldMapArea texture IDs instead of display-name lookup, covering custom instances/cities/wings that GetMapZones does not enumerate.

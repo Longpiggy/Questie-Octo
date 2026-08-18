@@ -54,6 +54,21 @@ local function GetButtonRegion(button,suffix)
   return getglobal(name..suffix)
 end
 
+local function RefreshVoiceOverQuestOverlay()
+  -- VoiceOver reserves space for its Quest Log play button by prefixing the
+  -- native quest title after QuestLog_Update. Questie-Octo intentionally
+  -- rebuilds that same title when adding [level], so re-run VoiceOver's own
+  -- overlay pass after our rows are finished instead of guessing its spacing
+  -- or moving its buttons ourselves. The lookup is dynamic so either addon
+  -- may load first.
+  local voiceOver=nil
+  if getglobal then voiceOver=getglobal("VoiceOver") end
+  if not voiceOver and _G then voiceOver=_G.VoiceOver end
+  local overlay=voiceOver and voiceOver.QuestOverlayUI
+  if not overlay or type(overlay.Update)~="function" then return end
+  pcall(overlay.Update,overlay)
+end
+
 local function ApplyTrackerCheck(button,index,questID)
   local check=GetButtonRegion(button,"Check")
   if not check then return end
@@ -232,6 +247,10 @@ function Q:Refresh()
     local button=GetTitleButton(i)
     if button and button:IsShown() then StyleButton(button,i+offset) end
   end
+
+  -- Questie-Octo has now finalized its [level] text and native check state.
+  -- Let VoiceOver re-apply only its own play-button spacing/placement last.
+  RefreshVoiceOverQuestOverlay()
 end
 
 function Q:ScheduleRefresh()
