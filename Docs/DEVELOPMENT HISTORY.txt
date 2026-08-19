@@ -1,3 +1,8 @@
+1.0.47 - ITEM-START WORLD-TOOLTIP VISIBILITY
+- Show Item-Start Quests now also controls available item-start information appended to creature, object, and item world-hover tooltips.
+- Disabled item-start presentation is omitted from the hover index, and a live visibility guard prevents stale/in-flight tooltip indexes from leaking item-start lines after the option is turned off.
+- Changing the master item-start toggle schedules a lightweight hover-index refresh; active quest objective tooltip information remains unaffected.
+
 1.0.46 - CONTINENT QUEST-MARKER DEDUPLICATION
 - Corrected continent/world-overview quest-marker inflation caused by overlapping zone coordinate representations.
 - Converts continent candidates back to canonical world coordinates and merges duplicate representations of the same physical quest source before display.

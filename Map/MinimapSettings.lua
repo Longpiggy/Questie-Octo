@@ -384,6 +384,9 @@ function S:Set(key,value)
     if QuestieOcto.Minimap and QuestieOcto.Minimap.OnSettingChanged then
       QuestieOcto.Minimap:OnSettingChanged(key,value)
     end
+    if key=="showItemStartQuests" and QuestieOcto.Tooltips and QuestieOcto.Tooltips.ScheduleHoverIndex then
+      QuestieOcto.Tooltips:ScheduleHoverIndex()
+    end
     return true
   end
 
