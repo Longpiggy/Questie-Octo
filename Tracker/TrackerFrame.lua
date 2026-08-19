@@ -224,6 +224,11 @@ function T:ApplyVisibleRowsHeight()
   -- height synchronously after the parent changes size. Whole-row paging must
   -- use the new viewport during this same render pass, so make it explicit.
   local scrollHeight=math.max(1,frameHeight-self.frameVerticalChrome)
+  -- Keep the viewport height we just calculated as the authoritative value for
+  -- this render pass. Vanilla can briefly report the previous ScrollFrame
+  -- height immediately after SetHeight(), which can clip the final whole row
+  -- until the next mouse-wheel/input event.
+  self.currentViewportHeight=scrollHeight
   if self.scroll.SetHeight then self.scroll:SetHeight(scrollHeight) end
 end
 
@@ -234,7 +239,10 @@ function T:GetVisibleRowRange()
   if first<1 then first=1 end
   if first>self.rowCount then first=self.rowCount end
 
-  local viewHeight=(self.scroll and self.scroll.GetHeight and self.scroll:GetHeight()) or 0
+  local viewHeight=tonumber(self.currentViewportHeight) or 0
+  if viewHeight<=0 then
+    viewHeight=(self.scroll and self.scroll.GetHeight and self.scroll:GetHeight()) or 0
+  end
   local maxRows=self:GetVisibleRowsSetting()
   local used=0
   local count=0
@@ -988,7 +996,8 @@ function T:CreateFrame()
   -- This prevents Vanilla from keeping the previous viewport height until the
   -- next input event after a row-count driven frame resize.
   scroll:SetWidth(math.max(1,self.defaultWidth-16))
-  scroll:SetHeight(math.max(1,self.defaultHeight-self.frameVerticalChrome))
+  self.currentViewportHeight=math.max(1,self.defaultHeight-self.frameVerticalChrome)
+  scroll:SetHeight(self.currentViewportHeight)
   if scroll.EnableMouseWheel then scroll:EnableMouseWheel(true) end
   scroll:SetScript("OnMouseWheel",function() T:ScrollBy(arg1) end)
 
