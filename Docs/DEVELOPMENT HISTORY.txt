@@ -1,3 +1,13 @@
+1.0.48 - TRACKER VISIBLE-ROW VIEWPORT SAFETY
+- Fixed the tracker occasionally clipping its final quest/objective even when the configured Visible Rows value had enough room.
+- Tracker layout now uses the viewport height calculated during the current render pass instead of immediately trusting Vanilla's potentially stale ScrollFrame:GetHeight() result after a resize.
+- Preserved whole-row paging and normal mouse-wheel scrolling when the tracker genuinely has more content than can fit.
+
+1.0.47 - ITEM-START WORLD-TOOLTIP VISIBILITY
+- Show Item-Start Quests now also controls available item-start information appended to creature, object, and item world-hover tooltips.
+- Disabled item-start presentation is omitted from the hover index, and a live visibility guard prevents stale/in-flight tooltip indexes from leaking item-start lines after the option is turned off.
+- Changing the master item-start toggle schedules a lightweight hover-index refresh; active quest objective tooltip information remains unaffected.
+
 1.0.46 - CONTINENT QUEST-MARKER DEDUPLICATION
 - Corrected continent/world-overview quest-marker inflation caused by overlapping zone coordinate representations.
 - Converts continent candidates back to canonical world coordinates and merges duplicate representations of the same physical quest source before display.

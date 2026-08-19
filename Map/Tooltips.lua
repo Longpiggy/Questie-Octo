@@ -715,10 +715,12 @@ end
 
 function T:RebuildHoverIndex()
   local nextIndex={ unitByName={}, objectByID={}, itemByID={} }
+  local showItemStarts=Settings():Get("showItemStartQuests") and true or false
 
   for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
     local questID=tonumber(node.questID)
-    if questID and questID>0 and IsQuestHoverRole(node.role) then
+    if questID and questID>0 and IsQuestHoverRole(node.role)
+       and (node.role~="itemStart" or showItemStarts) then
       if node.sourceKind=="creature" and node.sourceName then
         AppendIndexed(nextIndex.unitByName,UnitNameKey(node.sourceName),node)
       elseif node.sourceKind=="gameObject" and tonumber(node.sourceID) then
@@ -755,17 +757,21 @@ function T:RebuildHoverIndex()
 
   -- Available item-start quests likewise belong on the starter item's own
   -- tooltip even if the item came from a source outside our current map data.
-  for questID,resolved in pairs((QuestieOcto.ItemStarts and QuestieOcto.ItemStarts.byQuest) or {}) do
-    if QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.available[questID] then
-      for _,item in pairs(resolved.items or {}) do
-        local itemID=tonumber(item.itemID)
-        if itemID then
-          AppendIndexed(nextIndex.itemByID,itemID,{
-            questID=questID,
-            role="itemStart",
-            itemID=itemID,
-            itemName=item.name,
-          })
+  -- The master Show Item-Start Quests toggle applies to world/item hover too,
+  -- so disabling item-start presentation does not leave tooltip-only guidance.
+  if showItemStarts then
+    for questID,resolved in pairs((QuestieOcto.ItemStarts and QuestieOcto.ItemStarts.byQuest) or {}) do
+      if QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.available[questID] then
+        for _,item in pairs(resolved.items or {}) do
+          local itemID=tonumber(item.itemID)
+          if itemID then
+            AppendIndexed(nextIndex.itemByID,itemID,{
+              questID=questID,
+              role="itemStart",
+              itemID=itemID,
+              itemName=item.name,
+            })
+          end
         end
       end
     end
@@ -837,7 +843,8 @@ local function BuildHoverGroups(nodes,subjectKind)
   for _,node in pairs(nodes or {}) do
     local questID=tonumber(node.questID)
     local q=questID and QuestieOcto.QuestModel:Get(questID) or nil
-    if q then
+    local itemStartHidden=node.role=="itemStart" and not Settings():Get("showItemStartQuests")
+    if q and not itemStartHidden then
       local group=groups[questID]
       if not group then
         group={ quest=q, status=0, lines={}, seenLines={}, sourceIDs={} }
