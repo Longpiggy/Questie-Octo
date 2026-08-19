@@ -11,6 +11,15 @@ O.stats={
   mapped=0, unmapped=0, direct=0, fallback=0, fuzzy=0, single=0, typeMismatch=0,
   rebuilds=0, dependencyWaits=0
 }
+O.irItems=O.irItems or {}
+O.irItemQuests=O.irItemQuests or {}
+O.irPresence=O.irPresence or {}
+O.irPresenceScratch=O.irPresenceScratch or {}
+O.irChangedItems=O.irChangedItems or {}
+O.irAffectedQuests=O.irAffectedQuests or {}
+O.irTrackedCount=0
+O.irRegistryDirty=true
+O.irStats=O.irStats or {bagEvents=0,bagScans=0,bagSkips=0,changedScans=0}
 
 local MIN_DROP_CHANCE=1
 
@@ -106,6 +115,12 @@ local function ResolveItemSources(questID,itemID)
   return result
 end
 
+local function ClearTable(tbl)
+  if not tbl then return {} end
+  for key in pairs(tbl) do tbl[key]=nil end
+  return tbl
+end
+
 local function ItemIDFromLink(link)
   if not link then return nil end
   local _,_,id=string.find(link,"item:(%d+)")
@@ -134,55 +149,123 @@ local function PlayerHasItem(itemID)
   return false
 end
 
--- pfQuest only reacts to bag changes that affect registered quest-item
--- dependencies. Normal objective counts refresh the Tracker directly; map
--- objectives only rebuild when their todo/done semantics actually change.
-local function CollectIRItemIDs()
-  local tracked={}
+-- IR dependencies are rare, so keep a tiny active-quest registry instead of
+-- rescanning every active quest after every inventory event. Presence is built
+-- with one pass over bags/equipment for all tracked IR items together.
+local function RefreshIRRegistry()
+  local items=ClearTable(O.irItems)
+  local itemQuests=ClearTable(O.irItemQuests)
+  local trackedCount=0
+
   for questID in pairs(QuestieOcto.QuestLog.active or {}) do
     local q=QuestieOcto.QuestModel:Get(questID)
     if q and q.objectives and q.objectives.irItems then
       for _,itemID in pairs(q.objectives.irItems) do
         itemID=tonumber(itemID)
-        if itemID and itemID>0 then tracked[itemID]=true end
+        if itemID and itemID>0 then
+          if not items[itemID] then
+            items[itemID]=true
+            trackedCount=trackedCount+1
+          end
+          local quests=itemQuests[itemID]
+          if not quests then
+            quests={}
+            itemQuests[itemID]=quests
+          end
+          quests[tonumber(questID) or questID]=true
+        end
       end
     end
   end
-  return tracked
+
+  O.irItems=items
+  O.irItemQuests=itemQuests
+  O.irTrackedCount=trackedCount
+  return trackedCount
 end
 
-local function SnapshotIRPresence()
-  local state={}
-  local tracked=CollectIRItemIDs()
-  for itemID in pairs(tracked) do
-    state[itemID]=PlayerHasItem(itemID) and true or false
+local function ScanIRPresence()
+  local tracked=O.irItems or {}
+  local trackedCount=tonumber(O.irTrackedCount) or 0
+  local current=ClearTable(O.irPresenceScratch)
+  local changed=ClearTable(O.irChangedItems)
+  O.irPresenceScratch=current
+  O.irChangedItems=changed
+
+  if trackedCount<=0 then
+    O.irPresence=ClearTable(O.irPresence)
+    return nil
   end
-  return state
-end
 
-local function RefreshIRPresence()
-  O.irPresence=SnapshotIRPresence()
-end
+  O.irStats.bagScans=(O.irStats.bagScans or 0)+1
+  local foundCount=0
 
-local function IRPresenceChanged()
+  if GetContainerNumSlots and GetContainerItemLink then
+    local bag=0
+    while bag<=4 and foundCount<trackedCount do
+      local slots=GetContainerNumSlots(bag) or 0
+      local slot=1
+      while slot<=slots and foundCount<trackedCount do
+        local itemID=ItemIDFromLink(GetContainerItemLink(bag,slot))
+        if itemID and tracked[itemID] and not current[itemID] then
+          current[itemID]=true
+          foundCount=foundCount+1
+        end
+        slot=slot+1
+      end
+      bag=bag+1
+    end
+  end
+
+  if foundCount<trackedCount and GetInventoryItemLink then
+    local slot=1
+    while slot<=19 and foundCount<trackedCount do
+      local itemID=ItemIDFromLink(GetInventoryItemLink("player",slot))
+      if itemID and tracked[itemID] and not current[itemID] then
+        current[itemID]=true
+        foundCount=foundCount+1
+      end
+      slot=slot+1
+    end
+  end
+
   local previous=O.irPresence or {}
-  local current=SnapshotIRPresence()
-
-  for itemID,present in pairs(current) do
+  local changedAny=false
+  for itemID in pairs(tracked) do
+    local present=current[itemID] and true or false
+    current[itemID]=present
     if previous[itemID]~=present then
-      O.irPresence=current
-      return true
-    end
-  end
-  for itemID in pairs(previous) do
-    if current[itemID]==nil then
-      O.irPresence=current
-      return true
+      changed[itemID]=true
+      changedAny=true
     end
   end
 
+  -- Reuse both presence tables instead of allocating a new snapshot for every
+  -- bag event. The old presence table becomes next scan's scratch table.
+  O.irPresenceScratch=previous
   O.irPresence=current
-  return false
+
+  if changedAny then
+    O.irStats.changedScans=(O.irStats.changedScans or 0)+1
+    return changed
+  end
+  return nil
+end
+
+local function RefreshIRRegistryAndPresence()
+  RefreshIRRegistry()
+  ScanIRPresence()
+end
+
+local function TrackedIRItemPresent(itemID)
+  itemID=tonumber(itemID)
+  if not itemID then return false end
+  local present=O.irPresence and O.irPresence[itemID]
+  if present~=nil then return present and true or false end
+  -- Defensive fallback for a dependency resolved before the active IR registry
+  -- is initialized. Normal rebuild/refresh paths populate the shared snapshot
+  -- before ResolveQuest, so this should not be a hot-path inventory scan.
+  return PlayerHasItem(itemID)
 end
 
 local function BuildIRTargets(q)
@@ -193,7 +276,7 @@ local function BuildIRTargets(q)
   for _,itemID in pairs(q.objectives.irItems or {}) do
     local requirement=QuestieOcto.DatabaseAPI:GetQuestItemRequirementRaw(itemID)
     if requirement then
-      local hasItem=PlayerHasItem(itemID)
+      local hasItem=TrackedIRItemPresent(itemID)
       for signedID in pairs(requirement) do
         signedID=tonumber(signedID)
         if signedID and signedID<0 then
@@ -495,6 +578,11 @@ function O:Rebuild()
   for questID in pairs(QuestieOcto.QuestLog.active or {}) do table.insert(ids,questID) end
   table.sort(ids)
 
+  -- Build one shared IR inventory snapshot before resolving quests. This avoids
+  -- scanning the entire inventory independently for each active IR item.
+  RefreshIRRegistryAndPresence()
+  O.irRegistryDirty=false
+
   local pos=1
   local function step()
     if generation~=O.generation then return end
@@ -513,7 +601,6 @@ function O:Rebuild()
     end
     O.running=false
     O.ready=true
-    RefreshIRPresence()
     QuestieOcto:SendMessage("OBJECTIVES_READY")
     if O.pending then O.pending=false; O:Schedule(0.01) end
   end
@@ -527,7 +614,7 @@ function O:Schedule(delay)
   end,"objectives-rebuild")
 end
 
-function O:RefreshQuests(changedQuests)
+function O:RefreshQuests(changedQuests,irPresenceFresh)
   if not self.ready or self.running or not DependenciesReady() then
     self:Schedule(0.01)
     return
@@ -537,6 +624,11 @@ function O:RefreshQuests(changedQuests)
   for questID in pairs(changedQuests or {}) do table.insert(ids,tonumber(questID)) end
   table.sort(ids)
   if table.getn(ids)==0 then return end
+
+  if not irPresenceFresh and O.irRegistryDirty then
+    RefreshIRRegistryAndPresence()
+    O.irRegistryDirty=false
+  end
 
   self.running=true
   self.generation=self.generation+1
@@ -563,7 +655,6 @@ function O:RefreshQuests(changedQuests)
     end
 
     O.running=false
-    RefreshIRPresence()
     QuestieOcto:SendMessage("OBJECTIVES_CHANGED",changedQuests)
     if O.pending then O.pending=false; O:Schedule(0.01) end
   end
@@ -579,27 +670,43 @@ function O:OnDependencyChanged(changedQuests)
   end
 end
 
+function O:OnActiveSetChanged()
+  -- Active quest membership is the only normal event that changes which IR
+  -- items need tracking. Mark the registry dirty here; the following map-state
+  -- refresh rebuilds it once before resolving affected quests.
+  self.irRegistryDirty=true
+end
+
+QuestieOcto:RegisterMessage("QUEST_ACTIVE_SET_CHANGED",O,"OnActiveSetChanged")
 QuestieOcto:RegisterMessage("QUEST_MAP_STATE_CHANGED",O,"OnDependencyChanged")
 QuestieOcto:RegisterMessage("DATABASE_API_READY",O,"OnDependencyChanged")
 
 local bagFrame=CreateFrame("Frame","QuestieOctoObjectiveItemEvents",UIParent)
-bagFrame:RegisterEvent("BAG_UPDATE")
-bagFrame:RegisterEvent("UNIT_INVENTORY_CHANGED")
+-- ClassicAPI exposes BAG_UPDATE_DELAYED on this Vanilla client. Use the settled
+-- event rather than reacting to every individual stack/ammunition mutation.
+bagFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 bagFrame:SetScript("OnEvent",function()
-  if event=="UNIT_INVENTORY_CHANGED" and arg1 and arg1~="player" then return end
+  O.irStats.bagEvents=(O.irStats.bagEvents or 0)+1
+  if (tonumber(O.irTrackedCount) or 0)<=0 then
+    O.irStats.bagSkips=(O.irStats.bagSkips or 0)+1
+    return
+  end
 
-  -- Coalesce the entire loot/equipment burst, then touch the objective pipeline
-  -- only if an IR quest-item dependency actually appeared/disappeared.
+  -- Coalesce any additional delayed inventory burst. Scan the inventory once
+  -- for all currently relevant IR items, then refresh only quests mapped to the
+  -- item IDs whose presence actually changed.
   QuestieOcto.Scheduler:After(0.25,function()
-    if IRPresenceChanged() then
-      local affected={}
-      for questID in pairs(QuestieOcto.QuestLog.active or {}) do
-        local q=QuestieOcto.QuestModel:Get(questID)
-        if q and q.objectives and q.objectives.irItems and table.getn(q.objectives.irItems)>0 then
-          affected[questID]=true
-        end
+    if (tonumber(O.irTrackedCount) or 0)<=0 then return end
+    local changedItems=ScanIRPresence()
+    if not changedItems then return end
+
+    local affected=ClearTable(O.irAffectedQuests)
+    O.irAffectedQuests=affected
+    for itemID in pairs(changedItems) do
+      for questID in pairs((O.irItemQuests and O.irItemQuests[itemID]) or {}) do
+        affected[questID]=true
       end
-      if next(affected) then O:RefreshQuests(affected) end
     end
+    if next(affected) then O:RefreshQuests(affected,true) end
   end,"objective-ir-bag-check")
 end)

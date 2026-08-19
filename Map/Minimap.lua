@@ -11,9 +11,18 @@ MM.bindRevision=1
 MM.elapsed=0
 MM.updateInterval=0.05
 MM.globalScale=1
+-- Keep smooth 20 Hz movement for nearby pins, but do not rescan the full
+-- prepared zone plan at that rate. A discovery pass keeps a generous ring of
+-- nearby candidates and is repeated only after the player has moved far enough
+-- that a new pin could enter the real minimap without already being a candidate.
+MM.discoveryMargin=1.5
+MM.rediscoverFraction=0.25
+MM.shapeCheckInterval=1
+MM.mapIdentityCheckInterval=0.5
 MM.stats={
   active=0,created=0,reused=0,hidden=0,
-  refreshes=0,positionUpdates=0,mapChanges=0,
+  refreshes=0,positionUpdates=0,discoveryScans=0,fastPositionUpdates=0,mapChanges=0,
+  candidateFrames=0,scannedDescriptors=0,
   mapContextRestores=0,lastMapContextReason="none",
   visibleAvailable=0,visibleItemStart=0,visibleObjective=0,visibleTurnin=0
 }
@@ -22,6 +31,16 @@ MM.stats={
 local function Settings()
   return QuestieOcto.MinimapSettings
 end
+
+local function ClearTable(tbl)
+  if not tbl then return {} end
+  for key in pairs(tbl) do tbl[key]=nil end
+  return tbl
+end
+
+local OVERLAP_OFFSETS={
+  {0,0},{10,0},{-10,0},{0,10},{0,-10},{8,8},{-8,8},{8,-8},{-8,-8}
+}
 
 -- Lua 5.0 compatibility: RefreshVisualSettings/RescaleIcons are defined
 -- before the implementations below, so forward-declare both locals explicitly.
@@ -296,7 +315,7 @@ local function WorldMapBrowsingAwayFromPlayer(mapID)
   return tonumber(displayed)~=tonumber(mapID)
 end
 
-local function PlayerPosition()
+local function PlayerPosition(physicalMapID)
   -- Questie owns minimap refresh timing/state. Never retarget the World Map
   -- every 0.05s just to obtain player coordinates: that would fight the user
   -- while they browse. Instead, keep the last physical-zone position while the
@@ -304,7 +323,7 @@ local function PlayerPosition()
   -- soon as the physical map context is available again.
   if not GetPlayerMapPosition then return nil,nil end
 
-  local physicalMapID=CurrentMapID()
+  physicalMapID=physicalMapID or CurrentMapID()
   if WorldMapBrowsingAwayFromPlayer(physicalMapID) then
     return MM.physicalPlayerX,MM.physicalPlayerY
   end
@@ -333,7 +352,7 @@ end
 
 local function ResetPin(pin)
   pin.itemStartArea=nil
-  pin.entries={}
+  pin.entries=ClearTable(pin.entries)
   pin.visualPriority=nil
   pin.role=nil
   pin.questID=nil
@@ -641,17 +660,20 @@ function MM:HideAll()
   for _,pin in pairs(self.activeFrames or {}) do
     if pin:IsShown() then pin:Hide(); self.stats.hidden=self.stats.hidden+1 end
   end
-  self.activeFrames={}
+  self.activeFrames=ClearTable(self.activeFrames)
   self.stats.active=0
+  self.stats.candidateFrames=0
 end
 
-function MM:RefreshPlan()
-  local mapID=CurrentMapID()
+function MM:RefreshPlan(mapID)
+  mapID=tonumber(mapID) or CurrentMapID()
   if not mapID then
     self.mapID=nil
     self.plan=nil
     self.itemStartPlan=nil
     self.planRevision=nil
+    self.mapWidth=nil
+    self.mapHeight=nil
     self:HideAll()
     return
   end
@@ -662,6 +684,12 @@ function MM:RefreshPlan()
     self.lastPlayerX=nil
     self.lastPlayerY=nil
     self.lastZoom=nil
+    self.discoveryPlayerX=nil
+    self.discoveryPlayerY=nil
+    self.cachedIndoor=nil
+    self.cachedSquareMinimap=nil
+    self.nextShapeCheck=nil
+    self.nextMapIdentityCheck=nil
   end
 
   -- Instance type changes at the same lifecycle boundaries that refresh the
@@ -679,6 +707,8 @@ function MM:RefreshPlan()
     self.plan=nil
     self.itemStartPlan=nil
     self.planRevision=nil
+    self.mapWidth=nil
+    self.mapHeight=nil
     self:HideAll()
     if QuestieOcto.ZoneBootstrap then QuestieOcto.ZoneBootstrap:Request(mapID,0.01) end
     return
@@ -687,8 +717,9 @@ function MM:RefreshPlan()
   self.plan=plan
   self.itemStartPlan=itemStartPlan
   self.planRevision=QuestieOcto.PreparedMap.stateRevision
+  self.mapWidth,self.mapHeight=QuestieOcto.DatabaseAPI:GetMinimapSize(mapID)
   self.stats.refreshes=self.stats.refreshes+1
-  self:UpdatePositions(true)
+  self:UpdatePositions(true,mapID)
 end
 
 local function ResetVisibleStats()
@@ -710,47 +741,105 @@ local function CountVisible(pin)
   end
 end
 
-function MM:UpdatePositions(force)
-  if not self.enabled or not Minimap or not self.plan or not self.mapID then
-    self:HideAll()
-    return
+local function PinDiscoverySort(a,b)
+  local ak=tostring(a and a.coordKey or "")
+  local bk=tostring(b and b.coordKey or "")
+  if ak~=bk then return ak<bk end
+
+  local ap=IsPermanentRole(a and a.role) and 1 or 0
+  local bp=IsPermanentRole(b and b.role) and 1 or 0
+  if ap~=bp then return ap<bp end
+  if tostring(a and a.role or "")~=tostring(b and b.role or "") then
+    return tostring(a and a.role or "")<tostring(b and b.role or "")
+  end
+  return tonumber(a and a.sourceID or 0)<tonumber(b and b.sourceID or 0)
+end
+
+local function AssignCandidateOffsets(frames)
+  table.sort(frames,PinDiscoverySort)
+  local previousKey=nil
+  local groupIndex=0
+  local offsetCount=table.getn(OVERLAP_OFFSETS)
+
+  for index=1,table.getn(frames) do
+    local pin=frames[index]
+    local key=tostring(pin and pin.coordKey or "")
+    if key~=previousKey then
+      previousKey=key
+      groupIndex=1
+    else
+      groupIndex=groupIndex+1
+    end
+    local off=OVERLAP_OFFSETS[math.mod(groupIndex-1,offsetCount)+1]
+    pin.questieOctoOffsetX=off[1]
+    pin.questieOctoOffsetY=off[2]
+  end
+end
+
+function MM:PositionCandidates(px,py,fromDiscovery)
+  local xDraw=tonumber(self.cachedXDraw)
+  local yDraw=tonumber(self.cachedYDraw)
+  local width=tonumber(self.cachedMinimapWidth)
+  local height=tonumber(self.cachedMinimapHeight)
+  local radiusSquared=tonumber(self.cachedRadiusSquared)
+  if not xDraw or not yDraw or not width or not height or not radiusSquared then return end
+
+  ResetVisibleStats()
+  local visibleCount=0
+  local squareMinimap=self.cachedSquareMinimap and true or false
+  local frames=self.activeFrames or {}
+
+  for index=1,table.getn(frames) do
+    local pin=frames[index]
+    local x=tonumber(pin and pin.mapX)
+    local y=tonumber(pin and pin.mapY)
+    local inside=false
+    local xPos=nil
+    local yPos=nil
+
+    if x and y then
+      xPos=(x-px)*xDraw
+      yPos=(y-py)*yDraw
+      if squareMinimap then
+        inside=math.abs(xPos)<(width/2) and math.abs(yPos)<(height/2)
+      else
+        inside=xPos*xPos+yPos*yPos<radiusSquared
+      end
+    end
+
+    if inside then
+      visibleCount=visibleCount+1
+      local targetX=xPos+(pin.questieOctoOffsetX or 0)
+      local targetY=-yPos+(pin.questieOctoOffsetY or 0)
+      if pin.lastDrawX~=targetX or pin.lastDrawY~=targetY then
+        pin.lastDrawX=targetX
+        pin.lastDrawY=targetY
+        pin:ClearAllPoints()
+        pin:SetPoint("CENTER",Minimap,"CENTER",targetX,targetY)
+      end
+      if not pin:IsShown() then pin:Show() end
+      CountVisible(pin)
+    elseif pin and pin:IsShown() then
+      pin:Hide()
+      self.stats.hidden=self.stats.hidden+1
+    end
   end
 
-  local current=CurrentMapID()
-  if tonumber(current)~=tonumber(self.mapID) then self:RefreshPlan(); return end
-  if self.planRevision~=QuestieOcto.PreparedMap.stateRevision then self:RefreshPlan(); return end
-  local published=QuestieOcto.PreparedMap:Get(self.mapID)
-  if published and published~=self.plan then self:RefreshPlan(); return end
-  local publishedItemStarts=QuestieOcto.PreparedMap:GetWorldItemStarts(self.mapID)
-  if publishedItemStarts and publishedItemStarts~=self.itemStartPlan then self:RefreshPlan(); return end
+  self.stats.active=visibleCount
+  self.stats.positionUpdates=self.stats.positionUpdates+1
+  if not fromDiscovery then
+    self.stats.fastPositionUpdates=(self.stats.fastPositionUpdates or 0)+1
+  end
+end
 
-  local px,py=PlayerPosition()
-  if not px or not py then self:HideAll(); return end
-
-  local mapWidth,mapHeight=QuestieOcto.DatabaseAPI:GetMinimapSize(self.mapID)
+function MM:DiscoverCandidates(px,py,zoom,squareMinimap,width,height)
+  local mapWidth=tonumber(self.mapWidth)
+  local mapHeight=tonumber(self.mapHeight)
   if not mapWidth or not mapHeight or mapWidth<=0 or mapHeight<=0 then self:HideAll(); return end
-
-  local zoom=Minimap.GetZoom and Minimap:GetZoom() or 0
-  local squareMinimap=UsesSquareMinimap()
-  local now=GetTime and GetTime() or 0
-  if not force and self.lastPlayerX==px and self.lastPlayerY==py and self.lastZoom==zoom
-     and self.lastSquareMinimap==squareMinimap
-     and self.nextStaticRefresh and now<self.nextStaticRefresh then
-    return
-  end
-  self.lastPlayerX=px
-  self.lastPlayerY=py
-  self.lastZoom=zoom
-  self.lastSquareMinimap=squareMinimap
-  self.nextStaticRefresh=now+1
 
   local indoor=MinimapIndoor()
   local mapZoom=MINIMAP_ZOOM[indoor] and MINIMAP_ZOOM[indoor][zoom]
   if not mapZoom or mapZoom<=0 then self:HideAll(); return end
-
-  local width=Minimap:GetWidth()
-  local height=Minimap:GetHeight()
-  if not width or width<=0 or not height or height<=0 then return end
 
   local xScale=mapZoom/mapWidth
   local yScale=mapZoom/mapHeight
@@ -758,20 +847,32 @@ function MM:UpdatePositions(force)
   local yDraw=height/yScale/100
   local radius=math.min(width,height)/2
   local radiusSquared=radius*radius
+  local margin=tonumber(self.discoveryMargin) or 1.5
+  local expandedRadiusSquared=radiusSquared*margin*margin
+  local expandedHalfWidth=(width/2)*margin
+  local expandedHalfHeight=(height/2)*margin
 
-  ResetVisibleStats()
-  local visibleGroups={}
-  local activeFrames={}
+  self.cachedIndoor=indoor
+  self.cachedXDraw=xDraw
+  self.cachedYDraw=yDraw
+  self.cachedMinimapWidth=width
+  self.cachedMinimapHeight=height
+  self.cachedRadius=radius
+  self.cachedRadiusSquared=radiusSquared
+  self.cachedSquareMinimap=squareMinimap and true or false
+  self.lastZoom=zoom
+  self.discoveryPlayerX=px
+  self.discoveryPlayerY=py
+
+  local frames=ClearTable(self.activeFrames)
+  self.activeFrames=frames
   local frameIndex=0
   local revision=self.bindRevision or 1
 
-  -- pfQuest architecture: scan coordinate data, but allocate/reuse UI Buttons
-  -- only for coordinates that are actually inside the current minimap circle.
-  -- There is intentionally no hard node cap here. Item-start entries from the
-  -- base plan are skipped, then the same dedicated item-start plan used by the
-  -- World Map is scanned so ultra-rare sources have identical representation.
-  -- Keep this as a two-pass loop instead of allocating a closure/table in the
-  -- moving-player hot path.
+  -- Full descriptor discovery is deliberately separate from the 20 Hz movement
+  -- pass. Keep candidates in a 1.5x minimap envelope so newly-visible pins can
+  -- be shown smoothly while the player moves; rescan the complete plan only
+  -- after the player moves a meaningful fraction of the minimap radius.
   local planPass=1
   while planPass<=2 do
     local scanPlan=planPass==1 and self.plan or self.itemStartPlan
@@ -784,27 +885,20 @@ function MM:UpdatePositions(force)
         if x and y then
           local xPos=(x-px)*xDraw
           local yPos=(y-py)*yDraw
-          local inside=false
+          local insideEnvelope=false
           if squareMinimap then
-            inside=math.abs(xPos)<(width/2) and math.abs(yPos)<(height/2)
+            insideEnvelope=math.abs(xPos)<expandedHalfWidth and math.abs(yPos)<expandedHalfHeight
           else
-            inside=xPos*xPos+yPos*yPos<radiusSquared
+            insideEnvelope=xPos*xPos+yPos*yPos<expandedRadiusSquared
           end
-          if inside then
+
+          if insideEnvelope then
             frameIndex=frameIndex+1
             local pin=self:GetOrCreate(frameIndex)
             local bound=(pin.boundDescriptor==desc and pin.boundRevision==bindRevision)
             if not bound then bound=BindDescriptor(pin,desc,bindRevision,allowItemStart) end
-
             if bound then
-              pin.questieOctoBaseX=xPos
-              pin.questieOctoBaseY=-yPos
-              local groupKey=pin.coordKey or tostring(x)..":"..tostring(y)
-              visibleGroups[groupKey]=visibleGroups[groupKey] or {}
-              table.insert(visibleGroups[groupKey],pin)
-              table.insert(activeFrames,pin)
-              if not pin:IsShown() then pin:Show() end
-              CountVisible(pin)
+              frames[frameIndex]=pin
             else
               frameIndex=frameIndex-1
             end
@@ -812,44 +906,84 @@ function MM:UpdatePositions(force)
         end
       end
     end
-
     planPass=planPass+1
   end
 
-  local offsets={{0,0},{10,0},{-10,0},{0,10},{0,-10},{8,8},{-8,8},{8,-8},{-8,-8}}
-  for _,group in pairs(visibleGroups) do
-    table.sort(group,function(a,b)
-      local ap=IsPermanentRole(a.role) and 1 or 0
-      local bp=IsPermanentRole(b.role) and 1 or 0
-      if ap~=bp then return ap<bp end
-      if tostring(a.role)~=tostring(b.role) then return tostring(a.role)<tostring(b.role) end
-      return tonumber(a.sourceID or 0)<tonumber(b.sourceID or 0)
-    end)
-    for index,pin in ipairs(group) do
-      local off=offsets[math.mod(index-1,table.getn(offsets))+1]
-      local targetX=(pin.questieOctoBaseX or 0)+off[1]
-      local targetY=(pin.questieOctoBaseY or 0)+off[2]
-      -- Like pfQuest's world-map path, avoid ClearAllPoints/SetPoint if the
-      -- recyclable frame is already at the requested screen coordinate.
-      if pin.lastDrawX~=targetX or pin.lastDrawY~=targetY then
-        pin.lastDrawX=targetX
-        pin.lastDrawY=targetY
-        pin:ClearAllPoints()
-        pin:SetPoint("CENTER",Minimap,"CENTER",targetX,targetY)
-      end
-    end
-  end
-
-  for i=frameIndex+1,table.getn(self.frames) do
-    local pin=self.frames[i]
+  for index=frameIndex+1,table.getn(self.frames) do
+    local pin=self.frames[index]
     if pin and pin:IsShown() then pin:Hide(); self.stats.hidden=self.stats.hidden+1 end
   end
 
-  self.activeFrames=activeFrames
-  self.stats.active=frameIndex
-  self.stats.positionUpdates=self.stats.positionUpdates+1
+  AssignCandidateOffsets(frames)
+  self.stats.discoveryScans=(self.stats.discoveryScans or 0)+1
+  self.stats.candidateFrames=table.getn(frames)
   self.stats.scannedDescriptors=table.getn(self.plan or {})+table.getn(self.itemStartPlan or {})
-  self.stats.poolSize=table.getn(self.frames or {})
+  self:PositionCandidates(px,py,true)
+end
+
+function MM:NeedsDiscovery(px,py)
+  if not self.discoveryPlayerX or not self.discoveryPlayerY then return true end
+  local xDraw=tonumber(self.cachedXDraw)
+  local yDraw=tonumber(self.cachedYDraw)
+  local radius=tonumber(self.cachedRadius)
+  if not xDraw or not yDraw or not radius then return true end
+
+  local dx=(px-self.discoveryPlayerX)*xDraw
+  local dy=(py-self.discoveryPlayerY)*yDraw
+  local fraction=tonumber(self.rediscoverFraction) or 0.25
+  local threshold=radius*fraction
+
+  if self.cachedSquareMinimap then
+    local width=tonumber(self.cachedMinimapWidth) or radius*2
+    local height=tonumber(self.cachedMinimapHeight) or radius*2
+    return math.abs(dx)>((width/2)*fraction) or math.abs(dy)>((height/2)*fraction)
+  end
+  return dx*dx+dy*dy>threshold*threshold
+end
+
+function MM:UpdatePositions(force,currentMapID)
+  if not self.enabled or not Minimap or not self.plan or not self.mapID then
+    self:HideAll()
+    return
+  end
+
+  local current=tonumber(currentMapID) or CurrentMapID()
+  if tonumber(current)~=tonumber(self.mapID) then self:RefreshPlan(current); return end
+  if self.planRevision~=QuestieOcto.PreparedMap.stateRevision then self:RefreshPlan(current); return end
+
+  local px,py=PlayerPosition(current)
+  if not px or not py then self:HideAll(); return end
+
+  local zoom=Minimap.GetZoom and Minimap:GetZoom() or 0
+  local width=Minimap:GetWidth()
+  local height=Minimap:GetHeight()
+  if not width or width<=0 or not height or height<=0 then return end
+
+  local now=GetTime and GetTime() or 0
+  local squareMinimap=self.cachedSquareMinimap
+  if force or squareMinimap==nil or not self.nextShapeCheck or now>=self.nextShapeCheck then
+    local currentShape=UsesSquareMinimap()
+    self.nextShapeCheck=now+(tonumber(self.shapeCheckInterval) or 1)
+    if squareMinimap==nil or currentShape~=squareMinimap then force=true end
+    squareMinimap=currentShape
+  end
+
+  if self.lastZoom~=zoom or self.cachedMinimapWidth~=width or self.cachedMinimapHeight~=height then
+    force=true
+  end
+
+  if not force and self.lastPlayerX==px and self.lastPlayerY==py then
+    return
+  end
+
+  self.lastPlayerX=px
+  self.lastPlayerY=py
+
+  if force or self:NeedsDiscovery(px,py) then
+    self:DiscoverCandidates(px,py,zoom,squareMinimap,width,height)
+  else
+    self:PositionCandidates(px,py,false)
+  end
 end
 
 function MM:OnUpdate(elapsed)
@@ -857,13 +991,21 @@ function MM:OnUpdate(elapsed)
   if self.elapsed<self.updateInterval then return end
   self.elapsed=0
 
-  local current=CurrentMapID()
-  if tonumber(current)~=tonumber(self.mapID) then
-    self:RefreshPlan()
-    return
+  -- Zone/minimap events already refresh the physical map immediately. Keep a
+  -- low-frequency safety check for unusual client transitions instead of
+  -- crossing C_Map.GetBestMapForUnit on every 0.05-second movement tick.
+  local now=GetTime and GetTime() or 0
+  local current=self.mapID
+  if not self.nextMapIdentityCheck or now>=self.nextMapIdentityCheck then
+    self.nextMapIdentityCheck=now+(tonumber(self.mapIdentityCheckInterval) or 0.5)
+    current=CurrentMapID()
+    if tonumber(current)~=tonumber(self.mapID) then
+      self:RefreshPlan(current)
+      return
+    end
   end
 
-  self:UpdatePositions(false)
+  self:UpdatePositions(false,current)
 end
 
 function MM:OnPreparedMapReady(mapID)

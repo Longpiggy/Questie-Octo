@@ -90,6 +90,16 @@ SlashCmdList["QUESTIEOCTO"]=function(msg)
       tostring(st.maxQueue or 0).."/"..tostring(st.maxJobsInFrame or 0))
     QuestieOcto:Print(string.format("scheduler slowest=%s %.4fs, max budgeted frame %.4fs",
       tostring(st.slowestLabel or "none"),tonumber(st.slowestSeconds or 0) or 0,tonumber(st.maxFrameSeconds or 0) or 0))
+    local mm=QuestieOcto.Minimap
+    local mms=mm and mm.stats or {}
+    QuestieOcto:Print("minimap discovery/fast/candidates/lastScan="..
+      tostring(mms.discoveryScans or 0).."/"..tostring(mms.fastPositionUpdates or 0).."/"..
+      tostring(mms.candidateFrames or 0).."/"..tostring(mms.scannedDescriptors or 0))
+    local obj=QuestieOcto.Objectives
+    local ir=obj and obj.irStats or {}
+    QuestieOcto:Print("objective IR tracked/bagEvents/scans/changes="..
+      tostring(obj and obj.irTrackedCount or 0).."/"..tostring(ir.bagEvents or 0).."/"..
+      tostring(ir.bagScans or 0).."/"..tostring(ir.changedScans or 0))
 
   elseif msg=="info" then
     QuestieOcto:Print(tostring(QuestieOcto.version).." infrastructure diagnostic")
