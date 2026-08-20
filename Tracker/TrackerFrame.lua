@@ -644,8 +644,29 @@ function T:UpdateTimerRows()
   if expired then self:Render() end
 end
 
+local function ObjectiveTextForDisplay(objective)
+  if not objective then return "" end
+
+  -- Keep native Turtle leaderboard wording whenever it is complete. During the
+  -- login cache race, however, rawText can temporarily be only ": 0/10". If
+  -- QuestLog already resolved a safe database/previous label, use that; until
+  -- then show only the counter rather than caching/displaying a nameless colon.
+  if objective.rawTextIncomplete then
+    local repaired=objective.text
+    if repaired and repaired~="" and repaired~=objective.rawText then return repaired end
+    local current=tonumber(objective.current)
+    local required=tonumber(objective.required)
+    if current and required and required>0 then
+      return tostring(current).."/"..tostring(required)
+    end
+    return ""
+  end
+
+  return objective.rawText or objective.text or ""
+end
+
 local function ObjectiveDisplayText(objective)
-  local text=objective and (objective.rawText or objective.text) or ""
+  local text=ObjectiveTextForDisplay(objective)
   if not text then text="" end
 
   -- The native Vanilla leaderboard text already contains the desired 5/10 form.
@@ -756,7 +777,8 @@ function T:Render()
 end
 
 local function MenuObjectiveText(objective)
-  local text=objective and (objective.rawText or objective.text) or "Objective"
+  local text=ObjectiveTextForDisplay(objective)
+  if not text or text=="" then text="Objective" end
   text=tostring(text or "Objective")
   text=string.gsub(text,"^%-%s*","")
   if string.len(text)>72 then text=string.sub(text,1,69).."..." end

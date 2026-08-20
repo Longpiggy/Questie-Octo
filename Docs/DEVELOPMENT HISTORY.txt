@@ -1,3 +1,11 @@
+1.0.52 - TRACKER LOGIN OBJECTIVE SETTLEMENT
+- Fixed the intermittent login state where tracker objective rows could retain only a counter such as `: 0/10` because Turtle/ClassicAPI had published numerical progress before the corresponding objective label.
+- The regression came from our compiled-runtime startup optimization: Questie-Octo deliberately consumed the first Quest Log snapshot immediately and incorrectly assumed another QUEST_LOG_UPDATE would always arrive after the client cache settled.
+- Kept the immediate startup snapshot and low-memory compiled database, but now primes the native Quest Log and performs bounded one-shot settled refreshes at foundation readiness plus approximately 1 and 4 seconds after login. There is no permanent polling loop.
+- If a later transient read loses a label, the Quest Log cache preserves the last complete label for the same live objective while still taking current progress/completion counters from the newest API read.
+- Until a label is settled, the tracker suppresses the malformed leading colon and can display the available counter alone rather than caching misleading objective text.
+- No quest data, map data, tracker layout/sorting, memory-database contents, or 1.0.50 right-click Show on Map behavior changed.
+
 1.0.51 - LIVE-VERIFIED QUEST AVAILABILITY SUPPRESSION
 - Temporarily marked quest 40795, In Search of Solar Knowledge, disabled in the Octo merge layer after live-realm evidence conflicted with the current bundled Turtle source data.
 - A level-eligible Priest verified that the live Magistrix Ishalah in the High Elf city does not offer quest 40795, while the second database-listed Ishalah spawn could not be found at the indicated starting-area location.
