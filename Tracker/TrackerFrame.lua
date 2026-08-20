@@ -34,6 +34,9 @@ T.maxHeight=2000
 T.padding=8
 T.autoFitMinWidth=100
 T.autoFitMaxWidth=280
+T.contextMenu=nil
+T.contextQuest=nil
+T.contextObjectives={}
 
 local function Settings()
   return QuestieOcto.MinimapSettings
@@ -351,6 +354,7 @@ local function EnsureRow(index,parent)
       GameTooltip:SetOwner(this,"ANCHOR_LEFT")
       GameTooltip:SetText(this.questTitle or "Quest",1,0.82,0)
       GameTooltip:AddLine("Click to open this quest in the Quest Log.",1,1,1)
+      GameTooltip:AddLine("Right click for quest options.",1,1,1)
       GameTooltip:AddLine("Shift + Click to stop tracking it.",0.7,0.7,0.7)
       GameTooltip:Show()
     end
@@ -358,8 +362,15 @@ local function EnsureRow(index,parent)
   row:SetScript("OnLeave",function()
     if GameTooltip then GameTooltip:Hide() end
   end)
+  row:RegisterForClicks("LeftButtonUp","RightButtonUp")
   row:SetScript("OnClick",function()
     if not this.questID then return end
+    local click=arg1 or "LeftButton"
+    if click=="RightButton" then
+      T:ShowQuestMenu(this.questID)
+      return
+    end
+    if click~="LeftButton" then return end
     if IsShiftKeyDown and IsShiftKeyDown() then
       if QuestieOcto.TrackerDriver then QuestieOcto.TrackerDriver:Toggle(this.questID) end
       return
@@ -742,6 +753,141 @@ function T:Render()
   end
   self:ApplyVisibleRowsHeight()
   self:LayoutVisibleRows()
+end
+
+local function MenuObjectiveText(objective)
+  local text=objective and (objective.rawText or objective.text) or "Objective"
+  text=tostring(text or "Objective")
+  text=string.gsub(text,"^%-%s*","")
+  if string.len(text)>72 then text=string.sub(text,1,69).."..." end
+  return text
+end
+
+local function AddTrackerMenuButton(text,func,arg1,arg2,hasArrow,value,isTitle,disabled)
+  if not UIDropDownMenu_CreateInfo or not UIDropDownMenu_AddButton then return end
+  local info=UIDropDownMenu_CreateInfo()
+  info.text=text
+  info.func=func
+  info.arg1=arg1
+  info.arg2=arg2
+  info.hasArrow=hasArrow and 1 or nil
+  info.value=value
+  info.isTitle=isTitle and 1 or nil
+  info.disabled=disabled and 1 or nil
+  info.notCheckable=1
+  UIDropDownMenu_AddButton(info,UIDROPDOWNMENU_MENU_LEVEL)
+end
+
+local function CloseTrackerMenu()
+  if CloseDropDownMenus then CloseDropDownMenus() end
+end
+
+function T:ContextShowQuestLog(questID)
+  CloseTrackerMenu()
+  self:OpenQuest(questID)
+end
+
+function T:ContextUntrackQuest(questID)
+  CloseTrackerMenu()
+  if QuestieOcto.TrackerDriver then QuestieOcto.TrackerDriver:Untrack(questID) end
+end
+
+function T:ContextShowObjective(questID,objectiveIndex)
+  CloseTrackerMenu()
+  local quest=self.contextQuest
+  local zoneGroup=quest and quest.zoneGroup or nil
+  if QuestieOcto.Map and QuestieOcto.Map.ShowTrackerObjective
+     and QuestieOcto.Map:ShowTrackerObjective(questID,objectiveIndex,zoneGroup) then
+    return
+  end
+  if QuestieOcto.Print then QuestieOcto:Print("No selectable World Map location was found for this objective.") end
+end
+
+function T:ContextShowFinisher(questID)
+  CloseTrackerMenu()
+  local quest=self.contextQuest
+  local zoneGroup=quest and quest.zoneGroup or nil
+  if QuestieOcto.Map and QuestieOcto.Map.ShowTrackerFinisher
+     and QuestieOcto.Map:ShowTrackerFinisher(questID,zoneGroup) then
+    return
+  end
+  if QuestieOcto.Print then QuestieOcto:Print("No selectable World Map location was found for this quest turn-in.") end
+end
+
+function T:InitializeQuestMenu(level)
+  local quest=self.contextQuest
+  if not quest then return end
+  level=tonumber(level) or UIDROPDOWNMENU_MENU_LEVEL or 1
+
+  if level==1 then
+    AddTrackerMenuButton(quest.title or "Quest",nil,nil,nil,false,nil,true,false)
+
+    if quest.complete then
+      local canShow=QuestieOcto.Map and QuestieOcto.Map.CanShowTrackerFinisher
+        and QuestieOcto.Map:CanShowTrackerFinisher(quest.id,quest.zoneGroup)
+      AddTrackerMenuButton("Show on Map",function(qid) T:ContextShowFinisher(qid) end,quest.id,nil,false,nil,false,not canShow)
+    elseif table.getn(self.contextObjectives or {})>0 then
+      AddTrackerMenuButton("Objectives",nil,nil,nil,true,"objectives",false,false)
+    end
+
+    AddTrackerMenuButton("Show in Quest Log",function(qid) T:ContextShowQuestLog(qid) end,quest.id,nil,false,nil,false,false)
+    AddTrackerMenuButton("Untrack Quest",function(qid) T:ContextUntrackQuest(qid) end,quest.id,nil,false,nil,false,false)
+    AddTrackerMenuButton("Cancel",function() CloseTrackerMenu() end,nil,nil,false,nil,false,false)
+    return
+  end
+
+  if level==2 and UIDROPDOWNMENU_MENU_VALUE=="objectives" then
+    for _,entry in pairs(self.contextObjectives or {}) do
+      AddTrackerMenuButton(entry.text,nil,nil,nil,true,"objective:"..tostring(entry.index),false,false)
+    end
+    return
+  end
+
+  if level==3 then
+    local value=tostring(UIDROPDOWNMENU_MENU_VALUE or "")
+    local _,_,objectiveValue=string.find(value,"^objective:(%d+)$")
+    local objectiveIndex=tonumber(objectiveValue)
+    if objectiveIndex then
+      local canShow=QuestieOcto.Map and QuestieOcto.Map.CanShowTrackerObjective
+        and QuestieOcto.Map:CanShowTrackerObjective(quest.id,objectiveIndex,quest.zoneGroup)
+      AddTrackerMenuButton("Show on Map",function(qid,index) T:ContextShowObjective(qid,index) end,quest.id,objectiveIndex,false,nil,false,not canShow)
+    end
+  end
+end
+
+function T:EnsureQuestMenu()
+  if self.contextMenu then return self.contextMenu end
+  if not UIDropDownMenu_Initialize or not ToggleDropDownMenu then return nil end
+  local frame=CreateFrame("Frame","QuestieOctoTrackerDropDown",UIParent,"UIDropDownMenuTemplate")
+  UIDropDownMenu_Initialize(frame,function(level) T:InitializeQuestMenu(level) end,"MENU")
+  self.contextMenu=frame
+  return frame
+end
+
+function T:ShowQuestMenu(questID)
+  questID=tonumber(questID)
+  if not questID then return end
+  local quest=QuestieOcto.TrackerDriver and QuestieOcto.TrackerDriver.tracked
+    and QuestieOcto.TrackerDriver.tracked[questID] or nil
+  if not quest then return end
+
+  local objectives={}
+  if not quest.complete then
+    for i=1,table.getn(quest.objectives or {}) do
+      local objective=quest.objectives[i]
+      if not objective.complete then
+        local index=tonumber(objective.index) or i
+        table.insert(objectives,{index=index,text=MenuObjectiveText(objective)})
+      end
+    end
+  end
+
+  self.contextQuest=quest
+  self.contextObjectives=objectives
+  local menu=self:EnsureQuestMenu()
+  if not menu then return end
+  if GameTooltip then GameTooltip:Hide() end
+  ToggleDropDownMenu(1,nil,menu,"cursor",0,0)
 end
 
 function T:OpenQuest(questID)

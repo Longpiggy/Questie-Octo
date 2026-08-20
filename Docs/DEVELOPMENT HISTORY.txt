@@ -1,3 +1,21 @@
+1.0.50 - TRACKER SHOW ON MAP
+- Added a Questie 5/6-style right-click menu to tracked quest titles while preserving normal left-click Quest Log opening and Shift+Left Click manual untracking.
+- Active quests now expose an Objectives submenu; each unfinished objective can open the native World Map directly to a selectable zone containing that objective's existing Questie-Octo markers.
+- Completed quests now expose Show on Map for their turn-in location when the native World Map can select that map.
+- The implementation uses Turtle/Vanilla SetMapZoom / SetMapToCurrentZone behavior rather than assuming modern WorldMapFrame:SetMapID APIs, and does not add a navigation arrow, TomTom target, focus mode, or new map markers.
+- Quest, objective, tracker sorting, map-node visibility settings, and underlying database data are unchanged.
+
+1.0.49 - MINIMAP / IR INVENTORY HOT-PATH OPTIMIZATION
+- Split minimap work into a smooth 0.05-second nearby-pin movement pass and a much less frequent full descriptor discovery pass.
+- Full minimap discovery now keeps a 1.5x nearby candidate envelope and only rescans the complete zone plan after the player moves a meaningful fraction of the minimap radius, instead of scanning every descriptor on every movement tick.
+- Removed the old once-per-second forced full minimap scan while the player is stationary.
+- Reduced physical map-ID polling to a low-frequency safety check backed by normal zone events, cached zone minimap dimensions, reduced repeated square/indoor geometry work, and removed per-tick visible-group table allocation/sorting from the movement path.
+- Switched IR quest-item tracking from BAG_UPDATE/UNIT_INVENTORY_CHANGED to ClassicAPI's settled BAG_UPDATE_DELAYED path.
+- Active IR dependencies now maintain a small item-to-quest registry; bag changes scan bags/equipment once for all relevant IR items and refresh only quests whose dependency item actually appeared or disappeared.
+- Characters with no active IR-dependent quests now ignore delayed bag updates without scheduling objective work.
+- Added lightweight manual /qo perf counters for minimap discovery/candidate activity and IR bag scans; no continuous diagnostic polling was added.
+- Quest/map data, minimap icon semantics, Clustered/Full Nodes behavior, and the 0.05-second visible-pin movement cadence are unchanged.
+
 1.0.48 - TRACKER VISIBLE-ROW VIEWPORT SAFETY
 - Fixed the tracker occasionally clipping its final quest/objective even when the configured Visible Rows value had enough room.
 - Tracker layout now uses the viewport height calculated during the current render pass instead of immediately trusting Vanilla's potentially stale ScrollFrame:GetHeight() result after a resize.

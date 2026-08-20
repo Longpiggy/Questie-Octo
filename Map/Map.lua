@@ -422,6 +422,292 @@ local function OpenContinentZoneForPin(pin)
   return false
 end
 
+-- Tracker "Show on Map" support, adapted from Questie 5/6's tracker intent
+-- to the native Vanilla/Turtle World Map API. Modern Questie can call
+-- WorldMapFrame:SetMapID(); Interface 11200 instead selects ordinary zones
+-- through SetMapZoom(continent, zoneIndex), while the player's current
+-- custom/instance map is reached through SetMapToCurrentZone().
+local function TrackerObjectiveRole(role)
+  return role=="objectiveCreature" or role=="objectiveObject"
+      or role=="objectiveItemSource" or role=="objectiveArea"
+end
+
+local function AddTrackerTargetCoords(targets,seen,coords)
+  for _,coord in pairs(coords or {}) do
+    if type(coord)=="table" then
+      local x=tonumber(coord[1])
+      local y=tonumber(coord[2])
+      local mapID=tonumber(coord[3])
+      if x and y and mapID then
+        local key=tostring(mapID)..":"..string.format("%.3f",x)..":"..string.format("%.3f",y)
+        if not seen[key] then
+          seen[key]=true
+          table.insert(targets,{x=x,y=y,mapID=mapID})
+        end
+      end
+    end
+  end
+end
+
+local function AddTrackerAreaTarget(targets,seen,src)
+  if not src then return end
+  local x=tonumber(src.x)
+  local y=tonumber(src.y)
+  local mapID=tonumber(src.mapID)
+  if not x or not y or not mapID then return end
+  AddTrackerTargetCoords(targets,seen,{{x,y,mapID}})
+end
+
+local function UnfinishedObjectiveCount(questID)
+  local state=QuestieOcto.QuestLog and QuestieOcto.QuestLog.active
+    and QuestieOcto.QuestLog.active[tonumber(questID)] or nil
+  if not state then return 0 end
+  local count=0
+  for _,objective in pairs(state.objectives or {}) do
+    if not objective.complete then count=count+1 end
+  end
+  return count
+end
+
+local function CollectTrackerObjectiveTargets(questID,objectiveIndex)
+  questID=tonumber(questID)
+  objectiveIndex=tonumber(objectiveIndex)
+  if not questID or not objectiveIndex then return {} end
+
+  local targets={}
+  local seen={}
+  -- First use the canonical active node set. This preserves presentation-only
+  -- source corrections and scripted encounter coordinates exactly as the map
+  -- itself renders them.
+  for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
+    if tonumber(node.questID)==questID and TrackerObjectiveRole(node.role)
+       and tonumber(node.objectiveIndex)==objectiveIndex then
+      AddTrackerTargetCoords(targets,seen,node.coords)
+    end
+  end
+
+  -- The objective resolver is the fallback when the tracker becomes clickable
+  -- before the asynchronous Nodes rebuild has finished. It also keeps this
+  -- interaction independent from map render timing.
+  local resolved=QuestieOcto.Objectives and QuestieOcto.Objectives.byQuest
+    and QuestieOcto.Objectives.byQuest[questID] or nil
+  local db=QuestieOcto.DatabaseAPI
+  if resolved and db then
+    for _,src in pairs(resolved.creature or {}) do
+      if tonumber(src.objectiveIndex)==objectiveIndex then
+        AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(src.id))
+        end
+    end
+    for _,src in pairs(resolved.gameObject or {}) do
+      if tonumber(src.objectiveIndex)==objectiveIndex then
+        AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(src.id))
+        end
+    end
+    for _,item in pairs(resolved.item or {}) do
+      if tonumber(item.objectiveIndex)==objectiveIndex then
+        for _,src in pairs(item.sources or {}) do
+          if src.kind=="creature" then
+            AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(src.id))
+          else
+            AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(src.id))
+          end
+        end
+        end
+    end
+    for _,src in pairs(resolved.areaTrigger or {}) do
+      if tonumber(src.objectiveIndex)==objectiveIndex then
+        AddTrackerAreaTarget(targets,seen,src)
+        end
+    end
+  end
+
+  -- Vanilla does not expose a reliable leaderboard index for quest-bound area
+  -- triggers. When a quest has exactly one unfinished objective, an unindexed
+  -- objective-area node is unambiguous and can safely serve that objective's
+  -- Show on Map action without changing canonical objective truth.
+  if table.getn(targets)==0 and UnfinishedObjectiveCount(questID)==1 then
+    for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
+      if tonumber(node.questID)==questID and TrackerObjectiveRole(node.role)
+         and not tonumber(node.objectiveIndex) then
+        AddTrackerTargetCoords(targets,seen,node.coords)
+      end
+    end
+    if resolved then
+      for _,src in pairs(resolved.areaTrigger or {}) do
+        if not tonumber(src.objectiveIndex) then AddTrackerAreaTarget(targets,seen,src) end
+      end
+    end
+  end
+
+  return targets
+end
+
+local function CollectTrackerFinisherTargets(questID)
+  questID=tonumber(questID)
+  if not questID then return {} end
+
+  local targets={}
+  local seen={}
+  for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
+    if tonumber(node.questID)==questID and node.role=="turnin" then
+      AddTrackerTargetCoords(targets,seen,node.coords)
+    end
+  end
+
+  -- Fallback for the short window before the node rebuild publishes the
+  -- completed quest's turn-in markers.
+  local q=QuestieOcto.QuestModel and QuestieOcto.QuestModel:Get(questID) or nil
+  local db=QuestieOcto.DatabaseAPI
+  if q and db then
+    for _,id in pairs(q.finishes.creature or {}) do
+      AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(id))
+    end
+    for _,id in pairs(q.finishes.gameObject or {}) do
+      AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(id))
+    end
+  end
+  return targets
+end
+
+local function ClientAreaName(mapID)
+  local areas=QuestieOcto.API and QuestieOcto.API.GetClientAreas
+    and QuestieOcto.API:GetClientAreas() or nil
+  return areas and areas[tonumber(mapID)] or nil
+end
+
+local function FindSelectableWorldMapZone(mapID)
+  mapID=tonumber(mapID)
+  if not mapID or not GetMapZones or not SetMapZoom then return nil,nil end
+
+  local targetName=ClientAreaName(mapID)
+  local fallbackContinent=nil
+  local fallbackZone=nil
+  local fallbackCount=0
+  local continents={}
+  if GetMapContinents then continents={GetMapContinents()} end
+  local count=table.getn(continents)
+  if count<1 then count=2 end
+
+  for continent=1,count do
+    local zones={GetMapZones(continent)}
+    for zoneIndex,zoneName in ipairs(zones) do
+      local resolved=QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI.GetMapIDByName
+        and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneName) or nil
+      if tonumber(resolved)==mapID then return continent,zoneIndex end
+
+      -- Current client area names are localized and can recover a selectable
+      -- dropdown zone even when the packaged reverse lookup marked that name
+      -- ambiguous. Only use this fallback when it identifies one zone entry.
+      if targetName and zoneName==targetName then
+        fallbackContinent=continent
+        fallbackZone=zoneIndex
+        fallbackCount=fallbackCount+1
+      end
+    end
+  end
+
+  if fallbackCount==1 then return fallbackContinent,fallbackZone end
+  return nil,nil
+end
+
+local function TrackerTargetMapCounts(targets)
+  local counts={}
+  for _,target in pairs(targets or {}) do
+    local mapID=tonumber(target.mapID)
+    if mapID then counts[mapID]=(counts[mapID] or 0)+1 end
+  end
+  return counts
+end
+
+local function IsTrackerMapSelectable(mapID)
+  mapID=tonumber(mapID)
+  if not mapID then return false end
+  local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
+    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
+  if physical and physical==mapID then return true end
+  local continent,zoneIndex=FindSelectableWorldMapZone(mapID)
+  return continent and zoneIndex and true or false
+end
+
+local function ChooseTrackerTargetMap(targets,zoneGroup)
+  local counts=TrackerTargetMapCounts(targets)
+  if not next(counts) then return nil end
+
+  local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
+    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
+  if physical and counts[physical] then return physical end
+
+  local zoneMapID=QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI.GetMapIDByName
+    and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneGroup) or nil
+  zoneMapID=tonumber(zoneMapID)
+  if zoneMapID and counts[zoneMapID] and IsTrackerMapSelectable(zoneMapID) then
+    return zoneMapID
+  end
+
+  local best=nil
+  local bestCount=-1
+  for mapID,count in pairs(counts) do
+    if IsTrackerMapSelectable(mapID) then
+      if count>bestCount or (count==bestCount and (not best or mapID<best)) then
+        best=mapID
+        bestCount=count
+      end
+    end
+  end
+  return best
+end
+
+local function OpenTrackerTargetMap(mapID)
+  mapID=tonumber(mapID)
+  if not mapID or not WorldMapFrame then return false end
+
+  local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
+    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
+  local continent=nil
+  local zoneIndex=nil
+  if not (physical and physical==mapID) then
+    continent,zoneIndex=FindSelectableWorldMapZone(mapID)
+    if not continent or not zoneIndex then return false end
+  end
+
+  if not WorldMapFrame:IsVisible() then
+    if ShowUIPanel then ShowUIPanel(WorldMapFrame) else WorldMapFrame:Show() end
+  end
+
+  if physical and physical==mapID then
+    if SetMapToCurrentZone then SetMapToCurrentZone() end
+  else
+    SetMapZoom(continent,zoneIndex)
+  end
+
+  if M.RequestSync then M:RequestSync(true) end
+  return true
+end
+
+function M:CanShowTrackerObjective(questID,objectiveIndex,zoneGroup)
+  local targets=CollectTrackerObjectiveTargets(questID,objectiveIndex)
+  return ChooseTrackerTargetMap(targets,zoneGroup) and true or false
+end
+
+function M:ShowTrackerObjective(questID,objectiveIndex,zoneGroup)
+  local targets=CollectTrackerObjectiveTargets(questID,objectiveIndex)
+  local mapID=ChooseTrackerTargetMap(targets,zoneGroup)
+  if not mapID then return false end
+  return OpenTrackerTargetMap(mapID)
+end
+
+function M:CanShowTrackerFinisher(questID,zoneGroup)
+  local targets=CollectTrackerFinisherTargets(questID)
+  return ChooseTrackerTargetMap(targets,zoneGroup) and true or false
+end
+
+function M:ShowTrackerFinisher(questID,zoneGroup)
+  local targets=CollectTrackerFinisherTargets(questID)
+  local mapID=ChooseTrackerTargetMap(targets,zoneGroup)
+  if not mapID then return false end
+  return OpenTrackerTargetMap(mapID)
+end
+
 local function AttachWorldMapPinInput(pin)
   if not pin then return end
   pin:EnableMouse(true)
