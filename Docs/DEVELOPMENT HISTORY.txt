@@ -1,3 +1,10 @@
+1.0.51 - LIVE-VERIFIED QUEST AVAILABILITY SUPPRESSION
+- Temporarily marked quest 40795, In Search of Solar Knowledge, disabled in the Octo merge layer after live-realm evidence conflicted with the current bundled Turtle source data.
+- A level-eligible Priest verified that the live Magistrix Ishalah in the High Elf city does not offer quest 40795, while the second database-listed Ishalah spawn could not be found at the indicated starting-area location.
+- Preserved the complete underlying quest source record and localization for provenance/auditing; only the merged runtime availability state is disabled, so the quest can be restored without reconstructing its data.
+- Established the evidence rule for future live suppressions: a missing Questie-Octo marker alone is not sufficient; player eligibility and the expected live quest source/offer must be verified before overriding bundled database availability.
+- No other quest data, map coordinates, class/race requirements, tracker behavior, or 1.0.50 Show on Map behavior changed.
+
 1.0.50 - TRACKER SHOW ON MAP
 - Added a Questie 5/6-style right-click menu to tracked quest titles while preserving normal left-click Quest Log opening and Shift+Left Click manual untracking.
 - Active quests now expose an Objectives submenu; each unfinished objective can open the native World Map directly to a selectable zone containing that objective's existing Questie-Octo markers.
