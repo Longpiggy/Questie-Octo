@@ -240,6 +240,26 @@ local function ObjectiveProgressFallback(text)
   return tonumber(current),tonumber(required)
 end
 
+-- Turtle/ClassicAPI can expose an objective counter before the objective label
+-- itself has finished propagating at login (for example ": 0/10"). Treat that
+-- as an unsettled client-cache row, not as authoritative display text.
+local function IsObjectiveTextIncomplete(text)
+  if text==nil then return true end
+  local value=tostring(text)
+  if value=="" or string.find(value,"^%s*$") then return true end
+  if string.find(value,"^%s*:?%s*%d+%s*/%s*%d+%s*$") then return true end
+  return false
+end
+
+local function ObjectiveLabelFromText(text)
+  if IsObjectiveTextIncomplete(text) then return nil end
+  local label=string.gsub(tostring(text),"%s*:%s*%d+%s*/%s*%d+%s*$","")
+  label=string.gsub(label,"^%s+","")
+  label=string.gsub(label,"%s+$","")
+  if label=="" then return nil end
+  return label
+end
+
 local function SortedNumericKeys(src)
   local keys={}
   if type(src)~="table" then return keys end
@@ -447,12 +467,77 @@ local function LocalizeObjectiveRows(questID,objectives)
   return objectives
 end
 
+-- If a later client read temporarily loses an objective label, retain the last
+-- complete native label for that same live row. This is deliberately display/
+-- matching safety only; current counters/completion state always come from the
+-- newest API read. The startup case has no previous row, so settled refreshes
+-- below still perform the authoritative repair once Turtle finishes caching it.
+local function PreserveSettledObjectiveText(previousState,objectives)
+  if type(objectives)~="table" then return objectives end
+  local previousObjectives=previousState and previousState.objectives or nil
+
+  for i=1,table.getn(objectives) do
+    local row=objectives[i]
+    if row and IsObjectiveTextIncomplete(row.rawText) then
+      row.rawTextIncomplete=true
+      local previous=nil
+
+      if type(previousObjectives)=="table" then
+        local rowID=tonumber(row.objectiveID)
+        if rowID then
+          for j=1,table.getn(previousObjectives) do
+            local candidate=previousObjectives[j]
+            if candidate and tonumber(candidate.objectiveID)==rowID then
+              previous=candidate
+              break
+            end
+          end
+        end
+
+        if not previous then
+          for j=1,table.getn(previousObjectives) do
+            local candidate=previousObjectives[j]
+            if candidate and tonumber(candidate.index)==tonumber(row.index)
+              and tostring(candidate.type or "")==tostring(row.type or "") then
+              previous=candidate
+              break
+            end
+          end
+        end
+      end
+
+      local previousText=nil
+      if previous then
+        if not IsObjectiveTextIncomplete(previous.rawText) then
+          previousText=previous.rawText
+        elseif not IsObjectiveTextIncomplete(previous.text) then
+          previousText=previous.text
+        end
+      end
+      local label=ObjectiveLabelFromText(previousText)
+      if label then
+        if row.current~=nil and row.required~=nil then
+          row.rawText=label..": "..tostring(row.current).."/"..tostring(row.required)
+        else
+          row.rawText=previousText
+        end
+        row.rawTextIncomplete=false
+        if IsObjectiveTextIncomplete(row.text) then row.text=row.rawText end
+      end
+    else
+      row.rawTextIncomplete=false
+    end
+  end
+
+  return objectives
+end
+
 -- Questie 5.2.3/6.0.0 explicitly "prime" the native quest log on accept
 -- because first-time quest data can arrive several seconds later than a
 -- re-accepted/cached quest on old clients. Turtle/ClassicAPI exhibits the same
 -- behavior. Touch the native title/leaderboard APIs so the client requests and
 -- exposes the fresh quest data as early as possible.
-local function PrimeQuestLog()
+local function PrimeQuestLog(countAsAcceptedPrime)
   local entries=GetNumQuestLogEntries() or 0
   for i=1,entries+1 do
     if GetQuestLogTitle then GetQuestLogTitle(i) end
@@ -469,7 +554,15 @@ local function PrimeQuestLog()
       QuestieOcto.API:GetQuestIDForLogIndex(i)
     end
   end
-  QL.stats.acceptedPrimes=(QL.stats.acceptedPrimes or 0)+1
+  if countAsAcceptedPrime then
+    QL.stats.acceptedPrimes=(QL.stats.acceptedPrimes or 0)+1
+  end
+end
+
+local function SettledQuestLogRefresh()
+  if not QL.started then return end
+  PrimeQuestLog()
+  QL:Schedule(0.01,true)
 end
 
 local function AddAcceptedHint(questID,questLogIndex)
@@ -534,7 +627,7 @@ function QL:BeginAcceptedPolling()
   local function poll()
     if generation~=QL.acceptPollGeneration then return end
     QL.stats.acceptedPolls=(QL.stats.acceptedPolls or 0)+1
-    PrimeQuestLog()
+    PrimeQuestLog(true)
     QL:Schedule(0.01,true)
 
     local now=GetTime and GetTime() or 0
@@ -552,7 +645,7 @@ function QL:BeginAcceptedPolling()
   -- Do the Questie-style priming immediately, then keep a short fast poll
   -- alive while ClassicAPI catches up. Repeated accepts restart/extend this
   -- window, so accepting several starter quests quickly is also handled.
-  PrimeQuestLog()
+  PrimeQuestLog(true)
   QuestieOcto.Scheduler:After(0.08,poll,"questlog-accepted-poll")
 end
 
@@ -636,6 +729,7 @@ function QL:Refresh(fastRefresh)
         end
         local objectives,objectiveSnapshot,allObjectivesDone,objectiveSource,objectiveMapSnapshot=ReadObjectives(index,questID)
         objectives=LocalizeObjectiveRows(questID,objectives)
+        objectives=PreserveSettledObjectiveText(previousActive[questID],objectives)
 
         -- Preserve the client/server tri-state exactly:
         --   1 = complete, 0 = incomplete, -1 = failed.
@@ -1070,5 +1164,25 @@ function QL:Start()
     end
   end)
 
+  -- The 1.0.10 startup optimization made the first Quest Log snapshot visible
+  -- immediately so tracker/availability could initialize without waiting for
+  -- the world database. On Turtle, that first read can contain counters before
+  -- their labels. Prime once now, then force two one-shot settled reads even if
+  -- the client never emits another QUEST_LOG_UPDATE. This is bounded startup
+  -- work only; there is no permanent polling loop.
+  PrimeQuestLog()
+  QuestieOcto.Scheduler:After(1.00,SettledQuestLogRefresh,"questlog-login-settle-1")
+  QuestieOcto.Scheduler:After(4.00,SettledQuestLogRefresh,"questlog-login-settle-4")
+
   self:Schedule(0.01,true)
 end
+
+function QL:OnFoundationReady()
+  -- By FOUNDATION_READY the compiled DB/API services are available, allowing
+  -- live objective IDs to resolve against names even if the very first login
+  -- snapshot was incomplete. Refresh once here in addition to the fixed login
+  -- settlement timers so readiness order cannot strand stale tracker text.
+  SettledQuestLogRefresh()
+end
+
+QuestieOcto:RegisterMessage("FOUNDATION_READY",QL,"OnFoundationReady")
