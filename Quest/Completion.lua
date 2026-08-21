@@ -53,6 +53,32 @@ local function Save()
   QuestieOctoDB.dailyReset=C.dailyReset
 end
 
+-- Character-specific SavedVariables can survive a Hardcore fresh-life reset or
+-- a delete/recreate that reuses the same character name. pfQuest protects the
+-- same Vanilla case by treating level 1 with exactly 0 XP as an unequivocally
+-- fresh character. Do that before asking the server for completion state so old
+-- quest history cannot suppress the new character's starting quests.
+--
+-- Only quest-completion bookkeeping is cleared. Character options, tracker
+-- placement/state, Quest Log collapse preferences, and other settings remain.
+local function ResetCompletionForFreshCharacter()
+  if type(UnitLevel)~="function" or type(UnitXP)~="function" then return false end
+  local level=tonumber(UnitLevel("player"))
+  local xp=tonumber(UnitXP("player"))
+  if level~=1 or xp~=0 then return false end
+
+  C.history={}
+  C.current={}
+  C.sessionLocks={}
+  C.dailyReset={}
+  C.flaggedCompletionCache={}
+
+  QuestieOctoDB=QuestieOctoDB or {}
+  QuestieOctoDB.completed={}
+  QuestieOctoDB.dailyReset={}
+  return true
+end
+
 local function Publish(source)
   C.ready=true
   C.source=source or C.source
@@ -299,6 +325,7 @@ end
 
 function C:Start()
   LoadSaved()
+  ResetCompletionForFreshCharacter()
 
   -- pfQuest's /db query protocol is important on Vanilla/Turtle: first ask the
   -- server to populate the completion cache, then wait for QUEST_QUERY_COMPLETE
