@@ -181,8 +181,21 @@ function C:VerifyOrdinaryCompletionFlag(questID,q)
 
   local learned=not self.history[questID]
   self.history[questID]=true
-  self.current[questID]=true
+
+  -- A repeatable-after-first-completion quest is ordinary only until this
+  -- character has completed it once. A direct completion flag can therefore
+  -- both repair missing history and unlock the quest's repeatable state in the
+  -- same pass; do not suppress its newly valid repeatable availability.
+  local afterFirst=QuestieOcto.QuestModel and QuestieOcto.QuestModel.IsRepeatableAfterFirstCompletionRaw
+    and QuestieOcto.QuestModel:IsRepeatableAfterFirstCompletionRaw(questID,nil)
+  if afterFirst then
+    self.current[questID]=nil
+  else
+    self.current[questID]=true
+  end
+
   if learned then Save() end
+  if afterFirst then return false,learned end
   return true,learned
 end
 
@@ -231,7 +244,12 @@ function C:OnQuestTurnedIn(questID)
     -- establish state after a relog.
     self.current[questID]=true
     self.sessionLocks[questID]=true
-  elseif q and q.repeatable then
+  elseif q and (q.repeatable or q.repeatableAfterFirstCompletion) then
+    -- For repeatable-after-first-completion quests, q.repeatable is still false
+    -- at the instant of the first turn-in because history is written just above.
+    -- The explicit semantic therefore participates in this branch so the first
+    -- completion does not leave an ordinary-quest lock behind. Future QuestModel
+    -- reads immediately see history and present the quest as repeatable.
     if q.hideAfterFirstCompletion then
       self.current[questID]=true
     else

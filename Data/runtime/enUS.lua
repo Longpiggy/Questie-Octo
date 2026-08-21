@@ -822,6 +822,7 @@ QuestieOcto.RuntimeLocales={
 [4604]="Forest Mushroom Cap",
 [4605]="Red-speckled Mushroom",
 [4606]="Spongy Morel",
+[4608]="Raw Black Truffle",
 [4609]="Recipe: Barbecued Buzzard Wing",
 [4610]="Carved Stone Urn",
 [4611]="Blue Pearl",
@@ -14875,6 +14876,7 @@ QuestieOcto.RuntimeLocales={
 [80745]={["D"]="The Mid-Autumn Festival is upon us, a time to celebrate unity and joy under the moonlit sky. You've been chosen to take part in the ancient lantern-lighting ceremony, a tradition that fills the night with glowing blessings.Head to the riverbank, place your lantern on the waters, and watch as it drifts, carrying your wishes for peace and prosperity. The spirits of the water will guide your light, spreading warmth and hope through the night.Return once the lantern has set sail, and you'll be rewarded for your participation in this sacred event.",["O"]="Travel to the riverbank and release the lantern into the water.",["T"]="Illuminate the Moonlit Night"},
 [80755]={["D"]="Yes, yes, I understand why Liott sent you to me. Without that incantation, you would have had quite the struggle taming all but the most indiscriminate of beasts. Now you may tame living creatures the world over!$B$BBut you must know that is not enough. You must realize that the true power of the creatures you turn to your whims lies in bestowing them the talents you observe in the wild. It is not enough to simply sic a wild animal upon your foes.$B$BIf you wish to tap into the true potential of your pets, then speak to me once again. I will spare no detail in enlightening you in the ways of the beast master.",["O"]="Speak with Diane Willowfield in the War Quarter of the Undercity.",["T"]="Training the Beast"},
 [140821]={["D"]="Listen up, soldiers! Our scouts have identified one of the orcs' battlefield leaders. He is an extraordinarily bloodthirsty and cunning blademaster by the name of Axun. Take a company of men, and search for him. The sooner we eliminate this menace, the better our chances of holding the line. We must not let these savages advance further into human lands.",["O"]="Search the battlefield for Blademaster Axun and slay him.",["T"]="Strategic Strike"},
+[700001]={["D"]="Oink! Oink oink!$B$B<The pig snuffles at your feet, then noses hopefully toward your pack.>",["O"]="Bring 1 Raw Black Truffle to the Pig in Elwynn Forest.",["T"]="Oink, Oink!"},
 [1140820]={["D"]="As much as I enjoy watching you grunts throw yourself into the meat grinder, this won't win us the battle. If we are to conquer these lands, we must decapitate their leadership. Gather the other grunts, and find Lady Katrin, the humans' battlefield strategist. Once their command structure crumbles, their footmen will be easy pickings for our warriors.",["O"]="Search the battlefield for Lady Katrin and slay her.",["T"]="Strategic Strike"}
 },
 ["units"]={
@@ -28251,6 +28253,7 @@ QuestieOcto.RuntimeLocales={
 [80995]="Nanze",
 [80996]="Kestren Rainmight",
 [80997]="Toci Flipper",
+[80999]="Elodia",
 [81000]="Quest trigger: invite Gazlowe",
 [81001]="Quest trigger: invite Reviglaz",
 [81002]="Quest trigger: save shark",
@@ -28954,6 +28957,7 @@ QuestieOcto.RuntimeLocales={
 [533003]="Anub'Rekhan",
 [533004]="Faerlina RP",
 [604250]="Area Trigger for quest 40377",
+[900200]="Pig",
 [987000]="High Overlord Saurfang",
 [987800]="Madness Trigger",
 [988001]="Blackwing Technician",

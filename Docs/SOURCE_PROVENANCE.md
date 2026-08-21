@@ -1,3 +1,5 @@
+> Packaging note (2026-08-21): Questie-Octo 1.0.68 was rebuilt fresh from the accepted 1.0.66 Questie-Octo source after the 1.0.67 delivery was rejected as the wrong project artifact. pfQuest-octo 1.1.5 is audit/reference input only; it is not the addon package baseline.
+
 # Questie-Octo source provenance and licensing audit
 
 Audit date: 2026-08-15
@@ -46,24 +48,47 @@ Questie-Octo and this record does not change their licensing or ownership.
 | pfUI-classicAPI-octo | `5b4ed17b4ca94712ea7cc35cd86f31dfdc7b5d94a83bb51abb3cfca2e8e4911b` | Tooltip lifecycle, minimap shape, and Vanilla/ClassicAPI UI compatibility reference. |
 | DragonflightUI-Reforged | `2c08e1ae203f54d7969262b65056d58d5e9e8c26f3b61f2c935ff0825525ac68` | Replacement ESC/GameMenu behavior and square-minimap compatibility reference. |
 
-## Current authoritative pfQuest reference snapshots (2026-08-17)
+## Prior pfQuest reference snapshots (2026-08-17; superseded for current Octo comparison)
 
 The user supplied newer pfQuest reference archives after the original licensing
 audit. These newer snapshots supersede the older pfQuest rows above for current
 behavior/database comparison; the older hashes remain preserved above as
 historical provenance and must not be treated as current truth.
 
-| Current reference | SHA-256 | Authority / note |
+| Reference | SHA-256 | Authority / note |
 | --- | --- | --- |
 | `pfQuest-classicAPI-octo(5).zip` | `6f516c3d899bade909de1e79ddd55bd6f3eade9017541fdf3e5bb5c58c723d34` | Current pfQuest-family ClassicAPI/runtime reference. Compared with the previously used snapshot, only `slashcmd.lua` and `CHANGES-octo.md` changed; no quest/unit/item/object database payload changed. |
-| `pfQuest-octo-master(4).zip` | `91a663eaed749a5a2bbe8404381d4a897fe5583b9f05a765a8d42c2bcdcdec19` | **Primary current Octo database reference.** Octo DB version 1.1.0. Generated Turtle DB payload remains byte-identical to the prior supplied Octo master; new semantic corrections live in `overwrites.lua` (1.0.11-1.0.13). |
+| `pfQuest-octo-master(4).zip` | `91a663eaed749a5a2bbe8404381d4a897fe5583b9f05a765a8d42c2bcdcdec19` | Prior Octo database reference, version 1.1.0; superseded for current comparison by the 1.1.5 upload recorded below. |
 
-Maintenance rule: do **not** wholesale-copy the 1.1.0 generated database over
+Maintenance rule: do **not** wholesale-copy any pfQuest-octo generated database over
 Questie-Octo. Questie-Octo intentionally carries later/project-specific map and
 data corrections. Treat the new master as a semantic correction/reference
 source, verify non-additive changes against current Turtle server truth, and
 apply only the final intended state through Questie-Octo's overwrite/enrichment
 layers.
+
+### 1.0.68 pfQuest-octo 1.1.5 deployed-live reconciliation
+
+A newer user-supplied `pfQuest-octo-master(3).zip` identifies itself as Octo DB
+reference **1.1.5** and has SHA-256
+`de2441964f4a2125251c668b9ac7e99d56920103d41402ee73e430e206cbd8d7`. It
+supersedes the 1.1.0 snapshot for current pfQuest-octo comparison while the older
+hash remains historical provenance. Questie-Octo still does not wholesale-import
+the reference database.
+
+The 1.1.5 audit established two maintenance safeguards that must survive future
+handoffs:
+
+- a missing questgiver/ender relation in a single extraction is not proof that a
+  quest is unavailable; relation scans can be partially populated without an
+  obvious failure signal, so compare row counts/refreshes and corroborate with
+  deployed quest-template state, scripts/conditions, and live evidence;
+- entity-ID set diffs cannot detect relocations or removal of only one coordinate;
+  coordinate corrections require current patch notes, current authoritative spawn
+  data, or live measurement.
+
+Accepted 1.0.68 reconciliation details are recorded in
+`PFQUEST_OCTO_1_1_5_AUDIT_2026-08-21.md`.
 
 ### 1.0.58 pfQuest-octo/current-server reconciliation
 
@@ -226,3 +251,9 @@ the provenance/license of the underlying data.
 ## Atlas-CFM reference audit (2026-08-17)
 
 The user-supplied Atlas-CFM snapshot was inspected as a reference-only source for current dungeon layout/quest presentation during the 1.0.41 dungeon-map audit. Questie-Octo does not import Atlas-CFM code, map artwork, or quest-template data. Wailing Caverns scripted-encounter guidance is derived from current Turtle/Tortoise server script coordinates and cross-checked against the Atlas presentation.
+
+### 1.0.70 staged-repeatability rule
+
+Live verification of Oink, Oink! established a quest state that should not be flattened into the ordinary static `repeatable` flag: the first offer is an ordinary quest, while later offers are repeatable after that character completes it once. Questie-Octo records that semantic explicitly as `repeatableAfterFirstCompletion` and derives the active state from per-character completion history.
+
+This distinction is important because `QuestieOctoGlobalDB.observedRepeatableQuests` is shared across characters. A global observation must not turn another character's first offer blue. Future audits should use the staged semantic whenever current data/live behavior proves the same ordinary-first / repeatable-afterward lifecycle. The first offer follows ordinary quest visibility/automation; after the first completion, normal repeatable visibility and `Include Repeatable Quests` automation rules apply.

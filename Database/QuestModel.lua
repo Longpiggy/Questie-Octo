@@ -127,11 +127,36 @@ local function ObservedRepeatables()
   return QuestieOctoGlobalDB.observedRepeatableQuests
 end
 
+local function CompletedOnce(questID)
+  questID=tonumber(questID)
+  if not questID then return false end
+  if QuestieOcto.Completion and QuestieOcto.Completion.IsEverComplete then
+    return QuestieOcto.Completion:IsEverComplete(questID) and true or false
+  end
+  local completed=QuestieOctoDB and QuestieOctoDB.completed
+  return completed and completed[questID] and true or false
+end
+
+function QM:IsRepeatableAfterFirstCompletionRaw(questID,raw)
+  questID=tonumber(questID)
+  raw=raw or (questID and QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI:GetQuestRaw(questID)) or nil
+  return raw and raw["repeatableAfterFirstCompletion"] and true or false
+end
 
 function QM:IsRepeatableRaw(questID,raw)
   questID=tonumber(questID)
   raw=raw or (questID and QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI:GetQuestRaw(questID)) or nil
-  return ((raw and raw["repeatable"]) or (questID and ObservedRepeatables()[questID])) and true or false
+  if not raw then return false end
+
+  -- Some quests are ordinary one-time offers on a character's first completion
+  -- and only become repeatable afterward. That transition is character-local,
+  -- so it must never inherit QuestieOctoGlobalDB's observed-repeatable state
+  -- from another character. The explicit database semantic wins here.
+  if raw["repeatableAfterFirstCompletion"] then
+    return CompletedOnce(questID)
+  end
+
+  return (raw["repeatable"] or (questID and ObservedRepeatables()[questID])) and true or false
 end
 
 function QM:GetConditionalOffer(questID)
@@ -149,6 +174,13 @@ end
 function QM:MarkObservedRepeatable(questID)
   questID=tonumber(questID)
   if not questID then return false end
+
+  -- Known repeatable-after-first-completion quests use character completion
+  -- history instead of the global observation cache. This prevents one
+  -- character's completed quest from making another character's first offer
+  -- blue/repeatable.
+  if self:IsRepeatableAfterFirstCompletionRaw(questID,nil) then return false end
+
   local db=ObservedRepeatables()
   if db[questID] then return false end
   db[questID]=true
@@ -156,6 +188,20 @@ function QM:MarkObservedRepeatable(questID)
     self.cache[questID].repeatable=true
     self.cache[questID].presentationRepeatable=not NORMAL_REPEATABLE_PRESENTATION[questID]
   end
+
+  -- Repeatability is presentation state as well as an availability filter.
+  -- An observed quest can stay in the available set before and after this
+  -- transition, so AvailableQuests' membership-only diff has nothing to report.
+  -- Refresh just this quest's already-published nodes immediately so an ordinary
+  -- yellow pickup can become the blue repeatable pickup without a reload, map
+  -- change, or unrelated quest-state change. This is event-driven and allocates
+  -- no background ticker/cache.
+  if QuestieOcto.Nodes and QuestieOcto.Nodes.RefreshAvailability
+     and QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.available
+     and QuestieOcto.AvailableQuests.available[questID] then
+    QuestieOcto.Nodes:RefreshAvailability({[questID]=true})
+  end
+
   if QuestieOcto.AvailableQuests and QuestieOcto.AvailableQuests.Schedule then
     QuestieOcto.AvailableQuests:Schedule(true,0.02)
   end
@@ -163,7 +209,16 @@ function QM:MarkObservedRepeatable(questID)
 end
 
 function QM:Get(questID)
-  if self.cache[questID] then return self.cache[questID] end
+  questID=tonumber(questID) or questID
+  if self.cache[questID] then
+    local cached=self.cache[questID]
+    local repeatable=self:IsRepeatableRaw(questID,nil)
+    if cached.repeatable~=repeatable then
+      cached.repeatable=repeatable
+      cached.presentationRepeatable=repeatable and not NORMAL_REPEATABLE_PRESENTATION[tonumber(questID)] and true or false
+    end
+    return cached
+  end
   if not QuestieOcto.DatabaseAPI:IsReady() then return nil end
 
   local raw=QuestieOcto.DatabaseAPI:GetQuestRaw(questID)
@@ -206,6 +261,7 @@ function QM:Get(questID)
     eventID=(tonumber(raw["event"])==5 and 4 or tonumber(raw["event"])),
     event=raw["event"],
     repeatable=self:IsRepeatableRaw(questID,raw),
+    repeatableAfterFirstCompletion=raw["repeatableAfterFirstCompletion"] and true or false,
     hideAfterFirstCompletion=raw["hideAfterFirstCompletion"] and true or false,
     daily=raw["daily"] and true or false,
     yearly=raw["yearly"] and true or false,

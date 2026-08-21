@@ -6701,5 +6701,6 @@ QuestieOcto.RuntimeQuestIDs={
 80745,
 80755,
 140821,
+700001,
 1140820
 }

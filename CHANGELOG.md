@@ -1,5 +1,22 @@
 # Questie-Octo Changelog
 
+## 1.0.70
+- Added generic support for quests that are ordinary on their first completion and become repeatable afterward.
+- These quests now show a normal yellow `!` the first time and a blue repeatable `!` only after that character has completed them once.
+- Repeatable visibility and quest automation settings apply only after the first completion, with no polling or background work.
+- **Oink, Oink!** now uses this confirmed first-time-ordinary / later-repeatable behavior.
+
+## 1.0.69
+- Fixed quests that become repeatable after their first completion continuing to show an ordinary yellow quest marker until another map/quest refresh occurred.
+- Live-observed repeatable quests now update their existing map and minimap markers immediately, with no polling or background distance/movement work.
+- **Oink, Oink!** is now recorded as live-confirmed current Octo content: ordinary on its first completion, then repeatable afterward.
+
+## 1.0.68
+- Hid **Join The League!** and **Help The League?** because the current Octo realm keeps those quest IDs as unimplemented placeholder quests.
+- Added **Oink, Oink!** and its Pig quest giver for live verification.
+- Fixed **Shellcoins** so its completed quest points back to **Elodia** for turn-in.
+- Updated **Voryn Skystrider** to the relocated Alah'Thalas flight-master position and removed Baron Rivendare's obsolete Stormwind marker.
+
 ## 1.0.66
 - Removed the non-functional **Proximity** tracker sorting option.
 - Tracker sorting now offers only **Zone** and **Level**, avoiding unnecessary background movement/distance work on the Vanilla Lua client.

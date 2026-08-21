@@ -1,3 +1,33 @@
+1.0.70 - GENERIC REPEATABLE-AFTER-FIRST-COMPLETION SEMANTIC
+- Replaced the failed 1.0.69 Oink-specific live-observation assumption with an explicit generic quest semantic: `repeatableAfterFirstCompletion`. A marked quest is ordinary for a character until that character has completed it once, then becomes repeatable for availability/presentation/automation.
+- Live-verified Oink, Oink! (700001) is the first quest marked with this semantic. Its first available marker remains ordinary yellow; after one completion, future availability uses the normal blue repeatable presentation and obeys Show Repeatable Quests.
+- The transition is derived from Questie-Octo's per-character completion history, not QuestieOctoGlobalDB. This prevents one character's repeatable observation from making another character see a blue first-time marker. Existing global observed-repeatable data is ignored for quests with the explicit staged semantic.
+- Quest Automation uses the same staged state: the first offer behaves like an ordinary quest; future offers require Include Repeatable Quests.
+- Completion turn-in handling explicitly avoids leaving an ordinary one-time completion lock on a staged quest after its first reward. Direct per-quest completion-flag repair can also learn the first completion without suppressing the newly repeatable offer.
+- QuestModel refreshes the effective repeatable/presentation state when a cached staged quest is read, so completion-history changes do not require a global cache clear. No polling, OnUpdate loop, movement work, or background repeatability scan was added.
+- Oink, Oink! remains live-confirmed current Octo content: Pig (900200) is giver/finisher and Raw Black Truffle (4608) is the objective.
+
+1.0.69 - LIVE REPEATABLE PRESENTATION REFRESH / OINK, OINK! CONFIRMED
+------------------------------------------------------------------
+- Live testing confirmed quest 700001 (Oink, Oink!) is obtainable on current OctoWoW, uses Pig (900200) as giver/finisher, requires Raw Black Truffle (4608), and is presented as an ordinary quest the first time before becoming repeatable after the first completion.
+- Audited Questie-Octo's observed-repeatability path. EventAvailability correctly learns repeatability from live gossip metadata and QuestModel persists it in QuestieOctoGlobalDB.observedRepeatableQuests. That learned state also correctly changes completion filtering so a rewarded repeatable can reappear.
+- Fixed the remaining presentation race: AvailableQuests compares visible membership only, so a quest that was available both before and after repeatability observation produced no changed-quest set. Existing map/minimap nodes therefore retained their earlier repeatable=false presentation and stayed yellow until some unrelated node rebuild.
+- QuestModel:MarkObservedRepeatable now refreshes only that quest's already-published availability nodes when it is currently visible. The normal availability scan still runs afterward for completion/filter correctness. There is no new OnUpdate, ticker, movement hook, database scan, or persistent proximity-style background work.
+- Added a project data rule for staged repeatability: when live behavior proves a quest is ordinary on first completion and becomes repeatable only afterward, do not flatten that into a static repeatable flag that would miscolor the first offer. Preserve first-time ordinary presentation and promote repeatability from live server observation.
+
+1.0.68 - PFQUEST-OCTO 1.1.5 LIVE-DATABASE RECONCILIATION
+------------------------------------------------------------
+- Correct Questie-Octo package rebuilt fresh from the known-good 1.0.66 full/source baseline after the 1.0.67 delivery was rejected as the wrong project artifact. Version 1.0.67 is not a trusted baseline.
+- Audited the user-supplied pfQuest-octo 1.1.5 reference against Questie-Octo and current supplied server/source material; pfQuest remains reference-only rather than wholesale authority.
+- Added the permanent partial-extraction safeguard: a missing questgiver/ender relation in one scan is never sufficient proof that a quest is unavailable. The pfQuest-octo 1.1.4 audit found a populated scan short by 562 questgivers and 607 enders. Future suppression requires corroboration from extraction completeness/row-count stability, quest-template state, scripts/conditions, and live evidence where available.
+- Added the coordinate-diff safeguard: entity-ID set comparisons cannot detect an NPC relocation or removal of only one coordinate; those changes require current spawn evidence, patch notes, or live measurement.
+- Suppressed quests 55100 (Join The League!) and 55101 (Help The League?) from Available presentation while retaining their source records, matching the deployed placeholder signature already established for 40795.
+- Restored Shellcoins (80381) turn-in guidance through Elodia (80999) at Tanaris 67.6, 26.82.
+- Updated Voryn Skystrider (93100) to Alah'Thalas 27.65, 74.54 and its Thalassian Highlands projection 50.95, 37.48.
+- Added Oink, Oink! (700001) and Pig (900200) from the completed pfQuest-octo extraction for direct live verification; this addition remains isolated/reversible.
+- Removed only Baron Rivendare's stale Stormwind coordinate; the valid Orgrimmar 74.0, 34.9 position remains.
+- Did not import Mysterious Stranger, Innkeeper Warmbreeze, Ozzy service NPCs, or reclaim-service quests because they add no current Questie quest-guidance value.
+
 1.0.66 - REMOVE PROXIMITY TRACKER SORTING
 - Audited the existing Proximity tracker sort path and confirmed it was incomplete: TrackerDriver had a comparator for `row.distance`, but no runtime path ever populated that field, so selecting Proximity effectively fell back to Zone ordering.
 - Removed Proximity from the Tracker sort selector and removed the unused CompareProximity comparator/branch. Zone and Level remain the only supported tracker sort modes.

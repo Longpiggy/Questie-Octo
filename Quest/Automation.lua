@@ -118,6 +118,16 @@ local function QuestModel(questID)
 end
 
 local function IsRepeatableQuest(questID,entry)
+  local q=QuestModel(questID)
+
+  -- Explicit repeatable-after-first-completion semantics are character-local
+  -- and take priority over live entry flags. The first interaction behaves as
+  -- an ordinary quest; only characters that completed it once should require
+  -- the Include Repeatable Quests automation opt-in afterward.
+  if q and q.repeatableAfterFirstCompletion then
+    return q.repeatable and true or false
+  end
+
   if type(entry)=="table" then
     local value=BooleanValue(entry.isRepeatable)
     if value~=nil then return value end
@@ -126,7 +136,6 @@ local function IsRepeatableQuest(questID,entry)
     if BooleanValue(entry.isDaily)==true or BooleanValue(entry.isWeekly)==true then return true end
   end
 
-  local q=QuestModel(questID)
   if q then
     return (q.repeatable or q.daily or q.yearly) and true or false
   end
