@@ -1,8 +1,10 @@
 # Questie-Octo 1.0.60 — Dungeon Entrance Audit
 
+> **Status after 1.0.61:** historical audit only. The 1.0.60 runtime entrance-pin feature was removed after live testing showed a bad Scarlet Monastery Cathedral exterior projection and the project chose not to duplicate dungeon-entrance guidance already common in other Turtle addons. The AreaTrigger/server-teleport findings below remain useful research, but they no longer create Questie-Octo map/minimap pins.
+
 ## Scope and authority
 
-This audit implements the previously deferred Vanilla-style dungeon entrance guidance for **active quests**. It does not treat reference-addon entrance tables as authority.
+This document records the 1.0.60 experiment that implemented the previously deferred dungeon entrance guidance for **active quests**. It did not treat reference-addon entrance tables as authority; the runtime experiment itself is removed in 1.0.61.
 
 Current sources used:
 
@@ -12,7 +14,7 @@ Current sources used:
 
 The current server teleport table contains **133 rows**. Raw rows are not equivalent to safe player markers: the table also contains exits, internal transitions, conditioned portals, PvP/city portals, duplicate legacy entries and unavailable content.
 
-## Runtime behavior
+## Historical 1.0.60 runtime behavior
 
 1. Questie-Octo first builds the normal current actionable nodes for an active quest.
 2. If those nodes reach a supported current client instance/floor context, the entrance subsystem considers that instance's verified physical server entrance(s).

@@ -107,4 +107,21 @@ Grim Batol, AQ20's helper-map-only exterior geometry, Lower/Upper Karazhan area
 3457 ambiguity, and current custom instances for which the supplied server table
 has no authoritative destination teleport. See
 `Docs/DUNGEON_ENTRANCE_AUDIT_2026-08-21.md` for the release-specific set.
+## 1.0.61 entrance-guidance follow-up
+
+Live testing of 1.0.60 showed the Scarlet Monastery Cathedral synthetic exterior
+pin projected to the wrong part of Tirisfal Glades. More broadly, Sandrea chose
+not to duplicate dungeon entrances on outdoor quest maps when modern Turtle
+addon stacks already commonly provide that information.
+
+Version 1.0.61 therefore removes the runtime entrance table and every synthetic
+`dungeonEntrance` node. Normal quest objectives in real pre-instance cave/tunnel
+spaces and internal dungeon objectives remain unchanged. The AreaTrigger plus
+server teleport reconciliation above is retained only as audit/reference data.
+
+Tracker Show on Map now better recognizes the player's current native dungeon
+map (and a dungeon/detail map already displayed by another addon), but the
+Interface 11200/ClassicAPI surface has no arbitrary instance-map setter. Questie-
+Octo therefore does not fake an outdoor objective or custom dungeon map merely to
+make an out-of-instance tracker click appear successful.
 

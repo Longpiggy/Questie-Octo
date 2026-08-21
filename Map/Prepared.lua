@@ -31,7 +31,7 @@ function P:GetCurrentDensitySignature()
 end
 
 local function ExactRole(role)
-  return role=="available" or role=="turnin" or role=="objectiveArea" or role=="dungeonEntrance" or role=="flightMaster"
+  return role=="available" or role=="turnin" or role=="objectiveArea" or role=="flightMaster"
       or role=="auctioneer" or role=="banker" or role=="mailbox"
       or role=="battlemaster" or role=="innkeeper" or role=="meetingStone"
       or role=="repair" or role=="spiritHealer" or role=="stableMaster" or role=="vendor"
@@ -46,14 +46,6 @@ local function DescriptorKey(node,x,y)
   -- both quests while Questie-Octo's turn-in priority selects the complete icon.
   if node.role=="available" or node.role=="turnin" then
     return "exact:quest-source:"..tostring(node.sourceKind)..":"..tostring(node.sourceID)..":"..
-      string.format("%.2f",x)..":"..string.format("%.2f",y)
-  end
-
-  -- Every active quest that uses the same verified dungeon portal should share
-  -- one physical entrance pin. Keep the individual quest relationships in the
-  -- slot entries so the tooltip can list them without stacking duplicate frames.
-  if node.role=="dungeonEntrance" then
-    return "exact:dungeon-entrance:"..tostring(node.sourceID)..":"..
       string.format("%.2f",x)..":"..string.format("%.2f",y)
   end
 

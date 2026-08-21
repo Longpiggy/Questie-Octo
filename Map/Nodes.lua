@@ -18,7 +18,6 @@ N.stats={
   objectiveObject=0,
   objectiveItemSource=0,
   objectiveArea=0,
-  dungeonEntrance=0,
   turnin=0,
   flightMaster=0,
   auctioneer=0,
@@ -44,7 +43,6 @@ local function NewStats()
     objectiveObject=0,
     objectiveItemSource=0,
     objectiveArea=0,
-    dungeonEntrance=0,
     turnin=0,
     flightMaster=0,
     auctioneer=0,
@@ -487,76 +485,6 @@ local function BuildPermanentMapNodes()
   BuildRareMobNodes()
 end
 
-local function QuestPointsOnMap(questID,mapID)
-  local points={}
-  mapID=tonumber(mapID)
-  questID=tonumber(questID)
-  if not mapID or not questID then return points end
-
-  for _,node in pairs(CurrentByMap()[mapID] or {}) do
-    if tonumber(node.questID)==questID and node.role~="dungeonEntrance" then
-      for _,coord in pairs(node.coords or {}) do
-        if type(coord)=="table" and tonumber(coord[3])==mapID then
-          local x=tonumber(coord[1])
-          local y=tonumber(coord[2])
-          if x and y then table.insert(points,{x=x,y=y}) end
-        end
-      end
-    end
-  end
-  return points
-end
-
-local function AddDungeonEntranceNodes(questID)
-  local entrances=QuestieOcto.DungeonEntrances
-  if not entrances or not entrances.GetMapData or not entrances.SelectForPoints then return end
-
-  -- Snapshot the quest's current actionable maps before adding exterior nodes.
-  -- AddNode() extends questMaps, so iterating that table while adding entrances
-  -- would otherwise mix target-instance maps with the newly added outdoor maps.
-  local targetMaps={}
-  for mapID in pairs(CurrentQuestMaps()[questID] or {}) do
-    mapID=tonumber(mapID)
-    if mapID and entrances:GetMapData(mapID) then table.insert(targetMaps,mapID) end
-  end
-  table.sort(targetMaps)
-  if table.getn(targetMaps)==0 then return end
-
-  local q=QuestieOcto.QuestModel:Get(questID)
-  local usedTriggers={}
-  for _,mapID in pairs(targetMaps) do
-    local points=QuestPointsOnMap(questID,mapID)
-    local selected=entrances:SelectForPoints(mapID,points)
-    local mapData=entrances:GetMapData(mapID)
-
-    for _,entry in pairs(selected or {}) do
-      local triggerID=tonumber(entry.id)
-      local exterior=entry.exterior
-      if triggerID and not usedTriggers[triggerID] and exterior
-         and tonumber(exterior[1]) and tonumber(exterior[2]) and tonumber(exterior[3]) then
-        usedTriggers[triggerID]=true
-        AddNode({
-          questID=questID,
-          role="dungeonEntrance",
-          event=IsPresentationEvent(q),
-          eventID=q and q.eventID or nil,
-          pvp=q and q.pvp or false,
-          repeatable=q and q.presentationRepeatable or false,
-          sourceKind="dungeonEntrance",
-          sourceID=triggerID,
-          sourceName=entry.name or (mapData and mapData.dungeonName) or "Dungeon Entrance",
-          dungeonName=mapData and mapData.dungeonName or nil,
-          minimumLevel=tonumber(entry.minimumLevel),
-          serverPhase=tonumber(entry.serverPhase),
-          targetMapID=mapID,
-          coords={{tonumber(exterior[1]),tonumber(exterior[2]),tonumber(exterior[3])}},
-        })
-        CurrentStats().dungeonEntrance=(CurrentStats().dungeonEntrance or 0)+1
-      end
-    end
-  end
-end
-
 local function BuildActiveQuestNodes(questID)
   local state=QuestieOcto.QuestLog.active[questID]
   local q=QuestieOcto.QuestModel:Get(questID)
@@ -571,7 +499,6 @@ local function BuildActiveQuestNodes(questID)
       AddObjectNode(questID,"turnin",id,nil,nil)
       CurrentStats().turnin=CurrentStats().turnin+1
     end
-    AddDungeonEntranceNodes(questID)
     return
   end
 
@@ -608,8 +535,6 @@ local function BuildActiveQuestNodes(questID)
       CurrentStats().objectiveArea=(CurrentStats().objectiveArea or 0)+1
     end
   end
-
-  AddDungeonEntranceNodes(questID)
 end
 
 local function BuildActiveNodes()
@@ -628,7 +553,6 @@ local function StatKeyForNode(node)
   if node.role=="objectiveObject" then return "objectiveObject" end
   if node.role=="objectiveItemSource" then return "objectiveItemSource" end
   if node.role=="objectiveArea" then return "objectiveArea" end
-  if node.role=="dungeonEntrance" then return "dungeonEntrance" end
   if node.role=="turnin" then return "turnin" end
   if node.role=="flightMaster" then return "flightMaster" end
   if node.role=="auctioneer" then return "auctioneer" end

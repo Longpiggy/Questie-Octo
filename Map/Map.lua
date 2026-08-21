@@ -172,7 +172,6 @@ local function TextureForNode(node)
   if node.role=="objectiveObject" then return TEX_OBJECT end
   if node.role=="objectiveCreature" then return TEX_SLAY end
   if node.role=="objectiveArea" then return TEX_EVENT end
-  if node.role=="dungeonEntrance" then return TEX_INTERACT end
   return TEX_INCOMPLETE
 end
 local function RolePriority(role)
@@ -185,7 +184,6 @@ local function RolePriority(role)
   -- displayed quest color over an indirect item-drop source. The merged pin
   -- still retains every quest/objective entry for its tooltip.
   if role=="objectiveObject" or role=="objectiveCreature" or role=="objectiveArea" then return 20 end
-  if role=="dungeonEntrance" then return 18 end
   if role=="objectiveItemSource" then return 15 end
   return 10
 end
@@ -608,12 +606,36 @@ local function TrackerTargetMapCounts(targets)
   return counts
 end
 
+local function VisibleTrackerMapID()
+  if not WorldMapFrame or not WorldMapFrame:IsVisible() then return nil end
+  return tonumber(DisplayedMapID())
+end
+
+-- Vanilla has no arbitrary "set World Map to area ID" API. Dungeon/city maps
+-- that are not enumerated by GetMapZones() are selectable only when they are
+-- already displayed or when SetMapToCurrentZone() can select the player's
+-- physical instance. Resolve that hidden current-instance texture here without
+-- touching a World Map the player is actively browsing.
+local function HiddenCurrentInstanceMapID()
+  if not WorldMapFrame or WorldMapFrame:IsVisible() then return nil end
+  if not QuestieOcto.API or not QuestieOcto.API.IsInDungeonOrRaid
+     or not QuestieOcto.API:IsInDungeonOrRaid() then return nil end
+  if not SetMapToCurrentZone then return nil end
+  SetMapToCurrentZone()
+  return tonumber(DisplayedMapID())
+end
+
 local function IsTrackerMapSelectable(mapID)
   mapID=tonumber(mapID)
   if not mapID then return false end
+
+  local displayed=VisibleTrackerMapID()
+  if displayed and displayed==mapID then return true end
+
   local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
     and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
   if physical and physical==mapID then return true end
+
   local continent,zoneIndex=FindSelectableWorldMapZone(mapID)
   return continent and zoneIndex and true or false
 end
@@ -622,9 +644,22 @@ local function ChooseTrackerTargetMap(targets,zoneGroup)
   local counts=TrackerTargetMapCounts(targets)
   if not next(counts) then return nil end
 
+  -- Respect a dungeon/detail map already being shown, including maps opened by
+  -- another addon. Questie-Octo only needs to publish its existing objective
+  -- nodes onto that native World Map context.
+  local displayed=VisibleTrackerMapID()
+  if displayed and counts[displayed] then return displayed end
+
   local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
     and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
   if physical and counts[physical] then return physical end
+
+  -- Some instance contexts resolve more precisely through GetMapInfo() after
+  -- SetMapToCurrentZone() than through GetBestMapForUnit(). This keeps tracker
+  -- Show on Map usable for the player's current dungeon without inventing an
+  -- outdoor entrance projection.
+  local currentInstance=HiddenCurrentInstanceMapID()
+  if currentInstance and counts[currentInstance] then return currentInstance end
 
   local zoneMapID=QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI.GetMapIDByName
     and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneGroup) or nil
@@ -650,11 +685,23 @@ local function OpenTrackerTargetMap(mapID)
   mapID=tonumber(mapID)
   if not mapID or not WorldMapFrame then return false end
 
+  -- If another addon/native action already has the dungeon/detail map open, do
+  -- not retarget it through a zone-name fallback. Just refresh Questie's pins.
+  local displayed=VisibleTrackerMapID()
+  if displayed and displayed==mapID then
+    if M.RequestSync then M:RequestSync(true) end
+    return true
+  end
+
   local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
     and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
+  local currentInstance=HiddenCurrentInstanceMapID()
+  local currentPhysical=(physical and physical==mapID)
+    or (currentInstance and currentInstance==mapID)
+
   local continent=nil
   local zoneIndex=nil
-  if not (physical and physical==mapID) then
+  if not currentPhysical then
     continent,zoneIndex=FindSelectableWorldMapZone(mapID)
     if not continent or not zoneIndex then return false end
   end
@@ -663,7 +710,7 @@ local function OpenTrackerTargetMap(mapID)
     if ShowUIPanel then ShowUIPanel(WorldMapFrame) else WorldMapFrame:Show() end
   end
 
-  if physical and physical==mapID then
+  if currentPhysical then
     if SetMapToCurrentZone then SetMapToCurrentZone() end
   else
     SetMapZoom(continent,zoneIndex)
@@ -1144,7 +1191,7 @@ function M:RenderPreparedDescriptor(desc,generation,renderItemStarts)
 end
 
 local function IsContinentQuestRole(role)
-  return role=="available" or role=="turnin" or role=="itemStart" or role=="dungeonEntrance"
+  return role=="available" or role=="turnin" or role=="itemStart"
 end
 
 -- Continent maps combine several independent zone coordinate systems. Turtle
@@ -1344,9 +1391,8 @@ function M:RenderContinentNode(node,mapID,generation,physicalRegistry)
   -- Selected zone and city maps keep normal/special quest markers visible and
   -- are controlled by Enable Available/Completed Quest Icons instead.
   if IsContinentQuestRole(node.role) and not IsQuestMarkerNodeEnabled(node) then return 0 end
-  -- The continent overview intentionally shows quest start/turn-in and verified
-  -- dungeon-entrance guidance plus Flight Masters. Ordinary objective/slay/full-node/
-  -- cluster data remains zone-only.
+  -- The continent overview intentionally shows only quest start/turn-in markers
+  -- plus Flight Masters. Objective/slay/full-node/cluster data remains zone-only.
   if not IsContinentQuestRole(node.role) and node.role~="flightMaster" then return 0 end
 
   local projection=QuestieOcto.ContinentProjection

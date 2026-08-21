@@ -2,7 +2,7 @@
 ## Title: Questie-Octo
 ## Notes: Quest helper.
 ## Author: Questie-Octo
-## Version: 1.0.60
+## Version: 1.0.61
 ## SavedVariables: QuestieOctoGlobalDB
 ## SavedVariablesPerCharacter: QuestieOctoDB
 
@@ -43,7 +43,6 @@ Quest\EventAvailability.lua
 Quest\AvailableQuests.lua
 Quest\Objectives.lua
 Quest\ItemStarts.lua
-Map\DungeonEntrances.lua
 Map\Nodes.lua
 Map\Clustering.lua
 Map\ItemStartAreas.lua

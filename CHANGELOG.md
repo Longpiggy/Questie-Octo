@@ -1,5 +1,9 @@
 # Questie-Octo Changelog
 
+## 1.0.61
+- Removed the 1.0.60 dungeon entrance quest markers from outdoor maps; normal objectives in pre-instance caves/tunnels and inside dungeons remain unchanged.
+- Dungeon objectives can now use the tracker **Objectives → Show on Map** action when their dungeon/detail map is available to the client, including while inside the dungeon or when another map addon already has that map displayed.
+
 ## 1.0.60
 - Added dungeon entrance markers for active dungeon quests, so outdoor maps can point to the verified entrance while the dungeon itself continues to show the real quest objectives.
 - Dungeons with multiple entrances now choose the doorway that best matches the active objective instead of showing every entrance at once.
