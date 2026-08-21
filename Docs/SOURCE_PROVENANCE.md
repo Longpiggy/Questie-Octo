@@ -65,6 +65,27 @@ source, verify non-additive changes against current Turtle server truth, and
 apply only the final intended state through Questie-Octo's overwrite/enrichment
 layers.
 
+## Current Octo client-authority snapshots (2026-08-21)
+
+The user supplied direct current-client extractions that supersede older inferred or
+reference-addon data whenever the question is about client-side DBC geometry or
+native FrameXML behavior. Newer direct extractions supplied later supersede these.
+
+| Current client reference | SHA-256 | Authority / note |
+| --- | --- | --- |
+| `DBFilesClient.zip` | `5ea0f15b14803b20848f4063f9af4a98bf8088a76a0eb1bd1eb780b56682bd05` | **Primary current client DBC/map-data authority.** Use current `WorldMapArea.dbc`, `Map.dbc`, `AreaTable.dbc`, `AreaTrigger.dbc`, and related DBCs for Octo/Turtle client map identity, map bounds, portal positions, and other client-side database facts. |
+| `BlizzardInterfaceCode(2).zip` | `c8b9867f8ffa1dc721bd453af5f8fb0674feec2f4fe6d16163ae6dcbadfd2117` | **Primary current native UI/FrameXML authority.** Use it for the current Octo/Turtle client UI implementation when the relevant Blizzard file is present. |
+
+Authority rule for maintenance: the newest direct Questie-Octo source is current
+implementation state; the newest direct DBFilesClient extraction is current client
+DBC/map truth; the newest direct BlizzardInterfaceCode extraction is current native
+UI truth; current Turtle/Tortoise server source is server-side quest/spawn/script
+truth. Questie, pfQuest, pfUI, Atlas and other addons remain comparison/reference
+implementations and must not override contradictory current client/server evidence.
+
+The 1.0.55 instance audit is recorded in
+`Docs/INSTANCE_MAP_AUDIT_2026-08-21.md`.
+
 ## Historical sources no longer available as exact archives
 
 Existing Questie-Octo comments and README history establish that Questie 3.3.5,

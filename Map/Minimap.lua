@@ -22,7 +22,7 @@ MM.mapIdentityCheckInterval=0.5
 MM.stats={
   active=0,created=0,reused=0,hidden=0,
   refreshes=0,positionUpdates=0,discoveryScans=0,fastPositionUpdates=0,mapChanges=0,
-  candidateFrames=0,scannedDescriptors=0,
+  candidateFrames=0,scannedDescriptors=0,indoorProbes=0,zoomEvents=0,
   mapContextRestores=0,lastMapContextReason="none",
   visibleAvailable=0,visibleItemStart=0,visibleObjective=0,visibleTurnin=0
 }
@@ -204,34 +204,85 @@ local function CurrentMapID()
   return MM.physicalMapID
 end
 
-local function MinimapIndoor()
-  if not Minimap or not Minimap.GetZoom or not Minimap.SetZoom then return 0 end
-  if not GetCVar then return 0 end
+local function ReadMinimapIndoorPassive()
+  if not Minimap or not Minimap.GetZoom or not GetCVar then return nil end
 
-  -- pfQuest Vanilla/Turtle compatibility, kept with the SAME state mapping.
-  -- Important: pfQuest's state 0 selects the 300-yard table and state 1
-  -- selects the 466.67-yard table. The previous Questie-Octo port inverted
-  -- this result, causing minimap offsets to grow too quickly as the player
-  -- moved away from a fixed quest target.
-  local tempzoom=0
-  local state=1
+  local zoom=tonumber(Minimap:GetZoom())
+  local outdoorZoom=tonumber(GetCVar("minimapZoom"))
+  local indoorZoom=tonumber(GetCVar("minimapInsideZoom"))
+  if zoom==nil or outdoorZoom==nil or indoorZoom==nil then return nil end
 
-  if GetCVar("minimapZoom")==GetCVar("minimapInsideZoom") then
-    if (tonumber(GetCVar("minimapInsideZoom")) or 0)>=3 then
-      Minimap:SetZoom(Minimap:GetZoom()-1)
-      tempzoom=1
-    else
-      Minimap:SetZoom(Minimap:GetZoom()+1)
-      tempzoom=-1
-    end
+  -- When the two saved zoom values differ, the current zoom tells us the
+  -- projection state without touching the native minimap at all. Preserve the
+  -- pfQuest/Turtle state mapping: 0 uses the 300-yard table, 1 the 466.67-yard
+  -- table.
+  if outdoorZoom~=indoorZoom then
+    if zoom==indoorZoom then return 0 end
+    if zoom==outdoorZoom then return 1 end
   end
 
-  if (tonumber(GetCVar("minimapInsideZoom")) or -1)==Minimap:GetZoom() then
+  return nil
+end
+
+local function ProbeMinimapIndoor()
+  if not Minimap or not Minimap.GetZoom or not Minimap.SetZoom or not GetCVar then
+    return MM.indoorState or 1
+  end
+
+  local passive=ReadMinimapIndoorPassive()
+  if passive~=nil then
+    MM.indoorState=passive
+    return passive
+  end
+
+  if MM.indoorProbeActive then return MM.indoorState or 1 end
+
+  -- Vanilla only exposes which zoom CVar is active indirectly when the indoor
+  -- and outdoor values are identical. The historical pfQuest-compatible test
+  -- briefly changes the native Minimap zoom to reveal that state. Doing this
+  -- from every movement rediscovery also forces Blizzard's own minimap
+  -- children (notably moving party markers) to redraw and visibly blink.
+  -- Keep the compatibility probe, but only for explicit minimap/zone context
+  -- settlement; normal movement discovery never calls it.
+  local originalZoom=tonumber(Minimap:GetZoom()) or 0
+  local probeZoom
+  if originalZoom>=3 then probeZoom=originalZoom-1 else probeZoom=originalZoom+1 end
+
+  MM.indoorProbeActive=true
+  MM.indoorProbeIgnoreUntil=(GetTime and GetTime() or 0)+0.25
+  Minimap:SetZoom(probeZoom)
+
+  local state=1
+  if (tonumber(GetCVar("minimapInsideZoom")) or -1)==tonumber(Minimap:GetZoom()) then
     state=0
   end
 
-  Minimap:SetZoom(Minimap:GetZoom()+tempzoom)
+  Minimap:SetZoom(originalZoom)
+  MM.indoorProbeActive=false
+  MM.indoorState=state
+  MM.stats.indoorProbes=(MM.stats.indoorProbes or 0)+1
   return state
+end
+
+function MM:RefreshIndoorState(allowProbe)
+  local previous=self.indoorState
+  local state=ReadMinimapIndoorPassive()
+  if state==nil and allowProbe then state=ProbeMinimapIndoor() end
+  if state~=nil then self.indoorState=state end
+  return state~=nil and state~=previous
+end
+
+local function MinimapIndoor()
+  -- Discovery must be read-only with respect to Blizzard's Minimap. Resolve a
+  -- non-ambiguous state passively, otherwise use the context state settled by
+  -- startup/zone/minimap events. This is what keeps continuous movement from
+  -- making native teammate markers blink.
+  local state=ReadMinimapIndoorPassive()
+  if state~=nil then
+    MM.indoorState=state
+    return state
+  end
+  return MM.indoorState or 1
 end
 
 local function MaskTextureSquareHint()
@@ -1034,10 +1085,38 @@ function MM:Start()
   f:RegisterEvent("ZONE_CHANGED")
   f:RegisterEvent("ZONE_CHANGED_NEW_AREA")
   f:RegisterEvent("MINIMAP_ZONE_CHANGED")
+  f:RegisterEvent("MINIMAP_UPDATE_ZOOM")
   f:RegisterEvent("PLAYER_LEVEL_UP")
 
   f:SetScript("OnEvent",function()
     local eventName=event
+    if eventName=="MINIMAP_UPDATE_ZOOM" then
+      MM.stats.zoomEvents=(MM.stats.zoomEvents or 0)+1
+      local now=GetTime and GetTime() or 0
+      if MM.indoorProbeActive or (MM.indoorProbeIgnoreUntil and now<MM.indoorProbeIgnoreUntil) then
+        return
+      end
+
+      -- Normal zoom changes can be resolved passively and UpdatePositions will
+      -- rebuild geometry because lastZoom changed. If the client reports a
+      -- minimap context transition without changing the visible zoom and both
+      -- CVars are ambiguous, allow one compatibility probe outside the movement
+      -- hot path.
+      local currentZoom=Minimap and Minimap.GetZoom and tonumber(Minimap:GetZoom()) or nil
+      local passive=ReadMinimapIndoorPassive()
+      if passive~=nil then MM.indoorState=passive end
+
+      if passive==nil and currentZoom~=nil and tonumber(MM.lastZoom)==currentZoom then
+        QuestieOcto.Scheduler:After(0.01,function()
+          MM:RefreshIndoorState(true)
+          MM:UpdatePositions(true)
+        end,"minimap-indoor-context-refresh")
+      else
+        MM:UpdatePositions(true)
+      end
+      return
+    end
+
     if eventName=="PLAYER_LEVEL_UP" then
       -- Force descriptor rebinding so +25/+26 gray presentation changes as
       -- soon as the player levels, without touching the prepared map geometry.
@@ -1050,6 +1129,7 @@ function MM:Start()
 
     QuestieOcto.Scheduler:After(0.01,function()
       RestoreCurrentZoneMapContext(eventName)
+      MM:RefreshIndoorState(true)
       MM:RefreshPlan()
     end,"minimap-zone-refresh")
   end)
@@ -1082,6 +1162,7 @@ function MM:Start()
 
   QuestieOcto.Scheduler:After(0.01,function()
     RestoreCurrentZoneMapContext("START")
+    MM:RefreshIndoorState(true)
     MM:RefreshPlan()
   end,"minimap-start")
 end
