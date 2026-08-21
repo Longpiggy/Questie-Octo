@@ -1,5 +1,10 @@
 # Questie-Octo Changelog
 
+## 1.0.60
+- Added dungeon entrance markers for active dungeon quests, so outdoor maps can point to the verified entrance while the dungeon itself continues to show the real quest objectives.
+- Dungeons with multiple entrances now choose the doorway that best matches the active objective instead of showing every entrance at once.
+- Added entrance guidance for supported Turtle dungeons such as Crescent Grove, Hateforge Quarry, Karazhan Crypt, Gilneas City, Stormwind Vault, and Black Morass alongside the classic dungeon set.
+
 ## 1.0.59
 - Fixed stray `~` characters sometimes appearing in unrelated item, player, or other GameTooltips after viewing a Questie-Octo tooltip.
 - Questie-Octo's centered respawn/drop-rate separator now cleans itself up whenever the tooltip is cleared or hidden.

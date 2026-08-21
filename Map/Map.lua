@@ -172,6 +172,7 @@ local function TextureForNode(node)
   if node.role=="objectiveObject" then return TEX_OBJECT end
   if node.role=="objectiveCreature" then return TEX_SLAY end
   if node.role=="objectiveArea" then return TEX_EVENT end
+  if node.role=="dungeonEntrance" then return TEX_INTERACT end
   return TEX_INCOMPLETE
 end
 local function RolePriority(role)
@@ -184,6 +185,7 @@ local function RolePriority(role)
   -- displayed quest color over an indirect item-drop source. The merged pin
   -- still retains every quest/objective entry for its tooltip.
   if role=="objectiveObject" or role=="objectiveCreature" or role=="objectiveArea" then return 20 end
+  if role=="dungeonEntrance" then return 18 end
   if role=="objectiveItemSource" then return 15 end
   return 10
 end
@@ -1142,7 +1144,7 @@ function M:RenderPreparedDescriptor(desc,generation,renderItemStarts)
 end
 
 local function IsContinentQuestRole(role)
-  return role=="available" or role=="turnin" or role=="itemStart"
+  return role=="available" or role=="turnin" or role=="itemStart" or role=="dungeonEntrance"
 end
 
 -- Continent maps combine several independent zone coordinate systems. Turtle
@@ -1342,8 +1344,9 @@ function M:RenderContinentNode(node,mapID,generation,physicalRegistry)
   -- Selected zone and city maps keep normal/special quest markers visible and
   -- are controlled by Enable Available/Completed Quest Icons instead.
   if IsContinentQuestRole(node.role) and not IsQuestMarkerNodeEnabled(node) then return 0 end
-  -- The continent overview intentionally shows only quest start/turn-in markers
-  -- plus Flight Masters. Objective/slay/full-node/cluster data remains zone-only.
+  -- The continent overview intentionally shows quest start/turn-in and verified
+  -- dungeon-entrance guidance plus Flight Masters. Ordinary objective/slay/full-node/
+  -- cluster data remains zone-only.
   if not IsContinentQuestRole(node.role) and node.role~="flightMaster" then return 0 end
 
   local projection=QuestieOcto.ContinentProjection

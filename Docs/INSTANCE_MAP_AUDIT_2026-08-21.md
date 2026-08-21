@@ -92,3 +92,19 @@ Questie-Octo still has some area-ID-centric map paths, so Lower/Upper Karazhan d
 - No minimap movement/performance path was changed.
 
 This keeps 1.0.55 limited to corrections supported simultaneously by current client map geometry and current server spawn data.
+## 1.0.60 implementation follow-up
+
+The future entrance-guidance path described by this audit was implemented in
+1.0.60 as a conservative active-quest feature. `Map/DungeonEntrances.lua` uses
+current physical AreaTrigger positions plus current server teleport destinations;
+it does **not** promote the overlapping `*Entrance` WorldMapArea helper rectangles
+into quest zones. Multi-entrance selection uses the inside teleport destinations
+to choose the entrance nearest the currently actionable internal objective(s).
+
+The first implementation keeps the audit's unsafe/ambiguous cases excluded:
+condition-gated entrances/shortcuts, internal-only raid transitions, unavailable
+Grim Batol, AQ20's helper-map-only exterior geometry, Lower/Upper Karazhan area
+3457 ambiguity, and current custom instances for which the supplied server table
+has no authoritative destination teleport. See
+`Docs/DUNGEON_ENTRANCE_AUDIT_2026-08-21.md` for the release-specific set.
+

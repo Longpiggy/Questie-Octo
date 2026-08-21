@@ -111,6 +111,25 @@ remains authoritative for map identity and faction ownership; current Turtle
 release/source material is preferred for newer zone ranges such as Moonwhisper
 Coast.
 
+## Dungeon entrance guidance (1.0.60)
+
+`Map/DungeonEntrances.lua` is a Questie-Octo-derived runtime guidance table built
+from two current authoritative inputs supplied by Sandrea:
+
+- `DBFilesClient(1).zip`: `AreaTrigger.dbc` supplies the physical trigger world
+  position and `WorldMapArea.dbc` supplies the current client map geometry used
+  to project that position onto the exterior map and the teleport destination
+  back onto the destination instance/floor map.
+- `tortoise-wow-main(7).zip`: current server
+  `sql/base/tw_world_areatrigger_teleport.sql` supplies the teleport relation,
+  destination map/position, entry level, content phase, and condition metadata.
+
+The runtime table is intentionally curated rather than a copy of all server
+teleports. Exit/internal-only rows, unavailable content, entries requiring
+per-character conditions that Questie-Octo cannot currently evaluate, ambiguous
+helper-map geometry, and the Lower/Upper Karazhan shared-area case are excluded.
+Reference addons are not used as authority for the entrance coordinates.
+
 ## Historical sources no longer available as exact archives
 
 Existing Questie-Octo comments and README history establish that Questie 3.3.5,

@@ -160,6 +160,7 @@ end
 local function RoleText(role)
   if role=="available" or role=="itemStart" then return "(Available)" end
   if role=="turnin" then return "(Complete)" end
+  if role=="dungeonEntrance" then return "(Entrance)" end
   return "(Active)"
 end
 local function RareRankText(rank)
