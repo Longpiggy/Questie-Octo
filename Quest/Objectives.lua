@@ -323,7 +323,7 @@ end
 -- Sparse presentation-only corrections for capture/transform objectives where
 -- the server awards quest credit against a temporary NPC entry that has no
 -- natural spawn points. Keep the authoritative live objective ID for progress
--- and completion; only map/minimap guidance uses the actionable source NPC.
+-- and completion; only map/minimap guidance uses the actionable source entity.
 --
 -- Plagued Lands (2118): Tortoise darkshore.cpp handles spell 9439 by changing
 -- Rabid Thistle Bear (2164) into Captured Rabid Thistle Bear (11836), then
@@ -334,14 +334,29 @@ end
 -- Flute on normal Deeprun Rats (13016). Guide to 13016 without rewriting the
 -- live completion target.
 local CREATURE_OBJECTIVE_SOURCE_OVERRIDES={
-  [2118]={ [11836]=2164 },
-  [6661]={ [13017]=13016 },
+  [2118]={ [11836]={kind="creature",id=2164} },
+  [6661]={ [13017]={kind="creature",id=13016} },
+
+  -- Attack from the Inside (40099): Grain Sack 2010824 awards the formal
+  -- hidden credit creature 60323 when poisoned with Grelda's Poison Vial.
+  [40099]={ [60323]={kind="gameObject",id=2010824} },
+
+  -- A Cannon's Misfortune (40174): Blast Powder Keg 2010834 awards the
+  -- formal hidden credit creature 60328 when sabotaged with Special Water.
+  [40174]={ [60328]={kind="gameObject",id=2010834} },
+
+  -- Wisdom of Ur (41383): completing Arch Druid Dreamwind's dialogue awards
+  -- the formal hidden credit creature 60056. Guide to Dreamwind himself.
+  [41383]={ [60056]={kind="creature",id=61512} },
 }
 
-local function PresentationCreatureSourceID(questID,objectiveID)
+local function PresentationCreatureSource(questID,objectiveID)
   local byQuest=CREATURE_OBJECTIVE_SOURCE_OVERRIDES[tonumber(questID)]
-  local sourceID=byQuest and byQuest[tonumber(objectiveID)]
-  return tonumber(sourceID) or tonumber(objectiveID)
+  local source=byQuest and byQuest[tonumber(objectiveID)]
+  if type(source)=="table" and tonumber(source.id) then
+    return source.kind or "creature",tonumber(source.id)
+  end
+  return "creature",tonumber(objectiveID)
 end
 
 local function Levenshtein(str1,str2)
@@ -539,12 +554,18 @@ function O:ResolveQuest(questID)
         O.stats.mapped=O.stats.mapped+1
 
         if kind=="creature" and not skipCreature[id] then
-          local sourceID=PresentationCreatureSourceID(questID,id)
-          table.insert(result.creature,MergeState({
-            kind="creature",id=sourceID,objectiveTargetID=id,
-            sourceOverride=(sourceID~=id) and true or nil
-          },row))
-          O.stats.creature=O.stats.creature+1
+          local sourceKind,sourceID=PresentationCreatureSource(questID,id)
+          local entry=MergeState({
+            kind=sourceKind,id=sourceID,objectiveTargetID=id,
+            sourceOverride=(sourceKind~="creature" or sourceID~=id) and true or nil
+          },row)
+          if sourceKind=="gameObject" then
+            table.insert(result.gameObject,entry)
+            O.stats.object=O.stats.object+1
+          else
+            table.insert(result.creature,entry)
+            O.stats.creature=O.stats.creature+1
+          end
         elseif kind=="gameObject" and not skipObject[id] then
           table.insert(result.gameObject,MergeState({kind="gameObject",id=id},row))
           O.stats.object=O.stats.object+1

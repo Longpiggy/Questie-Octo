@@ -2,13 +2,13 @@
 -- Built from Questie-Octo's packaged pfQuest/Turtle/Octo source data.
 -- Regenerate with Tools/compile_runtime_db.lua.
 QuestieOcto.RuntimeDatabaseStats={
-["itemNames"]=6395,
+["itemNames"]=6394,
 ["itemreq"]=189,
-["items"]=3635,
+["items"]=3634,
 ["links"]=8673,
 ["maps"]=108,
-["objectNames"]=1636,
-["objects"]=1637,
+["objectNames"]=1638,
+["objects"]=1639,
 ["pruned"]=true,
 ["quests"]=6700,
 ["refloot"]=124,

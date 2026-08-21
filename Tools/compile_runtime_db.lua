@@ -211,6 +211,9 @@ for unitID in pairs(pfDB.units.data or {}) do markUnit(unitID) end
 -- creature retention above, but keep them documented beside the build contract.
 markUnit(2164) -- Plagued Lands: Rabid Thistle Bear source for captured 11836
 markUnit(8519) -- Poisoned Water: Blighted Surge guidance for item 17309
+markObject(2010824) -- Attack from the Inside: Grain Sack -> hidden credit 60323
+markObject(2010834) -- A Cannon's Misfortune: Blast Powder Keg -> hidden credit 60328
+markUnit(61512) -- Wisdom of Ur: Dreamwind dialogue -> hidden credit 60056
 
 -- Resolve every source relation that ItemStarts/Objectives can traverse.
 for itemID in pairs(sourceItems) do

@@ -99,7 +99,7 @@ end
 for id in pairs(legacy.units.data or {}) do markU(id) end
 
 -- Source overrides are runtime behavior not necessarily represented by formal quest rows.
-markU(2164); markU(8519)
+markU(2164); markU(8519); markO(2010824); markO(2010834); markU(61512)
 
 for iid in pairs(sourceItems) do
   local r=legacy.items.data[iid] or {}

@@ -1,5 +1,10 @@
 # Questie-Octo Changelog
 
+## 1.0.65
+- Improved **The Burning of Spirits** map guidance so it points to the Burning Blade enemies used with the Burning Gem without showing a fake extra item objective.
+- Added the real **Grain Sack** locations for *Attack from the Inside* and **Blast Powder Keg** locations for *A Cannon's Misfortune*.
+- **Wisdom of Ur** now points to Arch Druid Dreamwind for its conversation objective.
+
 ## 1.0.64
 - Quest objective AreaTrigger markers now disappear as soon as their specific exploration/event objective is completed instead of waiting for the entire quest to finish.
 - Multiple equivalent exploration locations disappear together when that shared objective is completed.
