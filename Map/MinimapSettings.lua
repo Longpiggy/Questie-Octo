@@ -115,6 +115,9 @@ S.defaults={
   -- 1.0.96 Shagu-style options appearance by default. The settings minimap
   -- button is created only when enabled at login; disabling it therefore
   -- removes the frame entirely after /reload instead of merely hiding it.
+  -- Optional continent-hover zone level panel, adapted from LevelRange-Turtle.
+  -- It is global UI presentation, like Dark Theme and the minimap button.
+  showZoneLevelRanges=true,
   useDarkTheme=true,
   showMinimapButton=true,
 
@@ -255,7 +258,7 @@ function S:Set(key,value)
       key=="trackerEnabled" or key=="trackerLocked" or key=="trackerAutoTrack" or
       key=="trackerQuestLogCheckmarks" or key=="trackerShowCompleted" or key=="trackerHideCompletedObjectives" or key=="trackerHideInCombat" or
       key=="trackerOutlineText" or key=="trackerThickOutlineText" or
-      key=="useDarkTheme" or key=="showMinimapButton" or
+      key=="showZoneLevelRanges" or key=="useDarkTheme" or key=="showMinimapButton" or
       key=="autoAcceptQuests" or key=="autoTurnInQuests" or key=="autoAcceptGrayQuests" or key=="autoIncludeRepeatableQuests" then
     value=value and true or false
   elseif key=="lowLevelQuestRange" then
@@ -303,7 +306,12 @@ function S:Set(key,value)
   -- Interface-only settings do not need map/minimap data refreshes. Dark
   -- Theme can be applied immediately. The minimap button intentionally waits
   -- for /reload because OFF means the Minimap child frame must not exist at all.
-  if key=="useDarkTheme" then
+  if key=="showZoneLevelRanges" then
+    if QuestieOcto.ZoneLevelRange and QuestieOcto.ZoneLevelRange.Refresh then
+      QuestieOcto.ZoneLevelRange:Refresh()
+    end
+    return true
+  elseif key=="useDarkTheme" then
     if QuestieOcto.Options and QuestieOcto.Options.ApplyDarkTheme then
       QuestieOcto.Options:ApplyDarkTheme(value)
     end
@@ -467,6 +475,9 @@ function S:Reset()
   end
   if QuestieOcto.Options and QuestieOcto.Options.ApplyDarkTheme then
     QuestieOcto.Options:ApplyDarkTheme(self.defaults.useDarkTheme)
+  end
+  if QuestieOcto.ZoneLevelRange and QuestieOcto.ZoneLevelRange.Refresh then
+    QuestieOcto.ZoneLevelRange:Refresh()
   end
   if QuestieOcto.MinimapButton and QuestieOcto.MinimapButton.ResetPosition then
     QuestieOcto.MinimapButton:ResetPosition()

@@ -1,5 +1,17 @@
 # Questie-Octo Changelog
 
+## 1.0.57
+- Restored LevelRange-style **Friendly / Hostile / Contested** zone information, based on the player faction.
+- Fixed **Westfall** not showing a level-range panel: the current client contains two AreaTable entries named Westfall, so Questie-Octo now resolves continent hovers from the exact native World Map highlight texture before falling back to zone names.
+- Audited all 53 supported leveling zones against the current 1.18.1 client map data. Every supported zone has a valid WorldMapArea; the remaining outdoor map contexts are non-leveling entrance/helper/special maps and stay intentionally excluded.
+- Current-client faction ownership was audited from AreaTable data, including Turtle zones: Thalassian Highlands is Alliance, Blackstone Island is Horde, and the other supported custom leveling zones are Contested.
+
+## 1.0.56
+- Added an optional **Show Zone Level Ranges** World Map feature under **Other → Interface**, directly above Dark Theme.
+- Updated the integrated Turtle zone list for the current 1.18.1 client, adding **Moonwhisper Coast (50–56)** and the previously missing **Icepoint Rock (40–50)**.
+- Zone hover matching now uses current client map IDs/localized area data instead of relying on English zone-name keys, including the old Northwind trailing-space edge case.
+- The integration is intentionally focused on zone level ranges; LevelRange-Turtle's separate fishing/instance/raid option system is not imported.
+
 ## 1.0.55
 - Rebuilt static quest-objective locations for **Windhorn Canyon, Timbermaw Hold, and Frostmane Hollow** from the current Octo client map data and current Turtle server spawns.
 - Fixed the inherited `50,50` placeholder markers in those instances and restored missing quest-object locations, including all **Windhorn Relics** and the **Tablet of Kaz'gan**.

@@ -86,6 +86,22 @@ implementations and must not override contradictory current client/server eviden
 The 1.0.55 instance audit is recorded in
 `Docs/INSTANCE_MAP_AUDIT_2026-08-21.md`.
 
+## LevelRange references (1.0.56-1.0.57)
+
+The user-supplied `LevelRange-Turtle-main.zip` (upstream version 2.2.0) and
+`LevelRange-Octo-main.zip` (upstream version 2.0.4) are behavior/data references
+for Questie-Octo's optional continent-hover zone level range panel. Questie-Octo
+reimplements the feature by current client AreaTable/WorldMapArea identity rather
+than bundling LevelRange's XML/options/SavedVariables system. Version 1.0.57
+restores the references' Friendly/Hostile/Contested presentation while sourcing
+zone ownership from the current Octo AreaTable faction-group mask.
+
+The upstream license notice is preserved in `LICENSES/LevelRange-LICENSE.txt`
+and summarized in `THIRD_PARTY_NOTICES.md`. Current Octo `DBFilesClient.zip`
+remains authoritative for map identity and faction ownership; current Turtle
+release/source material is preferred for newer zone ranges such as Moonwhisper
+Coast.
+
 ## Historical sources no longer available as exact archives
 
 Existing Questie-Octo comments and README history establish that Questie 3.3.5,

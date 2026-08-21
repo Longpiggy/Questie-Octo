@@ -2,7 +2,7 @@
 ## Title: Questie-Octo
 ## Notes: Quest helper.
 ## Author: Questie-Octo
-## Version: 1.0.55
+## Version: 1.0.57
 ## SavedVariables: QuestieOctoGlobalDB
 ## SavedVariablesPerCharacter: QuestieOctoDB
 
@@ -54,6 +54,7 @@ Map\Visuals.lua
 Map\ContinentProjection.lua
 Map\Map.lua
 Map\MinimapSettings.lua
+UI\ZoneLevelRange.lua
 Quest\Automation.lua
 Map\Minimap.lua
 Libs\LibStub\LibStub.lua

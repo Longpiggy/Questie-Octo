@@ -79,6 +79,22 @@ are no longer available in the current project workspace. Their provenance is
 nevertheless retained in existing Questie-Octo comments and documentation and
 should not be erased by future human or AI-assisted changes.
 
+## LevelRange-Turtle
+
+Questie-Octo 1.0.56-1.0.57 uses the user-supplied LevelRange-Turtle 2.2.0 and
+LevelRange-Octo 2.0.4 sources as behavior/data references for the optional World
+Map zone-level-range panel. The Questie-Octo implementation is rewritten around
+current client AreaTable/WorldMapArea identity and does not bundle LevelRange's
+XML options frame, SavedVariables, slash commands, or fishing/instance/raid
+option system. Version 1.0.57 restores the references' player-relative
+Friendly/Hostile/Contested display while using current client faction ownership.
+
+The supplied LevelRange source credits Bull3t, Tenyar97, rado-boy, blehz,
+rafacc87, Diginfotek, and Spartelfant. Its source contains an unlimited license
+to use, reproduce, and copy the work subject to acceptance of responsibility
+and liability for damage arising from use. That notice is preserved in
+`LICENSES/LevelRange-LICENSE.txt`.
+
 ## ClassicAPI.dll
 
 ClassicAPI is an external runtime dependency used by Questie-Octo. The DLL is

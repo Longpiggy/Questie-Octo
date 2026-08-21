@@ -508,8 +508,9 @@ local function CreateQuestTab()
   tab.args.autoIncludeRepeatableQuests={type="toggle",order=5,name="Include Repeatable Quests",desc="Allow quest automation to accept and turn in repeatable quests. The same repeatable quest is processed at most once per NPC conversation.",width="full",disabled=function() return not Settings():Get("autoAcceptQuests") and not Settings():Get("autoTurnInQuests") end,get=GetValue,set=SetValue}
 
   tab.args.interface_header={type="header",order=9,name="Interface"}
-  tab.args.useDarkTheme={type="toggle",order=10,name="Enable Dark Theme",desc="Use Questie-Octo's dark Shagu-style options appearance. This only skins the Questie-Octo settings window.",width="full",get=GetValue,set=SetValue}
-  tab.args.showMinimapButton={type="toggle",order=11,name="Show Minimap Button",desc="Show the Questie-Octo settings button. Minimap-button panels can manage it like a normal addon button. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue}
+  tab.args.showZoneLevelRanges={type="toggle",order=10,name="Show Zone Level Ranges",desc="Show the recommended level range and Friendly, Hostile, or Contested status when hovering a zone on the continent World Map.",width="full",get=GetValue,set=SetValue}
+  tab.args.useDarkTheme={type="toggle",order=11,name="Enable Dark Theme",desc="Use Questie-Octo's dark Shagu-style options appearance. This only skins the Questie-Octo settings window.",width="full",get=GetValue,set=SetValue}
+  tab.args.showMinimapButton={type="toggle",order=12,name="Show Minimap Button",desc="Show the Questie-Octo settings button. Minimap-button panels can manage it like a normal addon button. Requires /reload when changed. When disabled, the button frame is not created at all.",width="full",get=GetValue,set=SetMinimapButtonValue}
   tab.args.reset_header={type="header",order=20,name="Reset Questie Options"}
   tab.args.reset_text={type="description",order=21,name="Quest data and completed-quest history are not deleted.",fontSize="medium"}
   tab.args.resetOptions={type="execute",order=22,name="Reset Options",desc="Restore option defaults.",func=function()
