@@ -124,4 +124,7 @@ map (and a dungeon/detail map already displayed by another addon), but the
 Interface 11200/ClassicAPI surface has no arbitrary instance-map setter. Questie-
 Octo therefore does not fake an outdoor objective or custom dungeon map merely to
 make an out-of-instance tracker click appear successful.
+## 1.0.62 follow-up
+
+Peroth'arn (60686) and Ursol (62947) no longer retain the inherited generic `50,50` area-5640 points. The current server snapshot still has no ordinary static map-819 spawn for either scripted encounter, so Questie-Octo now publishes no objective map position for them until verified source or live evidence provides one. Their quest relationships and pickup markers remain unchanged.
 

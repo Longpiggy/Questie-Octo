@@ -3,6 +3,7 @@ local MM = QuestieOcto.Minimap
 
 MM.enabled=true
 MM.mapID=nil
+MM.karazhanContext=nil
 MM.plan=nil
 MM.planRevision=nil
 MM.frames={}
@@ -363,7 +364,20 @@ local function WorldMapBrowsingAwayFromPlayer(mapID)
   -- Continent/world views have no zone map ID and therefore cannot provide
   -- physical-zone player coordinates through Vanilla's global map context.
   if not displayed then return true end
-  return tonumber(displayed)~=tonumber(mapID)
+  if tonumber(displayed)~=tonumber(mapID) then return true end
+
+  -- Lower and Upper Karazhan first floor share numeric AreaTable ID 3457. If
+  -- the player browses the opposite texture, GetPlayerMapPosition() belongs to
+  -- the browsed context even though the numeric ID still matches. Keep the last
+  -- reliable physical position just as we do when browsing another zone.
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    local displayedContext=QuestieOcto.Map.GetDisplayedSpecialMapContext
+      and QuestieOcto.Map:GetDisplayedSpecialMapContext() or nil
+    return displayedContext~=MM.karazhanContext
+  end
+
+  return false
 end
 
 local function PlayerPosition(physicalMapID)
@@ -553,6 +567,12 @@ end
 local function MinimapNodeVisible(node,allowItemStart)
   if not node or not IsRoleEnabled(node.role) or not PvPNodeVisible(node) then return false end
 
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(MM.mapID)
+     and not karazhan:NodeAllowed(node,MM.karazhanContext) then
+    return false
+  end
+
   if node.role=="itemStart" then
     if not allowItemStart then return false end
     if MM.inDungeonOrRaid and QuestieOcto.ItemStartAreas
@@ -567,6 +587,12 @@ end
 local function ItemAreaVisible(area,allowItemStart)
   if not allowItemStart or not area or not IsRoleEnabled("itemStart") then return false end
   if MM.inDungeonOrRaid and area.zoneWideRare then return false end
+
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(MM.mapID)
+     and not karazhan:ItemAreaAllowed(area,MM.karazhanContext) then
+    return false
+  end
 
   local q=QuestieOcto.QuestModel:Get(area.questID)
   if q and q.pvp and not Settings():Get("showPvPRelatedQuests") then return false end
@@ -720,6 +746,7 @@ function MM:RefreshPlan(mapID)
   mapID=tonumber(mapID) or CurrentMapID()
   if not mapID then
     self.mapID=nil
+    self.karazhanContext=nil
     self.plan=nil
     self.itemStartPlan=nil
     self.planRevision=nil
@@ -729,18 +756,31 @@ function MM:RefreshPlan(mapID)
     return
   end
 
-  if tonumber(self.mapID)~=mapID then
+  local karazhan=QuestieOcto.KarazhanContext
+  local newKarazhanContext=nil
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    newKarazhanContext=karazhan:GetPhysicalContext(mapID)
+  end
+
+  local mapChanged=tonumber(self.mapID)~=mapID
+  local contextChanged=self.karazhanContext~=newKarazhanContext
+  if mapChanged or contextChanged then
     self.mapID=mapID
-    self.stats.mapChanges=self.stats.mapChanges+1
+    self.karazhanContext=newKarazhanContext
+    if mapChanged then self.stats.mapChanges=self.stats.mapChanges+1 end
+    self.bindRevision=(self.bindRevision or 0)+1
     self.lastPlayerX=nil
     self.lastPlayerY=nil
     self.lastZoom=nil
     self.discoveryPlayerX=nil
     self.discoveryPlayerY=nil
+    self.physicalPlayerX=nil
+    self.physicalPlayerY=nil
     self.cachedIndoor=nil
     self.cachedSquareMinimap=nil
     self.nextShapeCheck=nil
     self.nextMapIdentityCheck=nil
+    self:HideAll()
   end
 
   -- Instance type changes at the same lifecycle boundaries that refresh the
@@ -768,7 +808,19 @@ function MM:RefreshPlan(mapID)
   self.plan=plan
   self.itemStartPlan=itemStartPlan
   self.planRevision=QuestieOcto.PreparedMap.stateRevision
-  self.mapWidth,self.mapHeight=QuestieOcto.DatabaseAPI:GetMinimapSize(mapID)
+
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    -- Numeric map ID 3457 alone cannot identify Lower vs Upper Karazhan. If
+    -- ClassicAPI cannot prove the physical server-map context, fail closed.
+    self.mapWidth,self.mapHeight=karazhan:GetMinimapSize(self.karazhanContext)
+    if not self.mapWidth or not self.mapHeight then
+      self:HideAll()
+      return
+    end
+  else
+    self.mapWidth,self.mapHeight=QuestieOcto.DatabaseAPI:GetMinimapSize(mapID)
+  end
+
   self.stats.refreshes=self.stats.refreshes+1
   self:UpdatePositions(true,mapID)
 end
@@ -1051,6 +1103,13 @@ function MM:OnUpdate(elapsed)
     self.nextMapIdentityCheck=now+(tonumber(self.mapIdentityCheckInterval) or 0.5)
     current=CurrentMapID()
     if tonumber(current)~=tonumber(self.mapID) then
+      self:RefreshPlan(current)
+      return
+    end
+
+    local karazhan=QuestieOcto.KarazhanContext
+    if karazhan and karazhan:IsSharedArea(current)
+       and karazhan:GetPhysicalContext(current)~=self.karazhanContext then
       self:RefreshPlan(current)
       return
     end

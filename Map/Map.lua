@@ -390,6 +390,30 @@ local function DisplayedContextKey()
   return nil
 end
 
+local function DisplayedSpecialMapContext(mapID)
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    return karazhan:GetDisplayedContext(mapID)
+  end
+  return nil
+end
+
+local function NodeAllowedOnDisplayedMap(node)
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(M.mapID) then
+    return karazhan:NodeAllowed(node,M.specialMapContext)
+  end
+  return true
+end
+
+local function ItemAreaAllowedOnDisplayedMap(area)
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(M.mapID) then
+    return karazhan:ItemAreaAllowed(area,M.specialMapContext)
+  end
+  return true
+end
+
 local function OpenContinentZoneForPin(pin)
   if not pin or not pin.continentZoneMapID or not SetMapZoom or not GetMapZones then return false end
   local continent=GetCurrentMapContinent and GetCurrentMapContinent() or 0
@@ -419,17 +443,26 @@ local function TrackerObjectiveRole(role)
       or role=="objectiveItemSource" or role=="objectiveArea"
 end
 
-local function AddTrackerTargetCoords(targets,seen,coords)
+local function AddTrackerTargetCoords(targets,seen,coords,sourceKind,sourceID)
   for _,coord in pairs(coords or {}) do
     if type(coord)=="table" then
       local x=tonumber(coord[1])
       local y=tonumber(coord[2])
       local mapID=tonumber(coord[3])
       if x and y and mapID then
-        local key=tostring(mapID)..":"..string.format("%.3f",x)..":"..string.format("%.3f",y)
+        local karazhanContext=nil
+        local karazhan=QuestieOcto.KarazhanContext
+        if karazhan and karazhan:IsSharedArea(mapID) then
+          karazhanContext=karazhan:GetSourceContext(sourceKind,sourceID)
+        end
+        local key=tostring(mapID)..":"..tostring(karazhanContext or "")..":"..
+          string.format("%.3f",x)..":"..string.format("%.3f",y)
         if not seen[key] then
           seen[key]=true
-          table.insert(targets,{x=x,y=y,mapID=mapID})
+          table.insert(targets,{
+            x=x,y=y,mapID=mapID,karazhanContext=karazhanContext,
+            sourceKind=sourceKind,sourceID=tonumber(sourceID) or sourceID
+          })
         end
       end
     end
@@ -442,7 +475,7 @@ local function AddTrackerAreaTarget(targets,seen,src)
   local y=tonumber(src.y)
   local mapID=tonumber(src.mapID)
   if not x or not y or not mapID then return end
-  AddTrackerTargetCoords(targets,seen,{{x,y,mapID}})
+  AddTrackerTargetCoords(targets,seen,{{x,y,mapID}},"areaTrigger",src.id)
 end
 
 local function UnfinishedObjectiveCount(questID)
@@ -469,7 +502,7 @@ local function CollectTrackerObjectiveTargets(questID,objectiveIndex)
   for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
     if tonumber(node.questID)==questID and TrackerObjectiveRole(node.role)
        and tonumber(node.objectiveIndex)==objectiveIndex then
-      AddTrackerTargetCoords(targets,seen,node.coords)
+      AddTrackerTargetCoords(targets,seen,node.coords,node.sourceKind,node.sourceID)
     end
   end
 
@@ -482,21 +515,21 @@ local function CollectTrackerObjectiveTargets(questID,objectiveIndex)
   if resolved and db then
     for _,src in pairs(resolved.creature or {}) do
       if tonumber(src.objectiveIndex)==objectiveIndex then
-        AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(src.id))
+        AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(src.id),"creature",src.id)
         end
     end
     for _,src in pairs(resolved.gameObject or {}) do
       if tonumber(src.objectiveIndex)==objectiveIndex then
-        AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(src.id))
+        AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(src.id),"gameObject",src.id)
         end
     end
     for _,item in pairs(resolved.item or {}) do
       if tonumber(item.objectiveIndex)==objectiveIndex then
         for _,src in pairs(item.sources or {}) do
           if src.kind=="creature" then
-            AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(src.id))
+            AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(src.id),"creature",src.id)
           else
-            AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(src.id))
+            AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(src.id),"gameObject",src.id)
           end
         end
         end
@@ -516,7 +549,7 @@ local function CollectTrackerObjectiveTargets(questID,objectiveIndex)
     for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
       if tonumber(node.questID)==questID and TrackerObjectiveRole(node.role)
          and not tonumber(node.objectiveIndex) then
-        AddTrackerTargetCoords(targets,seen,node.coords)
+        AddTrackerTargetCoords(targets,seen,node.coords,node.sourceKind,node.sourceID)
       end
     end
     if resolved then
@@ -537,7 +570,7 @@ local function CollectTrackerFinisherTargets(questID)
   local seen={}
   for _,node in pairs((QuestieOcto.Nodes and QuestieOcto.Nodes.nodes) or {}) do
     if tonumber(node.questID)==questID and node.role=="turnin" then
-      AddTrackerTargetCoords(targets,seen,node.coords)
+      AddTrackerTargetCoords(targets,seen,node.coords,node.sourceKind,node.sourceID)
     end
   end
 
@@ -547,10 +580,10 @@ local function CollectTrackerFinisherTargets(questID)
   local db=QuestieOcto.DatabaseAPI
   if q and db then
     for _,id in pairs(q.finishes.creature or {}) do
-      AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(id))
+      AddTrackerTargetCoords(targets,seen,db:GetCreatureCoords(id),"creature",id)
     end
     for _,id in pairs(q.finishes.gameObject or {}) do
-      AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(id))
+      AddTrackerTargetCoords(targets,seen,db:GetObjectCoords(id),"gameObject",id)
     end
   end
   return targets
@@ -597,18 +630,39 @@ local function FindSelectableWorldMapZone(mapID)
   return nil,nil
 end
 
+local function TrackerTargetMatches(target,mapID,specialContext)
+  if not target or tonumber(target.mapID)~=tonumber(mapID) then return false end
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    return specialContext~=nil and target.karazhanContext==specialContext
+  end
+  return true
+end
+
+local function TrackerTargetCount(targets,mapID,specialContext)
+  local count=0
+  for _,target in pairs(targets or {}) do
+    if TrackerTargetMatches(target,mapID,specialContext) then count=count+1 end
+  end
+  return count
+end
+
 local function TrackerTargetMapCounts(targets)
   local counts={}
+  local karazhan=QuestieOcto.KarazhanContext
   for _,target in pairs(targets or {}) do
     local mapID=tonumber(target.mapID)
-    if mapID then counts[mapID]=(counts[mapID] or 0)+1 end
+    if mapID and (not karazhan or not karazhan:IsSharedArea(mapID)) then
+      counts[mapID]=(counts[mapID] or 0)+1
+    end
   end
   return counts
 end
 
-local function VisibleTrackerMapID()
-  if not WorldMapFrame or not WorldMapFrame:IsVisible() then return nil end
-  return tonumber(DisplayedMapID())
+local function VisibleTrackerMapContext()
+  if not WorldMapFrame or not WorldMapFrame:IsVisible() then return nil,nil end
+  local mapID=tonumber(DisplayedMapID())
+  return mapID,DisplayedSpecialMapContext(mapID)
 end
 
 -- Vanilla has no arbitrary "set World Map to area ID" API. Dungeon/city maps
@@ -616,92 +670,140 @@ end
 -- already displayed or when SetMapToCurrentZone() can select the player's
 -- physical instance. Resolve that hidden current-instance texture here without
 -- touching a World Map the player is actively browsing.
-local function HiddenCurrentInstanceMapID()
-  if not WorldMapFrame or WorldMapFrame:IsVisible() then return nil end
+local function HiddenCurrentInstanceMapContext()
+  if not WorldMapFrame or WorldMapFrame:IsVisible() then return nil,nil end
   if not QuestieOcto.API or not QuestieOcto.API.IsInDungeonOrRaid
-     or not QuestieOcto.API:IsInDungeonOrRaid() then return nil end
-  if not SetMapToCurrentZone then return nil end
+     or not QuestieOcto.API:IsInDungeonOrRaid() then return nil,nil end
+  if not SetMapToCurrentZone then return nil,nil end
   SetMapToCurrentZone()
-  return tonumber(DisplayedMapID())
+  local mapID=tonumber(DisplayedMapID())
+  return mapID,DisplayedSpecialMapContext(mapID)
 end
 
-local function IsTrackerMapSelectable(mapID)
+local function PhysicalTrackerMapContext()
+  local mapID=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
+    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
+  if not mapID then return nil,nil end
+
+  local specialContext=nil
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    specialContext=karazhan:GetPhysicalContext(mapID)
+  end
+  return mapID,specialContext
+end
+
+local function IsTrackerMapSelectable(mapID,specialContext)
   mapID=tonumber(mapID)
   if not mapID then return false end
 
-  local displayed=VisibleTrackerMapID()
-  if displayed and displayed==mapID then return true end
+  local displayed,displayedContext=VisibleTrackerMapContext()
+  if displayed and displayed==mapID then
+    local karazhan=QuestieOcto.KarazhanContext
+    if not karazhan or not karazhan:IsSharedArea(mapID) then return true end
+    if specialContext and displayedContext==specialContext then return true end
+  end
 
-  local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
-    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
-  if physical and physical==mapID then return true end
+  local physical,physicalContext=PhysicalTrackerMapContext()
+  if physical and physical==mapID then
+    local karazhan=QuestieOcto.KarazhanContext
+    if not karazhan or not karazhan:IsSharedArea(mapID) then return true end
+    if specialContext and physicalContext==specialContext then return true end
+  end
+
+  local karazhan=QuestieOcto.KarazhanContext
+  if karazhan and karazhan:IsSharedArea(mapID) then
+    -- Interface 11200 cannot select Lower vs Upper Karazhan by AreaTable ID.
+    -- Only an already displayed or physically current context is safe.
+    return false
+  end
 
   local continent,zoneIndex=FindSelectableWorldMapZone(mapID)
   return continent and zoneIndex and true or false
 end
 
 local function ChooseTrackerTargetMap(targets,zoneGroup)
-  local counts=TrackerTargetMapCounts(targets)
-  if not next(counts) then return nil end
+  local karazhan=QuestieOcto.KarazhanContext
 
   -- Respect a dungeon/detail map already being shown, including maps opened by
-  -- another addon. Questie-Octo only needs to publish its existing objective
-  -- nodes onto that native World Map context.
-  local displayed=VisibleTrackerMapID()
-  if displayed and counts[displayed] then return displayed end
+  -- another addon. For AreaTable 3457, texture context must also match so a
+  -- Lower target can never be accepted merely because Upper is visible.
+  local displayed,displayedContext=VisibleTrackerMapContext()
+  if displayed and TrackerTargetCount(targets,displayed,displayedContext)>0 then
+    return displayed,displayedContext
+  end
 
-  local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
-    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
-  if physical and counts[physical] then return physical end
+  local physical,physicalContext=PhysicalTrackerMapContext()
+  if physical and TrackerTargetCount(targets,physical,physicalContext)>0 then
+    return physical,physicalContext
+  end
 
   -- Some instance contexts resolve more precisely through GetMapInfo() after
   -- SetMapToCurrentZone() than through GetBestMapForUnit(). This keeps tracker
   -- Show on Map usable for the player's current dungeon without inventing an
   -- outdoor entrance projection.
-  local currentInstance=HiddenCurrentInstanceMapID()
-  if currentInstance and counts[currentInstance] then return currentInstance end
+  local currentInstance,currentInstanceContext=HiddenCurrentInstanceMapContext()
+  if currentInstance and TrackerTargetCount(targets,currentInstance,currentInstanceContext)>0 then
+    return currentInstance,currentInstanceContext
+  end
 
+  local counts=TrackerTargetMapCounts(targets)
   local zoneMapID=QuestieOcto.DatabaseAPI and QuestieOcto.DatabaseAPI.GetMapIDByName
     and QuestieOcto.DatabaseAPI:GetMapIDByName(zoneGroup) or nil
   zoneMapID=tonumber(zoneMapID)
-  if zoneMapID and counts[zoneMapID] and IsTrackerMapSelectable(zoneMapID) then
-    return zoneMapID
+  if zoneMapID and counts[zoneMapID] and IsTrackerMapSelectable(zoneMapID,nil) then
+    return zoneMapID,nil
   end
 
   local best=nil
   local bestCount=-1
   for mapID,count in pairs(counts) do
-    if IsTrackerMapSelectable(mapID) then
+    if IsTrackerMapSelectable(mapID,nil) then
       if count>bestCount or (count==bestCount and (not best or mapID<best)) then
         best=mapID
         bestCount=count
       end
     end
   end
-  return best
+  return best,nil
 end
 
-local function OpenTrackerTargetMap(mapID)
+local function OpenTrackerTargetMap(mapID,specialContext)
   mapID=tonumber(mapID)
   if not mapID or not WorldMapFrame then return false end
 
   -- If another addon/native action already has the dungeon/detail map open, do
-  -- not retarget it through a zone-name fallback. Just refresh Questie's pins.
-  local displayed=VisibleTrackerMapID()
+  -- not retarget it through a zone-name fallback. Karazhan's shared numeric ID
+  -- additionally requires the exact Lower/Upper texture context.
+  local displayed,displayedContext=VisibleTrackerMapContext()
   if displayed and displayed==mapID then
-    if M.RequestSync then M:RequestSync(true) end
-    return true
+    local karazhan=QuestieOcto.KarazhanContext
+    if not karazhan or not karazhan:IsSharedArea(mapID)
+       or (specialContext and displayedContext==specialContext) then
+      if M.RequestSync then M:RequestSync(true) end
+      return true
+    end
   end
 
-  local physical=QuestieOcto.API and QuestieOcto.API.GetBestMapForPlayer
-    and tonumber(QuestieOcto.API:GetBestMapForPlayer()) or nil
-  local currentInstance=HiddenCurrentInstanceMapID()
-  local currentPhysical=(physical and physical==mapID)
-    or (currentInstance and currentInstance==mapID)
+  local physical,physicalContext=PhysicalTrackerMapContext()
+  local currentInstance,currentInstanceContext=HiddenCurrentInstanceMapContext()
+  local currentPhysical=false
+  if physical and physical==mapID then
+    local karazhan=QuestieOcto.KarazhanContext
+    currentPhysical=(not karazhan or not karazhan:IsSharedArea(mapID))
+      or (specialContext and physicalContext==specialContext)
+  end
+  if not currentPhysical and currentInstance and currentInstance==mapID then
+    local karazhan=QuestieOcto.KarazhanContext
+    currentPhysical=(not karazhan or not karazhan:IsSharedArea(mapID))
+      or (specialContext and currentInstanceContext==specialContext)
+  end
 
   local continent=nil
   local zoneIndex=nil
   if not currentPhysical then
+    local karazhan=QuestieOcto.KarazhanContext
+    if karazhan and karazhan:IsSharedArea(mapID) then return false end
     continent,zoneIndex=FindSelectableWorldMapZone(mapID)
     if not continent or not zoneIndex then return false end
   end
@@ -727,9 +829,9 @@ end
 
 function M:ShowTrackerObjective(questID,objectiveIndex,zoneGroup)
   local targets=CollectTrackerObjectiveTargets(questID,objectiveIndex)
-  local mapID=ChooseTrackerTargetMap(targets,zoneGroup)
+  local mapID,specialContext=ChooseTrackerTargetMap(targets,zoneGroup)
   if not mapID then return false end
-  return OpenTrackerTargetMap(mapID)
+  return OpenTrackerTargetMap(mapID,specialContext)
 end
 
 function M:CanShowTrackerFinisher(questID,zoneGroup)
@@ -739,9 +841,9 @@ end
 
 function M:ShowTrackerFinisher(questID,zoneGroup)
   local targets=CollectTrackerFinisherTargets(questID)
-  local mapID=ChooseTrackerTargetMap(targets,zoneGroup)
+  local mapID,specialContext=ChooseTrackerTargetMap(targets,zoneGroup)
   if not mapID then return false end
-  return OpenTrackerTargetMap(mapID)
+  return OpenTrackerTargetMap(mapID,specialContext)
 end
 
 local function AttachWorldMapPinInput(pin)
@@ -917,6 +1019,11 @@ function M:GetDisplayedMapID()
   return DisplayedMapID()
 end
 
+function M:GetDisplayedSpecialMapContext()
+  local mapID=DisplayedMapID()
+  return DisplayedSpecialMapContext(mapID)
+end
+
 function M:GetNearbyQuestTooltipPins(pin,maxPixels)
   local result={}
   if not pin or not pin:IsShown() then return result end
@@ -957,10 +1064,13 @@ function M:GetNearbyQuestTooltipPins(pin,maxPixels)
   return result
 end
 
-function M:SetMap(mapID)
+function M:SetMap(mapID,specialContext)
   mapID=tonumber(mapID)
-  if tonumber(self.mapID)==mapID then return end
+  local karazhan=QuestieOcto.KarazhanContext
+  if not karazhan or not karazhan:IsSharedArea(mapID) then specialContext=nil end
+  if tonumber(self.mapID)==mapID and self.specialMapContext==specialContext then return end
   self.mapID=mapID
+  self.specialMapContext=specialContext
   self.generation=self.generation+1
   self.syncing=false
   self.resync=false
@@ -974,6 +1084,7 @@ end
 
 function M:RenderItemStartArea(area,generation,continentZoneMapID)
   if not IsRoleEnabled("itemStart") then return end
+  if not continentZoneMapID and not ItemAreaAllowedOnDisplayedMap(area) then return end
   local itemQuest=QuestieOcto.QuestModel:Get(area.questID)
   if itemQuest and itemQuest.pvp and not DisplaySettings():Get("showPvPRelatedQuests") then return end
   local itemEvent=itemQuest and itemQuest.eventID and QuestieOcto.EventAvailability and QuestieOcto.EventAvailability:IsPresentationEvent(itemQuest.eventID) or false
@@ -1034,6 +1145,7 @@ end
 
 function M:RenderNode(node,generation)
   if not self.mapID then return end
+  if not NodeAllowedOnDisplayedMap(node) then return end
 
   -- Clustered item-start sources are represented by geographic area pins.
   -- Full Nodes intentionally renders their raw spawn coordinates.
@@ -1161,13 +1273,16 @@ end
 
 function M:RenderPreparedDescriptor(desc,generation,renderItemStarts)
   if desc.type=="itemStartArea" then
-    if renderItemStarts then M:RenderItemStartArea(desc.area,generation) end
+    if renderItemStarts and ItemAreaAllowedOnDisplayedMap(desc.area) then
+      M:RenderItemStartArea(desc.area,generation)
+    end
     return
   end
 
   if desc.type=="nodeSlot" then
     for _,entry in pairs(desc.entries or {}) do
-      if entry.node and (renderItemStarts or entry.node.role~="itemStart") then
+      if entry.node and NodeAllowedOnDisplayedMap(entry.node)
+         and (renderItemStarts or entry.node.role~="itemStart") then
         M:GetOrCreate(
           desc.key,
           entry.node,
@@ -1184,7 +1299,7 @@ function M:RenderPreparedDescriptor(desc,generation,renderItemStarts)
 
   -- Backward compatibility for a prepared map published by an older cache
   -- during an in-session update/reload boundary.
-  if desc.type=="node" and desc.node
+  if desc.type=="node" and desc.node and NodeAllowedOnDisplayedMap(desc.node)
      and (renderItemStarts or desc.node.role~="itemStart") then
     M:GetOrCreate(desc.key,desc.node,desc.x,desc.y,desc.clusterCount or 1,generation,desc.kind or "objective")
   end
@@ -1586,7 +1701,7 @@ function M:StartContinentSync(continentMapID,doPrune)
   if continentMapID==nil or not QuestieOcto.ContinentProjection then return end
 
   local contextKey=-1000-continentMapID
-  if tonumber(self.mapID)~=contextKey then self:SetMap(contextKey) end
+  if tonumber(self.mapID)~=contextKey or self.specialMapContext~=nil then self:SetMap(contextKey,nil) end
   if not QuestieOcto.Nodes.ready then self.syncing=false; return end
 
   self.generation=self.generation+1
@@ -1665,8 +1780,13 @@ function M:StartSync(doPrune)
       self:StartContinentSync(continentMapID,doPrune)
       return
     end
-    self:SetMap(nil)
+    self:SetMap(nil,nil)
     return
+  end
+
+  local specialContext=DisplayedSpecialMapContext(mapID)
+  if tonumber(self.mapID)~=tonumber(mapID) or self.specialMapContext~=specialContext then
+    self:SetMap(mapID,specialContext)
   end
 
   if not QuestieOcto.PreparedMap:Get(mapID) then
@@ -1681,8 +1801,6 @@ function M:StartSync(doPrune)
       return
     end
   end
-
-  if tonumber(self.mapID)~=tonumber(mapID) then self:SetMap(mapID) end
 
   self.generation=self.generation+1
   local generation=self.generation
@@ -1977,13 +2095,15 @@ function M:EnsureDisplayedContextCurrent()
   if not WorldMapFrame or not WorldMapFrame:IsVisible() then return end
 
   local contextKey=DisplayedContextKey()
-  if tonumber(contextKey)~=tonumber(self.mapID) then
-    self:SetMap(contextKey)
+  local displayedMapID=DisplayedMapID()
+  local specialContext=DisplayedSpecialMapContext(displayedMapID)
+  if tonumber(contextKey)~=tonumber(self.mapID) or self.specialMapContext~=specialContext then
+    self:SetMap(contextKey,specialContext)
     self:RequestSync(false)
     return
   end
 
-  local mapID=DisplayedMapID()
+  local mapID=displayedMapID
   if mapID then
     local prepared=QuestieOcto.PreparedMap:Get(mapID)
     -- PREPARED_MAP_READY can fire while the World Map is hidden. Comparing the

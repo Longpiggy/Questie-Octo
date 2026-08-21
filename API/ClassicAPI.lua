@@ -162,11 +162,15 @@ function A:GetMapAreaIDForTexture(textureName)
   return ids and tonumber(ids[textureName]) or nil
 end
 
-function A:GetDisplayedMapAreaID()
+function A:GetDisplayedMapTextureName()
   if type(GetMapInfo)~="function" then return nil end
   local ok,textureName=pcall(GetMapInfo)
-  if not ok then return nil end
-  return self:GetMapAreaIDForTexture(textureName)
+  if not ok or type(textureName)~="string" or textureName=="" then return nil end
+  return textureName
+end
+
+function A:GetDisplayedMapAreaID()
+  return self:GetMapAreaIDForTexture(self:GetDisplayedMapTextureName())
 end
 
 function A:GetBestMapForPlayer()
@@ -182,6 +186,13 @@ function A:GetInstanceType()
   local ok,name,instanceType=pcall(GetInstanceInfo)
   if not ok or type(instanceType)~="string" then return "none" end
   return instanceType
+end
+
+function A:GetInstanceMapID()
+  if type(GetInstanceInfo)~="function" then return nil end
+  local ok,name,instanceType,difficultyID,difficultyName,maxPlayers,dynamicDifficulty,isDynamic,instanceMapID=pcall(GetInstanceInfo)
+  if not ok then return nil end
+  return tonumber(instanceMapID)
 end
 
 function A:IsInDungeonOrRaid()

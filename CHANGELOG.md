@@ -1,5 +1,19 @@
 # Questie-Octo Changelog
 
+## 1.0.64
+- Quest objective AreaTrigger markers now disappear as soon as their specific exploration/event objective is completed instead of waiting for the entire quest to finish.
+- Multiple equivalent exploration locations disappear together when that shared objective is completed.
+- Ambiguous/custom trigger cases remain visible until quest completion rather than being hidden from guessed objective matching.
+
+## 1.0.63
+- Fixed Lower and Upper Karazhan first-floor quest markers sharing the same internal map identity.
+- Questie-Octo now keeps Lower Karazhan and Upper Karazhan objectives on their correct maps when that content is available.
+- Tracker **Show on Map** also respects the correct Lower/Upper Karazhan context instead of treating both maps as identical.
+
+## 1.0.62
+- Removed unverified center-of-map objective markers for **Ursol** and **Peroth'arn** in Timbermaw Hold.
+- Their quests and quest pickup markers remain available normally; only the unsupported boss objective locations are hidden until verified location data exists.
+
 ## 1.0.61
 - Removed the 1.0.60 dungeon entrance quest markers from outdoor maps; normal objectives in pre-instance caves/tunnels and inside dungeons remain unchanged.
 - Dungeon objectives can now use the tracker **Objectives → Show on Map** action when their dungeon/detail map is available to the client, including while inside the dungeon or when another map addon already has that map displayed.

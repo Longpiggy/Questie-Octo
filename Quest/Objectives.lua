@@ -8,6 +8,7 @@ O.pending=false
 O.generation=0
 O.stats={
   quests=0, creature=0, object=0, item=0, areaTrigger=0, itemSources=0, irTargets=0,
+  areaTriggerMapped=0, areaTriggerUnmapped=0,
   mapped=0, unmapped=0, direct=0, fallback=0, fuzzy=0, single=0, typeMismatch=0,
   rebuilds=0, dependencyWaits=0
 }
@@ -28,6 +29,7 @@ local function ResetStats()
   local waits=O.stats.dependencyWaits or 0
   O.stats={
     quests=0, creature=0, object=0, item=0, areaTrigger=0, itemSources=0, irTargets=0,
+    areaTriggerMapped=0, areaTriggerUnmapped=0,
     mapped=0, unmapped=0, direct=0, fallback=0, fuzzy=0, single=0, typeMismatch=0,
     rebuilds=rebuilds, dependencyWaits=waits
   }
@@ -383,6 +385,51 @@ local function ObjectiveTypesMatch(logType,dbType)
   return false
 end
 
+-- Vanilla stores exploration/event completion as one quest-level state rather
+-- than one state per AreaTrigger. A quest can therefore list several A nodes
+-- that are OR-equivalent ways to satisfy the same live event objective. Never
+-- infer that relationship from DB/objective array order: prefer an exact live
+-- leaderboard ID when ClassicAPI exposes one, otherwise accept only one unique
+-- live event-style row. Ambiguous/missing rows deliberately fail safe and leave
+-- the AreaTrigger visible until the whole quest completes, matching 1.0.63.
+local function AreaTriggerObjectiveRow(q,state)
+  local triggers=q and q.objectives and q.objectives.areaTrigger or nil
+  local rows=state and state.objectives or nil
+  if type(triggers)~="table" or type(rows)~="table" or table.getn(triggers)==0 then return nil end
+
+  local triggerSet={}
+  for _,id in pairs(triggers) do
+    id=tonumber(id)
+    if id then triggerSet[id]=true end
+  end
+
+  local exact=nil
+  local exactCount=0
+  for i=1,table.getn(rows) do
+    local row=rows[i]
+    local id=tonumber(row and row.objectiveID)
+    if id and triggerSet[id] then
+      exact=row
+      exactCount=exactCount+1
+    end
+  end
+  if exactCount==1 then return exact,"id" end
+  if exactCount>1 then return nil end
+
+  local eventRow=nil
+  local eventCount=0
+  for i=1,table.getn(rows) do
+    local row=rows[i]
+    local typ=string.lower(tostring(row and row.type or ""))
+    if typ=="event" or typ=="exploration" or typ=="areatrigger" or typ=="area" then
+      eventRow=row
+      eventCount=eventCount+1
+    end
+  end
+  if eventCount==1 then return eventRow,"event" end
+  return nil
+end
+
 local function EntryFromLiveObjectiveID(q,row)
   local id=tonumber(row and row.objectiveID)
   if not q or not id then return nil end
@@ -535,23 +582,30 @@ function O:ResolveQuest(questID)
     end
   end
 
-  -- Quest-bound area triggers are not generic exploration/fog helpers. pfQuest
-  -- resolves obj["A"] through ClassicAPI and shows those points while the quest
-  -- is active. Keep them separate from ordinary leaderboard entity matching:
-  -- Vanilla does not provide a reliable creature/object-style namespace for
-  -- these event triggers, and pfQuest likewise keeps them until the quest as a
-  -- whole is complete.
+  -- Quest-bound area triggers are not generic exploration/fog helpers. Resolve
+  -- their shared live event row when that relationship is unambiguous, so all
+  -- OR-equivalent locations disappear immediately once the exploration/event
+  -- objective completes. If no trustworthy row exists, preserve the old safe
+  -- behavior and keep the marker until the quest as a whole completes.
+  local areaTriggerRow=AreaTriggerObjectiveRow(q,state)
   for _,areaTriggerID in pairs(q.objectives.areaTrigger or {}) do
     local info=QuestieOcto.API and QuestieOcto.API.GetAreaTriggerInfo
       and QuestieOcto.API:GetAreaTriggerInfo(areaTriggerID) or nil
     if info then
-      table.insert(result.areaTrigger,{
+      local source={
         kind="areaTrigger",
         id=tonumber(areaTriggerID),
         mapID=info.areaID,
         x=info.mapX,
         y=info.mapY
-      })
+      }
+      if areaTriggerRow then
+        MergeState(source,areaTriggerRow)
+        O.stats.areaTriggerMapped=(O.stats.areaTriggerMapped or 0)+1
+      else
+        O.stats.areaTriggerUnmapped=(O.stats.areaTriggerUnmapped or 0)+1
+      end
+      table.insert(result.areaTrigger,source)
       O.stats.areaTrigger=(O.stats.areaTrigger or 0)+1
     end
   end

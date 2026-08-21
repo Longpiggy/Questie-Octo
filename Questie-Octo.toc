@@ -2,13 +2,14 @@
 ## Title: Questie-Octo
 ## Notes: Quest helper.
 ## Author: Questie-Octo
-## Version: 1.0.61
+## Version: 1.0.64
 ## SavedVariables: QuestieOctoGlobalDB
 ## SavedVariablesPerCharacter: QuestieOctoDB
 
 QuestieOcto.lua
 Core\Scheduler.lua
 API\ClassicAPI.lua
+Map\KarazhanContext.lua
 
 Data\runtime\init.lua
 Data\runtime\quests.lua
