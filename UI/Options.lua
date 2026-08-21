@@ -366,9 +366,10 @@ local function CreateGeneralTab()
     args={
       world_map_visibility_header={type="header",order=2,name="World Map Visibility"},
       enableMapIcons={type="toggle",order=2.1,name="Show Quests",desc="Show quest icons on the main map.",width="full",get=GetValue,set=SetValue},
-      showAllQuestsWorldMap={type="toggle",order=2.2,name="Show Quests on the World Map",desc="Show normal quest pickup and turn-in icons on continent maps.",width="full",get=GetValue,set=SetValue},
-      showSpecialQuestsWorldMap={type="toggle",order=2.3,name="Show Special Quests on the World Map",desc="Show repeatable, PvP, and active event quest icons on continent maps.",width="full",get=GetValue,set=SetValue},
-      showMapFlightMaster={type="toggle",order=2.4,name="Show Flight Master on the World Map",desc="Show Flight Master icons on the map.",width="full",get=GetValue,set=SetValue},
+      showAvailableQuestsWorldMap={type="toggle",order=2.2,name="Show Available Quests on the World Map",desc="Show available quest pickup icons on continent maps.",width="full",get=GetValue,set=SetValue},
+      showCompletedQuestsWorldMap={type="toggle",order=2.3,name="Show Completed Quests on the World Map",desc="Show completed quest turn-in icons on continent maps.",width="full",get=GetValue,set=SetValue},
+      showSpecialQuestsWorldMap={type="toggle",order=2.4,name="Show Special Quests on the World Map",desc="Show repeatable, PvP, and active event quest icons on continent maps.",width="full",get=GetValue,set=SetValue},
+      showMapFlightMaster={type="toggle",order=2.5,name="Show Flight Master on the World Map",desc="Show Flight Master icons on the map.",width="full",get=GetValue,set=SetValue},
       enableMiniMapIcons={type="toggle",order=3,name="Enable Minimap Icons",desc="Show quest icons on the minimap.",width="full",get=GetValue,set=SetValue},
       enableObjectives={type="toggle",order=4,name="Enable Objective Icons",desc="Show active quest objectives on the map and minimap.",width="full",get=GetValue,set=SetValue},
       enableTurnins={type="toggle",order=5,name="Enable Completed Quest Icons",desc="Show completed quest turn-ins on the map and minimap.",width="full",get=GetValue,set=SetValue},

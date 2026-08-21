@@ -14,8 +14,9 @@
 
 ## Beta 1.6 world-map visibility scope correction
 
-- `showAllQuestsWorldMap` and `showSpecialQuestsWorldMap` are continent/world-overview filters only.
-- Selected zone and city maps no longer apply those overview filters to available/item-start/turn-in quest markers.
+- `showAvailableQuestsWorldMap`, `showCompletedQuestsWorldMap`, and `showSpecialQuestsWorldMap` are continent/world-overview filters only.
+- `showAvailableQuestsWorldMap` is the broad available/item-start role gate; `showCompletedQuestsWorldMap` is the broad turn-in role gate. Special markers additionally require `showSpecialQuestsWorldMap`.
+- Selected zone and city maps do not apply those overview filters to available/item-start/turn-in quest markers.
 - Zone/city quest marker visibility remains governed by the ordinary available/completed/item-start controls.
 - `showSpecialQuestsWorldMap` remains default OFF.
 

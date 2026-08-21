@@ -6,10 +6,11 @@ S.defaults={
   -- Questie global map/minimap presentation defaults.
 
   enableMapIcons=true,
-  -- Continent/world-overview-only master for available quest starts
-  -- (including item starts) and completed turn-ins. Selected zone/city maps
-  -- are unaffected; active objective markers remain independently controlled.
-  showAllQuestsWorldMap=true,
+  -- Continent/world-overview-only quest-state filters. Available covers pickup
+  -- and item-start markers; Completed covers turn-ins. Special quests also
+  -- require their separate Special gate. Zone/city maps/objectives are unaffected.
+  showAvailableQuestsWorldMap=true,
+  showCompletedQuestsWorldMap=true,
   -- Continent/world-overview-only master for special quest markers:
   -- repeatable (blue), PvP (red), and verified seasonal/event (green).
   -- Selected zone/city maps are unaffected.
@@ -162,6 +163,25 @@ function S:Initialize()
   local db=QuestieOctoGlobalDB.minimap
   local charDB=QuestieOctoDB.options
 
+  -- 1.0.73 splits the former continent/world-overview quest-state master into
+  -- independent Available and Completed filters. Preserve the player's exact
+  -- former choice on upgrade, then discard the obsolete key.
+  if db.showAvailableQuestsWorldMap==nil then
+    if db.showAllQuestsWorldMap==nil then
+      db.showAvailableQuestsWorldMap=true
+    else
+      db.showAvailableQuestsWorldMap=db.showAllQuestsWorldMap and true or false
+    end
+  end
+  if db.showCompletedQuestsWorldMap==nil then
+    if db.showAllQuestsWorldMap==nil then
+      db.showCompletedQuestsWorldMap=true
+    else
+      db.showCompletedQuestsWorldMap=db.showAllQuestsWorldMap and true or false
+    end
+  end
+  db.showAllQuestsWorldMap=nil
+
   -- Discard obsolete presentation choices rather than leaving hidden stale
   -- settings in SavedVariables.
   db.databaseLocale=nil
@@ -240,7 +260,7 @@ end
 function S:Set(key,value)
   if not self.db or SavedVariableBindingsChanged(self) then self:Initialize() end
 
-  if key=="enableMapIcons" or key=="showAllQuestsWorldMap" or key=="showSpecialQuestsWorldMap" or key=="enableObjectives" or key=="enableTurnins" or
+  if key=="enableMapIcons" or key=="showAvailableQuestsWorldMap" or key=="showCompletedQuestsWorldMap" or key=="showSpecialQuestsWorldMap" or key=="enableObjectives" or key=="enableTurnins" or
       key=="enableAvailable" or key=="enableMiniMapIcons" or
       key=="alwaysGlowMap" or key=="alwaysGlowMinimap" or
       key=="questObjectiveColors" or key=="questMinimapObjectiveColors" or

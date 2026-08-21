@@ -18,10 +18,18 @@ end
 
 local function IsQuestMarkerNodeEnabled(node)
   local settings=DisplaySettings()
+  -- Available/Completed are the broad continent quest-state gates. Special
+  -- Quests remains an additional category gate, so disabling Available really
+  -- removes every pickup `!` (including special ones) while leaving turn-ins.
+  if node and node.role=="turnin" then
+    if not settings:Get("showCompletedQuestsWorldMap") then return false end
+  else
+    if not settings:Get("showAvailableQuestsWorldMap") then return false end
+  end
   if IsSpecialQuestNode(node) then
     return settings:Get("showSpecialQuestsWorldMap") and true or false
   end
-  return settings:Get("showAllQuestsWorldMap") and true or false
+  return true
 end
 
 local function IsPvPQuestNodeEnabled(node)
@@ -1940,7 +1948,7 @@ function M:ApplySettings()
 end
 
 function M:OnSettingChanged(key,value)
-  if key=="enableMapIcons" or key=="showAllQuestsWorldMap" or key=="showSpecialQuestsWorldMap" or key=="showPvPRelatedQuests" or key=="enableObjectives" or key=="enableTurnins" or
+  if key=="enableMapIcons" or key=="showAvailableQuestsWorldMap" or key=="showCompletedQuestsWorldMap" or key=="showSpecialQuestsWorldMap" or key=="showPvPRelatedQuests" or key=="enableObjectives" or key=="enableTurnins" or
      key=="enableAvailable" or key=="showItemStartQuests" or key=="showItemStartMap" or
      key=="showMapAuctioneer" or key=="showMapBanker" or
      key=="showMapFlightMaster" or key=="showMapMailbox" or

@@ -1,3 +1,10 @@
+1.0.73 - INDEPENDENT WORLD MAP AVAILABLE / COMPLETED QUEST FILTERS
+- Replaced the former continent/world-overview `Show Quests on the World Map` master with independent `Show Available Quests on the World Map` and `Show Completed Quests on the World Map` controls. This supports a turn-in-focused World Map view where ordinary available `!` markers can be hidden while completed `?` markers remain visible.
+- Available NPC/item-start markers use the Available control and turn-in markers use the Completed control. These are broad quest-state gates, so disabling Available removes every continent pickup `!`, including special quest pickups; `Show Special Quests on the World Map` remains an additional category gate for repeatable/PvP/event markers.
+- Selected zone/city maps remain governed by the existing map/minimap Available/Completed icon settings. Objective markers, Flight Masters, and minimap presentation are unchanged.
+- Upgrade migration copies the player's previous `showAllQuestsWorldMap` value into both new controls before removing the obsolete key, preserving the former normal quest-state visibility choice. The existing Special Quests preference is retained separately. Fresh/default profiles keep both new controls ON.
+- Questie-Octo 1.0.72 is the accepted implementation baseline for this release. The fullscreen World Map scheduler + WorldMapTooltip fixes are now live-confirmed working together; the earlier 1.0.59 centered-tilde tooltip cleanup is also live-confirmed good.
+
 1.0.72 - FULLSCREEN WORLD MAP TOOLTIP LIFECYCLE
 - Live testing of 1.0.71 confirmed the scheduler correction was only half of the fullscreen issue: Questie-Octo pins could now appear/update while the native World Map remained fullscreen, but hovering those visible pins produced no tooltip. The supplied player recording reproduced that split clearly.
 - Current native `GameTooltip.xml` defines `GameTooltip` as a child of `UIParent`. Native fullscreen World Map display hides `UIParent`, so Questie-Octo's existing World Map pin hover path could populate/show GameTooltip while the tooltip's parent hierarchy remained hidden.

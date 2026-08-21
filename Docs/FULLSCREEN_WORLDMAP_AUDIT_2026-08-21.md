@@ -202,5 +202,5 @@ The same selection is used for OnLeave/Hide. No scheduler behavior, pin parent/f
 5. Close the map and verify minimap marker tooltips and normal unit/object/item GameTooltips are unchanged.
 6. If using pfUI, verify its normal WorldMapTooltip skin/scale remains intact and minimap-pin tooltips do not recurse.
 
-Until those checks are completed, 1.0.72 should be described as source/static validated with a live-confirmed 1.0.71 reproduction, not as a live-confirmed final fix.
+Live follow-up on 2026-08-21 reported the combined 1.0.71 scheduler correction and 1.0.72 WorldMapTooltip correction working perfectly in the native fullscreen World Map. Questie-Octo 1.0.72 is therefore the accepted live-confirmed fullscreen baseline; the listed scenarios remain useful regression checks for future releases.
 

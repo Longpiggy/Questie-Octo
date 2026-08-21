@@ -1,5 +1,10 @@
 # Questie-Octo Changelog
 
+## 1.0.73
+- Split the World Map quest visibility setting into separate **Available Quests** and **Completed Quests** toggles.
+- You can now hide available `!` markers on the World Map while keeping completed `?` turn-ins visible.
+- Existing settings are preserved on upgrade, and both new toggles remain enabled by default for the current behavior.
+
 ## 1.0.72
 - Fixed Questie-Octo marker tooltips not appearing while the native World Map is fullscreen.
 - World Map marker hover information now stays available in fullscreen without changing minimap tooltip behavior.
