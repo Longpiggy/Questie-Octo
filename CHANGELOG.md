@@ -1,5 +1,14 @@
 # Questie-Octo Changelog
 
+## 1.0.59
+- Fixed stray `~` characters sometimes appearing in unrelated item, player, or other GameTooltips after viewing a Questie-Octo tooltip.
+- Questie-Octo's centered respawn/drop-rate separator now cleans itself up whenever the tooltip is cleared or hidden.
+
+## 1.0.58
+- Fixed **The Sal'Galaz Mines** and **Restoration** missing valid quest objectives.
+- Improved **Marauders of Darrowshire** and **Deeprun Rat Roundup** map guidance so they point to the creatures players actually need to hunt or interact with.
+- Restored the missing **Furen's Notes** delivery objective for **Klockmort Spannerspan**.
+
 ## 1.0.57
 - Restored LevelRange-style **Friendly / Hostile / Contested** zone information, based on the player faction.
 - Fixed **Westfall** not showing a level-range panel: the current client contains two AreaTable entries named Westfall, so Questie-Octo now resolves continent hovers from the exact native World Map highlight texture before falling back to zone names.

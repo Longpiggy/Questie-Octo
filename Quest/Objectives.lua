@@ -112,6 +112,18 @@ local function ResolveItemSources(questID,itemID)
     AddUniqueSource(result,seen,"creature",8519,itemID,nil,false)
   end
 
+  -- Marauders of Darrowshire (5206): the current server requires five
+  -- Resonating Skulls (13155) plus the Mystic Crystal (13156). The player
+  -- obtains those skulls by testing Fetid Skulls (13157), whose physical
+  -- source is the useful hunting target. Keep the formal server objectives
+  -- intact and use the current Fetid Skull source, Scourge Champion (8529),
+  -- only as presentation guidance for the Resonating Skull objective. Do not
+  -- display the Fetid Skull's 80% drop chance as if it were the conversion
+  -- chance for a Resonating Skull.
+  if tonumber(questID)==5206 and tonumber(itemID)==13155 then
+    AddUniqueSource(result,seen,"creature",8529,itemID,nil,false)
+  end
+
   return result
 end
 
@@ -315,8 +327,13 @@ end
 -- Rabid Thistle Bear (2164) into Captured Rabid Thistle Bear (11836), then
 -- awards KilledMonsterCredit for 11836. The player must therefore find 2164,
 -- while 11836 remains the correct completion target in the quest log/database.
+-- Deeprun Rat Roundup (6661): the server's formal objective is Enthralled
+-- Deeprun Rat (13017), but players create that state by using the Rat Catcher's
+-- Flute on normal Deeprun Rats (13016). Guide to 13016 without rewriting the
+-- live completion target.
 local CREATURE_OBJECTIVE_SOURCE_OVERRIDES={
   [2118]={ [11836]=2164 },
+  [6661]={ [13017]=13016 },
 }
 
 local function PresentationCreatureSourceID(questID,objectiveID)

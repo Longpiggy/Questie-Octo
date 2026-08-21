@@ -65,6 +65,15 @@ source, verify non-additive changes against current Turtle server truth, and
 apply only the final intended state through Questie-Octo's overwrite/enrichment
 layers.
 
+### 1.0.58 pfQuest-octo/current-server reconciliation
+
+The 2026-08-21 1.0.58 data pass rechecked the current pfQuest-octo 1.1.0 snapshot
+against the supplied current Turtle/Tortoise server source before accepting any
+non-additive change. The pass retained Questie-Octo's additive/presentation split
+where server completion targets differ from the creatures/items a player must
+physically hunt or interact with. Accepted corrections and rejected replacement
+candidates are recorded in `PFQUEST_OCTO_DATABASE_AUDIT_2026-08-21.md`.
+
 ## Current Octo client-authority snapshots (2026-08-21)
 
 The user supplied direct current-client extractions that supersede older inferred or

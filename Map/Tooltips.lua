@@ -209,6 +209,41 @@ local function ResetCenteredTildes(tooltip)
   end
 end
 
+-- Centered tildes are separate child FontStrings, not native GameTooltip text.
+-- Hiding their parent makes them invisible but does not clear their own shown
+-- state, so a reused GameTooltip can otherwise resurrect an old marker over an
+-- unrelated item/unit tooltip.  Clear on both lifecycle boundaries: OnHide
+-- covers ordinary leave/reopen, while OnTooltipCleared covers addons/FrameXML
+-- that reuse a still-shown GameTooltip by replacing its contents in place.
+local function EnsureCenteredTildeCleanup(tooltip)
+  if not tooltip or tooltip.questieOctoCenteredTildeCleanupInstalled then return end
+  tooltip.questieOctoCenteredTildeCleanupInstalled=true
+
+  local function CleanupCenteredTildes()
+    ResetCenteredTildes(tooltip)
+  end
+
+  -- Prefer additive hooks so Blizzard, pfUI/ShaguTweaks, and other tooltip
+  -- addons keep ownership of their existing scripts.  Keep the same forwarding
+  -- fallback used elsewhere in Questie-Octo for older Vanilla clients.
+  if tooltip.HookScript then
+    tooltip:HookScript("OnHide",CleanupCenteredTildes)
+    tooltip:HookScript("OnTooltipCleared",CleanupCenteredTildes)
+  elseif tooltip.GetScript and tooltip.SetScript then
+    local previousOnHide=tooltip:GetScript("OnHide")
+    tooltip:SetScript("OnHide",function()
+      if previousOnHide then previousOnHide() end
+      CleanupCenteredTildes()
+    end)
+
+    local previousOnTooltipCleared=tooltip:GetScript("OnTooltipCleared")
+    tooltip:SetScript("OnTooltipCleared",function()
+      if previousOnTooltipCleared then previousOnTooltipCleared() end
+      CleanupCenteredTildes()
+    end)
+  end
+end
+
 local function TooltipLeftLine(tooltip,lineNumber)
   if not tooltip or not getglobal then return nil end
   local name=tooltip.GetName and tooltip:GetName() or nil
@@ -275,6 +310,7 @@ end
 
 local function PlaceCenteredTilde(tooltip,prefix,r,g,b,spaceIndex)
   if not tooltip or not tooltip.CreateFontString then return end
+  EnsureCenteredTildeCleanup(tooltip)
   local lineNumber=CurrentTooltipLineNumber(tooltip)
   local line=TooltipLeftLine(tooltip,lineNumber)
   if not line or not line.GetFont then return end
