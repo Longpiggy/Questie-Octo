@@ -88,18 +88,6 @@ local function CompareLevel(a,b)
   return string.lower(a.title or "")<string.lower(b.title or "")
 end
 
-local function CompareProximity(a,b)
-  -- Coordinate-aware proximity is populated by the map layer when available.
-  -- Unknown distances sort after known distances, with zone ordering as a
-  -- deterministic fallback.
-  local ad=tonumber(a.distance)
-  local bd=tonumber(b.distance)
-  if ad and bd and ad~=bd then return ad<bd end
-  if ad and not bd then return true end
-  if bd and not ad then return false end
-  return CompareZone(a,b)
-end
-
 function D:Rebuild()
   local db=EnsureCharacterDB()
   local nextTracked={}
@@ -152,7 +140,6 @@ function D:Rebuild()
 
   local sortMode=Settings():Get("trackerSort")
   if sortMode=="level" then table.sort(ordered,CompareLevel)
-  elseif sortMode=="proximity" then table.sort(ordered,CompareProximity)
   else table.sort(ordered,CompareZone) end
 
   for i=1,table.getn(ordered) do

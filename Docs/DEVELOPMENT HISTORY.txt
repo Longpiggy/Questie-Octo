@@ -1,3 +1,10 @@
+1.0.66 - REMOVE PROXIMITY TRACKER SORTING
+- Audited the existing Proximity tracker sort path and confirmed it was incomplete: TrackerDriver had a comparator for `row.distance`, but no runtime path ever populated that field, so selecting Proximity effectively fell back to Zone ordering.
+- Removed Proximity from the Tracker sort selector and removed the unused CompareProximity comparator/branch. Zone and Level remain the only supported tracker sort modes.
+- Existing SavedVariables with `trackerSort = "proximity"` migrate directly to `zone` during settings initialization. New writes accept only `zone` or `level`, so no hidden stale Proximity mode survives.
+- This intentionally avoids adding recurring player-movement distance calculations, coordinate caches, tracker resort ticks, or additional Lua allocations. The decision favors predictable memory/CPU behavior on the Vanilla/Turtle client, especially alongside large addon stacks.
+- No quest data, map/minimap node generation, tracker content, tracker layout, README, or runtime database content changed.
+
 1.0.65 - SCRIPTED / INTERACTION OBJECTIVE PRESENTATION CORRECTIONS
 - Audited quests 1435, 40099, 40174, 41243, and 41383 against the current Tortoise quest_template and server scripts. Kept formal server objective IDs authoritative and corrected only map/minimap presentation where hidden-credit/source entities have no useful physical spawn.
 - The Burning of Spirits (1435): removed ReqSourceId-derived item 6766 (Flayed Demon Skin (old2)) from the formal item objective list. The real objective remains Infused Burning Gem (6435); Burning Gem (6436) remains an IR interaction tool and its quest-item requirement targets provide the actionable Burning Blade creature locations.

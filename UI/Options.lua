@@ -467,7 +467,7 @@ local function CreateTrackerTab()
       trackerHideInCombat={type="toggle",order=7,name="Hide Tracker in Combat",desc="Hide the tracker while in combat.",width="full",get=GetValue,set=SetValue},
       appearance_header={type="header",order=20,name="Appearance"},
       trackerSortLabel={type="description",order=20.05,name="Sort Quests",fontSize="medium",width="normal"},
-      trackerSort={type="select",order=20.06,name="",desc="Choose how quests are sorted.",width="normal",values={zone="Zone",proximity="Proximity",level="Level"},get=GetValue,set=SetValue},
+      trackerSort={type="select",order=20.06,name="",desc="Choose how quests are sorted.",width="normal",values={zone="Zone",level="Level"},get=GetValue,set=SetValue},
       trackerOutlineText={type="toggle",order=20.1,name="Outline",desc="Add an outline to tracker text.",width="full",get=GetValue,set=SetValue},
       trackerThickOutlineText={type="toggle",order=20.2,name="Thick Outline",desc="Add a thicker outline to tracker text.",width="full",get=GetValue,set=SetValue},
       trackerFontSize={type="range",order=21,name="Font Size",desc="Adjust tracker text size.",width="double",min=8,max=18,step=1,get=GetValue,set=SetValue},

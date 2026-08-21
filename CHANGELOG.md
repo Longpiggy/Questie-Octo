@@ -1,5 +1,9 @@
 # Questie-Octo Changelog
 
+## 1.0.66
+- Removed the non-functional **Proximity** tracker sorting option.
+- Tracker sorting now offers only **Zone** and **Level**, avoiding unnecessary background movement/distance work on the Vanilla Lua client.
+
 ## 1.0.65
 - Improved **The Burning of Spirits** map guidance so it points to the Burning Blade enemies used with the Burning Gem without showing a fake extra item objective.
 - Added the real **Grain Sack** locations for *Attack from the Inside* and **Blast Powder Keg** locations for *A Cannon's Misfortune*.

@@ -166,6 +166,10 @@ function S:Initialize()
   -- settings in SavedVariables.
   db.databaseLocale=nil
   db.enableTooltipsObjectID=nil
+  -- 1.0.66 removes Proximity tracker sorting entirely. It never had a distance
+  -- producer and making it live would require recurring movement work on the
+  -- old Lua client. Existing profiles that selected it return safely to Zone.
+  if db.trackerSort=="proximity" then db.trackerSort="zone" end
   -- 1.0.31 replaces the experimental Thicker Text toggle with explicit WoW
   -- OUTLINE / THICKOUTLINE comparison toggles. Ignore the old saved value.
   db.trackerThickerText=nil
@@ -271,7 +275,7 @@ function S:Set(key,value)
   elseif key=="globalMiniMapScale" then
     value=Clamp(value,0.01,4)
   elseif key=="trackerSort" then
-    if value~="zone" and value~="level" and value~="proximity" then return false end
+    if value~="zone" and value~="level" then return false end
   elseif key=="trackerFontSize" then
     value=Clamp(value,8,18)
   elseif key=="trackerMaxWidth" then
