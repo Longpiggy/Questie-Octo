@@ -108,7 +108,9 @@ function S:Tick()
   if total>(self.stats.maxFrameSeconds or 0) then self.stats.maxFrameSeconds=total end
 end
 
-local f=CreateFrame("Frame","QuestieOctoSchedulerFrame",UIParent)
+-- Native fullscreen World Map hides UIParent. Keep the logic scheduler under
+-- WorldFrame so bounded queued/delayed work continues while full UI panels are shown.
+local f=CreateFrame("Frame","QuestieOctoSchedulerFrame",WorldFrame)
 f:SetScript("OnUpdate",function()
   local delta=arg1 or 0
   RunDelayed(S,delta)

@@ -1,5 +1,13 @@
 # Questie-Octo Changelog
 
+## 1.0.72
+- Fixed Questie-Octo marker tooltips not appearing while the native World Map is fullscreen.
+- World Map marker hover information now stays available in fullscreen without changing minimap tooltip behavior.
+
+## 1.0.71
+- Changed fullscreen World Map refresh handling so pending quest markers can keep processing without needing to minimize the map first.
+- The existing World Map pin layout, windowed-map behavior, and minimap logic are otherwise unchanged.
+
 ## 1.0.70
 - Added generic support for quests that are ordinary on their first completion and become repeatable afterward.
 - These quests now show a normal yellow `!` the first time and a blue repeatable `!` only after that character has completed them once.

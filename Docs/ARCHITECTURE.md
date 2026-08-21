@@ -19,7 +19,7 @@
 
 ClassicAPI contract
   -> build-time compiled runtime database
-  -> frame-budgeted Scheduler
+  -> frame-budgeted Scheduler (nonvisual driver parented to WorldFrame so native full UIPanels cannot pause queued work)
   -> QuestLog cache (ClassicAPI IDs)
   -> Turtle completion history
   -> canonical Quest model

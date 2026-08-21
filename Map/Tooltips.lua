@@ -60,7 +60,19 @@ local function ApplyPfUISkin(tooltip)
   tooltip.questieOctoPfUISkinned=true
 end
 
-local function MapTooltip()
+local function IsWorldMapPin(pin)
+  return pin and pin.GetParent and WorldMapButton and pin:GetParent()==WorldMapButton
+end
+
+local function MapTooltip(pin)
+  -- The native fullscreen World Map hides UIParent, and GameTooltip is a
+  -- UIParent child. WorldMapTooltip is instead a WorldMapFrame child and is
+  -- Blizzard's own tooltip for interactive World Map elements. Route only
+  -- World Map pins through that native map tooltip; minimap/world hovers keep
+  -- their existing GameTooltip/pfUI-private paths. pfQuest uses the same
+  -- WorldMapButton -> WorldMapTooltip split on this client family.
+  if IsWorldMapPin(pin) and WorldMapTooltip then return WorldMapTooltip end
+
   -- Non-pfUI users keep the exact native Blizzard tooltip frame. This also
   -- means other ordinary tooltip skins/addons can style GameTooltip normally.
   if not GetPfUI() then return GameTooltip end
@@ -94,9 +106,7 @@ local function MapTooltip()
 end
 
 function T:Hide(pin)
-  local tooltip=nil
-  if GetPfUI() then tooltip=self.mapTooltip end
-  if not tooltip then tooltip=GameTooltip end
+  local tooltip=MapTooltip(pin)
   if not tooltip then return end
 
   if not pin or not tooltip.GetOwner or tooltip:GetOwner()==pin then
@@ -658,7 +668,7 @@ local function SemanticallyRelatedNearbyFullNodePins(pin,pins)
 end
 
 local function ShowCombinedNearbyFullNodeTooltip(pin,pins)
-  local tooltip=MapTooltip()
+  local tooltip=MapTooltip(pin)
   tooltip:SetOwner(pin,"ANCHOR_CURSOR")
   tooltip:ClearLines()
   ResetCenteredTildes(tooltip)
@@ -684,7 +694,7 @@ local function ShowCombinedNearbyFullNodeTooltip(pin,pins)
 end
 
 local function ShowCombinedNearbyQuestTooltip(pin,pins)
-  local tooltip=MapTooltip()
+  local tooltip=MapTooltip(pin)
   tooltip:SetOwner(pin,"ANCHOR_CURSOR")
   tooltip:ClearLines()
   ResetCenteredTildes(tooltip)
@@ -1253,7 +1263,7 @@ function T:Show(pin)
   if not pin then return end
   pin.questieOctoTooltipPin=true
 
-  local tooltip=MapTooltip()
+  local tooltip=MapTooltip(pin)
   if not tooltip then return end
 
   local permanentLabels={
