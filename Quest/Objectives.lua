@@ -345,6 +345,18 @@ local CREATURE_OBJECTIVE_SOURCE_OVERRIDES={
   -- formal hidden credit creature 60328 when sabotaged with Special Water.
   [40174]={ [60328]={kind="gameObject",id=2010834} },
 
+  -- The Maul'ogg Crisis I (40264): speaking with Lord Cruk'Zogg completes
+  -- the formal hidden credit creature 60337. Guide to Cruk'Zogg himself.
+  [40264]={ [60337]={kind="creature",id=92180} },
+
+  -- The Maul'ogg Crisis III (40266): completing Seer Bol'ukk's dialogue awards
+  -- the formal hidden credit creature 60338. Guide to Bol'ukk himself.
+  [40266]={ [60338]={kind="creature",id=91854} },
+
+  -- The Maul'ogg Crisis IX (40272): giving the Elixir of Insom'ni to Lord
+  -- Cruk'Zogg awards the formal hidden credit creature 60339. Guide to him.
+  [40272]={ [60339]={kind="creature",id=92180} },
+
   -- Wisdom of Ur (41383): completing Arch Druid Dreamwind's dialogue awards
   -- the formal hidden credit creature 60056. Guide to Dreamwind himself.
   [41383]={ [60056]={kind="creature",id=61512} },
