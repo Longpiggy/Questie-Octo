@@ -153,6 +153,16 @@ function D:Rebuild()
     table.insert(snapshot,row.failed and "1" or "0")
     for j=1,table.getn(row.objectives or {}) do
       local o=row.objectives[j]
+      -- TrackerFrame renders rawText preferentially once the native objective
+      -- label is considered settled. Keep every display-driving text field in
+      -- this snapshot: QuestLog can legitimately replace rawText (for example
+      -- "slain: 0/4" -> "Mo'grosh Ogre slain: 0/4") while the localized
+      -- `text` and numerical counters are already unchanged. Without rawText in
+      -- the change key, D:Rebuild() updates `ordered` but suppresses
+      -- TRACKER_STATE_CHANGED, leaving the visible rows stale until any manual
+      -- Render() such as tracker -/+ forces a repaint.
+      table.insert(snapshot,tostring(o.rawText or ""))
+      table.insert(snapshot,o.rawTextIncomplete and "1" or "0")
       table.insert(snapshot,tostring(o.text or ""))
       table.insert(snapshot,o.complete and "1" or "0")
       table.insert(snapshot,tostring(o.current or -1))

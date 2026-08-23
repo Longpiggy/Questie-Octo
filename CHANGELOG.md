@@ -1,5 +1,9 @@
 # Questie-Octo Changelog
 
+## 1.0.76
+- Fixed quest tracker objective lines sometimes staying stale even after the latest objective data had loaded.
+- Objective names and progress now repaint automatically as quest data settles, without collapsing/re-expanding the tracker or reloading the UI.
+
 ## 1.0.74
 - Fixed **The Maul'ogg Crisis I**, **III**, and **IX** not showing the NPC you actually need to speak with on the map.
 - These conversation objectives now point to **Lord Cruk'Zogg** or **Seer Bol'ukk** while keeping the server's hidden completion credit unchanged.
