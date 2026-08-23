@@ -965,45 +965,9 @@ end
 
 function T:HideNativeQuestTimer()
   if not QuestTimerFrame then return end
-
-  local clear=QuestTimerFrame.questieOctoOriginalClearAllPoints or QuestTimerFrame.ClearAllPoints
-  local setpoint=QuestTimerFrame.questieOctoOriginalSetPoint or QuestTimerFrame.SetPoint
-
-  if clear then clear(QuestTimerFrame) end
-  if setpoint then setpoint(QuestTimerFrame,"TOP",UIParent,"TOP",-10000,-10000) end
-end
-
-function T:LockNativeQuestTimerPosition()
-  if not QuestTimerFrame or self.nativeTimerMovementLocked then return end
-
-  QuestTimerFrame.questieOctoOriginalSetPoint=QuestTimerFrame.SetPoint
-  QuestTimerFrame.questieOctoOriginalClearAllPoints=QuestTimerFrame.ClearAllPoints
-  QuestTimerFrame.questieOctoOriginalSetAllPoints=QuestTimerFrame.SetAllPoints
-
-  QuestTimerFrame.SetPoint=function() end
-  QuestTimerFrame.ClearAllPoints=function() end
-  if QuestTimerFrame.SetAllPoints then QuestTimerFrame.SetAllPoints=function() end end
-
-  self.nativeTimerMovementLocked=true
-end
-
-function T:UnlockNativeQuestTimerPosition()
-  if not QuestTimerFrame or not self.nativeTimerMovementLocked then return end
-
-  if QuestTimerFrame.questieOctoOriginalSetPoint then
-    QuestTimerFrame.SetPoint=QuestTimerFrame.questieOctoOriginalSetPoint
+  if not QuestTimerFrame.IsShown or QuestTimerFrame:IsShown() then
+    QuestTimerFrame:Hide()
   end
-  if QuestTimerFrame.questieOctoOriginalClearAllPoints then
-    QuestTimerFrame.ClearAllPoints=QuestTimerFrame.questieOctoOriginalClearAllPoints
-  end
-  if QuestTimerFrame.questieOctoOriginalSetAllPoints then
-    QuestTimerFrame.SetAllPoints=QuestTimerFrame.questieOctoOriginalSetAllPoints
-  end
-
-  QuestTimerFrame.questieOctoOriginalSetPoint=nil
-  QuestTimerFrame.questieOctoOriginalClearAllPoints=nil
-  QuestTimerFrame.questieOctoOriginalSetAllPoints=nil
-  self.nativeTimerMovementLocked=false
 end
 
 function T:InstallNativeTimerSuppression()
@@ -1052,20 +1016,20 @@ function T:ApplyNativeTrackerVisibility()
     if enabled then QuestWatchFrame:Hide() else QuestWatchFrame:Show() end
   end
 
-  -- Old Questie embeds quest timers in its tracker and moves Blizzard's timer
-  -- frame offscreen instead of destroying it. Preserve its original point so
-  -- disabling Questie Tracker can restore the native timer cleanly.
+  -- Questie-Octo renders timed quests inside its own tracker. Hide Blizzard's
+  -- duplicate timer while that tracker is enabled, but never move or replace
+  -- QuestTimerFrame positioning methods. UI replacements such as pfUI own that
+  -- frame's movable position and may clamp it to the screen.
   if QuestTimerFrame then
-    self.nativeTimerPoint=self.nativeTimerPoint or {QuestTimerFrame:GetPoint()}
     if enabled then
       self:HideNativeQuestTimer()
-      self:LockNativeQuestTimerPosition()
+    elseif QuestTimerFrame.numTimers and QuestTimerFrame.numTimers>0 then
+      -- Native QUEST_LOG_UPDATE continues maintaining numTimers while hidden.
+      -- Showing the frame resumes its normal OnUpdate on the next frame, so its
+      -- countdown text immediately catches up without Questie touching anchors.
+      QuestTimerFrame:Show()
     else
-      self:UnlockNativeQuestTimerPosition()
-      if self.nativeTimerPoint and self.nativeTimerPoint[1] then
-        QuestTimerFrame:ClearAllPoints()
-        QuestTimerFrame:SetPoint(unpack(self.nativeTimerPoint))
-      end
+      QuestTimerFrame:Hide()
     end
   end
 end

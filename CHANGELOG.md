@@ -1,8 +1,9 @@
 # Questie-Octo Changelog
 
-## 1.0.76
-- Fixed quest tracker objective lines sometimes staying stale even after the latest objective data had loaded.
-- Objective names and progress now repaint automatically as quest data settles, without collapsing/re-expanding the tracker or reloading the UI.
+## 1.0.78
+- Fixed quest tracker objective names/progress sometimes staying visually stale after the latest quest data had already loaded.
+- Fixed the Blizzard/pfUI **Quest Timer** getting stuck at the bottom-left while Questie-Octo's tracker is enabled.
+- Questie-Octo now hides the duplicate native timer without taking control of its movable position.
 
 ## 1.0.74
 - Fixed **The Maul'ogg Crisis I**, **III**, and **IX** not showing the NPC you actually need to speak with on the map.
