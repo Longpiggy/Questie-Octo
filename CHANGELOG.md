@@ -1,5 +1,9 @@
 # Questie-Octo Changelog
 
+## 1.0.79
+- Improved settings compatibility with large UI/addon stacks by keeping Questie-Octo's Ace configuration runtime references stable after addon load.
+- If a required settings library is genuinely unavailable, Questie-Octo now reports which Ace component is missing.
+
 ## 1.0.78
 - Fixed quest tracker objective names/progress sometimes staying visually stale after the latest quest data had already loaded.
 - Fixed the Blizzard/pfUI **Quest Timer** getting stuck at the bottom-left while Questie-Octo's tracker is enabled.

@@ -1,3 +1,11 @@
+1.0.79 - STABLE ACECONFIG RUNTIME REFERENCES
+------------------------------------------------
+- Audited the player report `Questie-Octo ERROR: Questie-style AceConfig runtime unavailable` against the actual 1.0.78 Full/runtime packages and TOC. All required libraries are packaged and load before `UI/Options.lua`; the tracker and pfUI timer changes in 1.0.78 did not alter AceConfig or Options code.
+- `UI/Options.lua` previously re-queried the global `LibStub` for AceGUI and Questie-Octo's private AceConfig Registry/Dialog when settings were initialized/opened/reset. The options module now captures those already-loaded library tables once while Questie-Octo's own TOC is still loading and reuses the captured references for its lifetime.
+- Questie-Octo's private majors remain `QuestieOcto-AceConfigRegistry-3.0` and `QuestieOcto-AceConfigDialog-3.0`; no standard shared AceConfig major is republished. Shared `AceGUI-3.0` remains compatible with normal LibStub minor upgrades because LibStub upgrades the existing library table in place.
+- Failure handling remains conservative: if any required library was genuinely unavailable at Options.lua load time, settings initialization still stops safely, but the error now identifies the missing component(s) (`AceGUI`, `Registry`, and/or `Dialog`).
+- No new event, OnUpdate, timer, polling loop, frame, database scan, saved-variable field, map/minimap work, tracker work, or recurring allocation path was added. Runtime database content, README, fullscreen fixes, 1.0.78 tracker objective correction, 1.0.78 pfUI QuestTimer correction, and 1.0.74 Maul'ogg guidance are unchanged.
+
 1.0.78 - TRACKER OBJECTIVE DISPLAY INVALIDATION + PFUI QUEST TIMER COMPATIBILITY
 --------------------------------------------------------------------------------
 - Built cleanly from the accepted 1.0.74 source and merged the two isolated post-1.0.74 corrections that had previously been generated as separate test branches. Generated 1.0.75 remains discarded and is not used as a source.
