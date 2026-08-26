@@ -1,3 +1,11 @@
+1.0.80 - ITEM-START RARE SOURCE THRESHOLD 1.00%
+---------------------------------------------------
+- Raised `ItemStartAreas.zoneWideRareThreshold` from 0.50% to 1.00% to reduce World Map/minimap clutter from very low-drop-rate item-start quests.
+- Preserved the existing strict comparison: only `0 < chance < 1.00%` uses the zone-wide rare representative presentation; exactly 1.00% and higher remains normal detailed source presentation.
+- The shared ItemStartAreas plan still drives both World Map and minimap behavior, so Clustered/Full Nodes and both map surfaces keep the same threshold semantics.
+- This is presentation-only. Underlying item-start source data, quest availability, active quest objectives, drop rates, database/runtime content, and the master Show Item-Start Quests toggle are unchanged.
+- No new event, OnUpdate, timer, polling loop, frame, cache, database scan, or recurring allocation path was added.
+
 1.0.79 - STABLE ACECONFIG RUNTIME REFERENCES
 ------------------------------------------------
 - Audited the player report `Questie-Octo ERROR: Questie-style AceConfig runtime unavailable` against the actual 1.0.78 Full/runtime packages and TOC. All required libraries are packaged and load before `UI/Options.lua`; the tracker and pfUI timer changes in 1.0.78 did not alter AceConfig or Options code.

@@ -560,10 +560,10 @@ end
 -- prepared plan still contains raw item-start descriptors because Full Nodes
 -- can share physical slots with active objectives, so the minimap explicitly
 -- ignores item-start entries from that base plan and consumes the dedicated
--- World Map item-start plan instead. This gives both displays the same <0.50%
+-- World Map item-start plan instead. This gives both displays the same <1.00%
 -- zone-wide representative marker without changing the underlying source data.
 -- Inside dungeons/raids, only those ultra-rare representative markers are
--- hidden; meaningful >=0.50% item starters remain visible.
+-- hidden; meaningful >=1.00% item starters remain visible.
 local function MinimapNodeVisible(node,allowItemStart)
   if not node or not IsRoleEnabled(node.role) or not PvPNodeVisible(node) then return false end
 

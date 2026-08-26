@@ -1,5 +1,9 @@
 # Questie-Octo Changelog
 
+## 1.0.80
+- Reduced item-start quest map clutter by treating drop sources below **1.00%** as rare area markers instead of showing every individual source location.
+- Item-start sources at exactly **1.00%** or higher continue to use the normal detailed source presentation.
+
 ## 1.0.79
 - Improved settings compatibility with large UI/addon stacks by keeping Questie-Octo's Ace configuration runtime references stable after addon load.
 - If a required settings library is genuinely unavailable, Questie-Octo now reports which Ace component is missing.
