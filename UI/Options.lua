@@ -12,6 +12,14 @@ O.stats={
 
 local APP_NAME="Questie Options"
 
+-- Capture the Ace runtime while Questie-Octo's own TOC is still loading.
+-- Our private AceConfig majors are loaded immediately before Options.lua, so
+-- keeping these references avoids depending on a later global LibStub lookup
+-- after another addon has had a chance to alter shared library state.
+local AceGUI=LibStub and LibStub("AceGUI-3.0",true)
+local AceRegistry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
+local AceDialog=LibStub and LibStub("QuestieOcto-AceConfigDialog-3.0",true)
+
 -- ShaguTweaks' Darkened UI is the Vanilla compatibility reference here.
 -- Keep the original Questie outer-shell tint, but treat the AceConfig content
 -- like ShaguTweaks' Advanced Options: dark translucent backdrops instead of a
@@ -265,10 +273,9 @@ local function Settings()
 end
 
 local function ClearSavedConfigPosition()
-  local Dialog=LibStub and LibStub("QuestieOcto-AceConfigDialog-3.0",true)
-  if not Dialog or not Dialog.GetStatusTable then return end
+  if not AceDialog or not AceDialog.GetStatusTable then return end
 
-  local status=Dialog:GetStatusTable(APP_NAME)
+  local status=AceDialog:GetStatusTable(APP_NAME)
   if status then
     status.top=nil
     status.left=nil
@@ -546,8 +553,7 @@ local function CreateQuestTab()
       QuestieOcto:Print("Minimap Button reset will apply after /reload.")
     end
     ClearSavedConfigPosition()
-    local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
-    if Registry and Registry.NotifyChange then Registry:NotifyChange(APP_NAME) end
+    if AceRegistry and AceRegistry.NotifyChange then AceRegistry:NotifyChange(APP_NAME) end
   end}
 
   return tab
@@ -572,30 +578,30 @@ end
 function O:Initialize()
   if self.initialized then return true end
 
-  local AceGUI=LibStub and LibStub("AceGUI-3.0",true)
-  local Registry=LibStub and LibStub("QuestieOcto-AceConfigRegistry-3.0",true)
-  local Dialog=LibStub and LibStub("QuestieOcto-AceConfigDialog-3.0",true)
-
   self.stats.aceGUI=AceGUI and true or false
-  self.stats.aceRegistry=Registry and true or false
-  self.stats.aceDialog=Dialog and true or false
+  self.stats.aceRegistry=AceRegistry and true or false
+  self.stats.aceDialog=AceDialog and true or false
 
-  if not AceGUI or not Registry or not Dialog then
-    QuestieOcto:Error("Questie-style AceConfig runtime unavailable")
+  if not AceGUI or not AceRegistry or not AceDialog then
+    local missing={}
+    if not AceGUI then table.insert(missing,"AceGUI") end
+    if not AceRegistry then table.insert(missing,"Registry") end
+    if not AceDialog then table.insert(missing,"Dialog") end
+    QuestieOcto:Error("Questie-style AceConfig runtime unavailable: "..table.concat(missing,","))
     return false
   end
 
   -- Equivalent to Questie 5/6 RegisterOptionsTable(), without AceConfigCmd.
   -- We intentionally avoid Blizzard InterfaceOptions registration on 1.12.
-  Registry:RegisterOptionsTable(APP_NAME,CreateOptionsTable())
+  AceRegistry:RegisterOptionsTable(APP_NAME,CreateOptionsTable())
 
   -- Questie 5.2.3/6.0.0/3.3.5 create a standalone AceGUI Frame, then feed
   -- AceConfigDialog into that frame and keep it for later toggling.
   local configFrame=AceGUI:Create("Frame")
   configFrame:Hide()
 
-  Dialog:SetDefaultSize(APP_NAME,625,700)
-  Dialog:Open(APP_NAME,configFrame)
+  AceDialog:SetDefaultSize(APP_NAME,625,700)
+  AceDialog:Open(APP_NAME,configFrame)
   configFrame:SetLayout("Fill")
 
   -- Questie 5/6/3.3.5 use one persistent AceGUI frame as the options shell.
@@ -682,9 +688,8 @@ end
 function O:Show()
   if not self:Initialize() then return end
 
-  local Dialog=LibStub("QuestieOcto-AceConfigDialog-3.0")
   -- Questie 3.3.5 refreshes the existing standalone frame through Open().
-  Dialog:Open(APP_NAME,self.configFrame)
+  AceDialog:Open(APP_NAME,self.configFrame)
   RecenterConfigFrame(self.configFrame)
   if self.configFrame.SetStatusText then self.configFrame:SetStatusText(nil) end
   self:ApplyDarkTheme()
