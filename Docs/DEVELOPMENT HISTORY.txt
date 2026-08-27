@@ -1,3 +1,10 @@
+1.0.83 - COMPLETED QUEST OBJECTIVE VISIBILITY
+------------------------------------------------
+- Audited the reported completed War Banners tracker row against the accepted 1.0.82 source. TrackerDriver already respected `trackerHideCompletedObjectives`: when OFF it retained completed objectives, and when ON it filtered them out.
+- Found a second unconditional renderer gate in TrackerFrame: fully completed quests never iterated their objective rows at all. This made the Hide Completed Objectives setting ineffective whenever the whole quest was complete, even though the filtered objective state was correct.
+- Removed only that redundant renderer gate. TrackerFrame now renders exactly the objective list prepared by TrackerDriver, making the existing setting authoritative for both partially completed and fully completed quests.
+- No quest-log state, completion truth, sorting, tracker persistence, timers, map/minimap behavior, database data, events, polling, OnUpdate work, or background allocations changed.
+
 1.0.82 - CACHE-COLD AVAILABLE QUEST DIFFICULTY MARKERS
 --------------------------------------------------------
 - Re-audited the failed 1.0.81 available-quest `+` marker against ClassicAPI.dll, pfQuest-classicAPI, the compiled Questie-Octo database, and the current Tortoise quest_template source. ClassicAPI's C_QuestLog.GetQuestDetails() is cache-backed: pfQuest itself falls back to shipped quest text when that call returns nil for cache-cold quests. Therefore an unaccepted available quest cannot rely on that API to expose questType.
